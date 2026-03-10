@@ -105,8 +105,8 @@ model User {
   passwordHash String
   status       UserStatus @default(ACTIVE)
 
-  userRoles    UserRole[]
-  farmsOwned   Farm[]
+  userRoles  UserRole[]
+  farmsOwned Farm[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -116,13 +116,13 @@ model User {
 }
 
 model Role {
-  id          String           @id @default(uuid()) @db.Uuid
-  code        String           @unique
+  id          String  @id @default(uuid()) @db.Uuid
+  code        String  @unique
   name        String
   description String?
 
-  userRoles        UserRole[]
-  rolePermissions  RolePermission[]
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -131,8 +131,8 @@ model Role {
 }
 
 model Permission {
-  id          String @id @default(uuid()) @db.Uuid
-  code        String @unique
+  id          String  @id @default(uuid()) @db.Uuid
+  code        String  @unique
   name        String
   description String?
 
@@ -177,24 +177,25 @@ model RolePermission {
 }
 
 model Farm {
-  id            String @id @default(uuid()) @db.Uuid
-  ownerUserId   String @map("owner_user_id") @db.Uuid
-  code          String @unique
-  name          String
-  locationText  String @map("location_text")
-  latitude      Decimal? @db.Decimal(10, 7)
-  longitude     Decimal? @db.Decimal(10, 7)
-  areaHectares  Decimal @map("area_hectares") @db.Decimal(12, 2)
+  id           String   @id @default(uuid()) @db.Uuid
+  ownerUserId  String   @map("owner_user_id") @db.Uuid
+  code         String   @unique
+  name         String
+  locationText String   @map("location_text")
+  latitude     Decimal? @db.Decimal(10, 7)
+  longitude    Decimal? @db.Decimal(10, 7)
+  areaHectares Decimal  @map("area_hectares") @db.Decimal(12, 2)
 
-  owner              User               @relation(fields: [ownerUserId], references: [id])
-  farmPlots          FarmPlot[]
-  crops              Crop[]
-  activities         FarmingActivity[]
-  harvestRecords     HarvestRecord[]
-  productLifecycles  ProductLifecycle[]
+  owner             User               @relation(fields: [ownerUserId], references: [id])
+  farmPlots         FarmPlot[]
+  crops             Crop[]
+  activities        FarmingActivity[]
+  harvestRecords    HarvestRecord[]
+  productLifecycles ProductLifecycle[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  Batch     Batch[]
 
   @@index([ownerUserId])
   @@index([name])
@@ -202,8 +203,8 @@ model Farm {
 }
 
 model FarmPlot {
-  id           String @id @default(uuid()) @db.Uuid
-  farmId        String @map("farm_id") @db.Uuid
+  id           String  @id @default(uuid()) @db.Uuid
+  farmId       String  @map("farm_id") @db.Uuid
   code         String
   name         String
   areaHectares Decimal @map("area_hectares") @db.Decimal(12, 2)
@@ -224,23 +225,24 @@ model FarmPlot {
 }
 
 model Crop {
-  id             String @id @default(uuid()) @db.Uuid
-  farmId         String @map("farm_id") @db.Uuid
-  farmPlotId     String? @map("farm_plot_id") @db.Uuid
-  code           String
-  cropName       String @map("crop_name")
-  variety        String?
-  plantingDate   DateTime @map("planting_date")
+  id                  String    @id @default(uuid()) @db.Uuid
+  farmId              String    @map("farm_id") @db.Uuid
+  farmPlotId          String?   @map("farm_plot_id") @db.Uuid
+  code                String
+  cropName            String    @map("crop_name")
+  variety             String?
+  plantingDate        DateTime  @map("planting_date")
   expectedHarvestDate DateTime? @map("expected_harvest_date")
-  status         String
+  status              String
 
-  farm           Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
-  farmPlot       FarmPlot? @relation(fields: [farmPlotId], references: [id], onDelete: SetNull)
+  farm           Farm            @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  farmPlot       FarmPlot?       @relation(fields: [farmPlotId], references: [id], onDelete: SetNull)
   harvestRecords HarvestRecord[]
   batchItems     BatchItem[]
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  FarmingActivity FarmingActivity[]
 
   @@unique([farmId, code])
   @@index([farmPlotId])
@@ -252,8 +254,8 @@ model Fertilizer {
   id                  String  @id @default(uuid()) @db.Uuid
   code                String  @unique
   name                String
-  manufacturer         String?
-  nutrientComposition  String? @map("nutrient_composition")
+  manufacturer        String?
+  nutrientComposition String? @map("nutrient_composition")
 
   activities FarmingActivity[]
 
@@ -264,8 +266,8 @@ model Fertilizer {
 }
 
 model Pesticide {
-  id               String @id @default(uuid()) @db.Uuid
-  code             String @unique
+  id               String  @id @default(uuid()) @db.Uuid
+  code             String  @unique
   name             String
   manufacturer     String?
   activeIngredient String? @map("active_ingredient")
@@ -279,17 +281,17 @@ model Pesticide {
 }
 
 model FarmingActivity {
-  id                String       @id @default(uuid()) @db.Uuid
-  farmId            String       @map("farm_id") @db.Uuid
-  farmPlotId        String?      @map("farm_plot_id") @db.Uuid
-  cropId            String?      @map("crop_id") @db.Uuid
-  activityType      ActivityType @map("activity_type")
-  activityDate      DateTime     @map("activity_date")
-  description       String?
-  fertilizerId      String?      @map("fertilizer_id") @db.Uuid
-  pesticideId       String?      @map("pesticide_id") @db.Uuid
-  quantityUsed      Decimal?     @map("quantity_used") @db.Decimal(12, 3)
-  quantityUnit      String?      @map("quantity_unit")
+  id           String       @id @default(uuid()) @db.Uuid
+  farmId       String       @map("farm_id") @db.Uuid
+  farmPlotId   String?      @map("farm_plot_id") @db.Uuid
+  cropId       String?      @map("crop_id") @db.Uuid
+  activityType ActivityType @map("activity_type")
+  activityDate DateTime     @map("activity_date")
+  description  String?
+  fertilizerId String?      @map("fertilizer_id") @db.Uuid
+  pesticideId  String?      @map("pesticide_id") @db.Uuid
+  quantityUsed Decimal?     @map("quantity_used") @db.Decimal(12, 3)
+  quantityUnit String?      @map("quantity_unit")
 
   farm       Farm        @relation(fields: [farmId], references: [id], onDelete: Cascade)
   farmPlot   FarmPlot?   @relation(fields: [farmPlotId], references: [id], onDelete: SetNull)
@@ -308,13 +310,13 @@ model FarmingActivity {
 }
 
 model IrrigationLog {
-  id                 String   @id @default(uuid()) @db.Uuid
-  farmPlotId         String   @map("farm_plot_id") @db.Uuid
-  irrigationDate     DateTime @map("irrigation_date")
-  waterSource        String?  @map("water_source")
-  volumeLiters       Decimal? @map("volume_liters") @db.Decimal(14, 3)
-  method             String?
-  durationMinutes    Int?     @map("duration_minutes")
+  id              String   @id @default(uuid()) @db.Uuid
+  farmPlotId      String   @map("farm_plot_id") @db.Uuid
+  irrigationDate  DateTime @map("irrigation_date")
+  waterSource     String?  @map("water_source")
+  volumeLiters    Decimal? @map("volume_liters") @db.Decimal(14, 3)
+  method          String?
+  durationMinutes Int?     @map("duration_minutes")
 
   farmPlot FarmPlot @relation(fields: [farmPlotId], references: [id], onDelete: Cascade)
 
@@ -326,18 +328,18 @@ model IrrigationLog {
 }
 
 model HarvestRecord {
-  id                 String   @id @default(uuid()) @db.Uuid
-  farmId             String   @map("farm_id") @db.Uuid
-  farmPlotId         String?  @map("farm_plot_id") @db.Uuid
-  cropId             String?  @map("crop_id") @db.Uuid
-  harvestDate        DateTime @map("harvest_date")
-  quantityKg         Decimal  @map("quantity_kg") @db.Decimal(14, 3)
-  qualityGrade       String?  @map("quality_grade")
-  notes              String?
+  id           String   @id @default(uuid()) @db.Uuid
+  farmId       String   @map("farm_id") @db.Uuid
+  farmPlotId   String?  @map("farm_plot_id") @db.Uuid
+  cropId       String?  @map("crop_id") @db.Uuid
+  harvestDate  DateTime @map("harvest_date")
+  quantityKg   Decimal  @map("quantity_kg") @db.Decimal(14, 3)
+  qualityGrade String?  @map("quality_grade")
+  notes        String?
 
-  farm      Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
-  farmPlot  FarmPlot? @relation(fields: [farmPlotId], references: [id], onDelete: SetNull)
-  crop      Crop?     @relation(fields: [cropId], references: [id], onDelete: SetNull)
+  farm       Farm        @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  farmPlot   FarmPlot?   @relation(fields: [farmPlotId], references: [id], onDelete: SetNull)
+  crop       Crop?       @relation(fields: [cropId], references: [id], onDelete: SetNull)
   batchItems BatchItem[]
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -349,14 +351,14 @@ model HarvestRecord {
 }
 
 model Batch {
-  id                   String      @id @default(uuid()) @db.Uuid
-  farmId               String      @map("farm_id") @db.Uuid
-  batchCode            String      @unique @map("batch_code")
-  status               BatchStatus
-  harvestDate          DateTime    @map("harvest_date")
-  totalQuantityKg      Decimal     @map("total_quantity_kg") @db.Decimal(14, 3)
-  currentOwnerActorId  String?     @map("current_owner_actor_id") @db.Uuid
-  notes                String?
+  id                  String      @id @default(uuid()) @db.Uuid
+  farmId              String      @map("farm_id") @db.Uuid
+  batchCode           String      @unique @map("batch_code")
+  status              BatchStatus
+  harvestDate         DateTime    @map("harvest_date")
+  totalQuantityKg     Decimal     @map("total_quantity_kg") @db.Decimal(14, 3)
+  currentOwnerActorId String?     @map("current_owner_actor_id") @db.Uuid
+  notes               String?
 
   farm              Farm               @relation(fields: [farmId], references: [id], onDelete: Restrict)
   currentOwnerActor SupplyChainActor?  @relation("BatchCurrentOwner", fields: [currentOwnerActorId], references: [id], onDelete: SetNull)
@@ -370,8 +372,10 @@ model Batch {
   traceabilityLogs  TraceabilityLog[]
   productLifecycles ProductLifecycle[]
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  WarehouseLog     WarehouseLog[]
+  InspectionReport InspectionReport[]
 
   @@index([farmId, harvestDate])
   @@index([status])
@@ -380,11 +384,11 @@ model Batch {
 }
 
 model BatchItem {
-  id               String  @id @default(uuid()) @db.Uuid
-  batchId          String  @map("batch_id") @db.Uuid
-  cropId           String? @map("crop_id") @db.Uuid
-  harvestRecordId  String? @map("harvest_record_id") @db.Uuid
-  quantityKg       Decimal @map("quantity_kg") @db.Decimal(14, 3)
+  id              String  @id @default(uuid()) @db.Uuid
+  batchId         String  @map("batch_id") @db.Uuid
+  cropId          String? @map("crop_id") @db.Uuid
+  harvestRecordId String? @map("harvest_record_id") @db.Uuid
+  quantityKg      Decimal @map("quantity_kg") @db.Decimal(14, 3)
 
   batch         Batch          @relation(fields: [batchId], references: [id], onDelete: Cascade)
   crop          Crop?          @relation(fields: [cropId], references: [id], onDelete: SetNull)
@@ -400,13 +404,13 @@ model BatchItem {
 }
 
 model BatchHistory {
-  id           String      @id @default(uuid()) @db.Uuid
-  batchId      String      @map("batch_id") @db.Uuid
-  fromStatus   BatchStatus @map("from_status")
-  toStatus     BatchStatus @map("to_status")
-  changedAt    DateTime    @map("changed_at")
-  changedBy    String?     @map("changed_by")
-  remarks      String?
+  id         String      @id @default(uuid()) @db.Uuid
+  batchId    String      @map("batch_id") @db.Uuid
+  fromStatus BatchStatus @map("from_status")
+  toStatus   BatchStatus @map("to_status")
+  changedAt  DateTime    @map("changed_at")
+  changedBy  String?     @map("changed_by")
+  remarks    String?
 
   batch Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
@@ -418,17 +422,17 @@ model BatchHistory {
 }
 
 model ProcessingRecord {
-  id                  String         @id @default(uuid()) @db.Uuid
-  batchId             String         @map("batch_id") @db.Uuid
-  processingType      ProcessingType @map("processing_type")
-  facilityActorId     String?        @map("facility_actor_id") @db.Uuid
-  processDate         DateTime       @map("process_date")
-  inputQuantityKg     Decimal?       @map("input_quantity_kg") @db.Decimal(14, 3)
-  outputQuantityKg    Decimal?       @map("output_quantity_kg") @db.Decimal(14, 3)
-  notes               String?
+  id               String         @id @default(uuid()) @db.Uuid
+  batchId          String         @map("batch_id") @db.Uuid
+  processingType   ProcessingType @map("processing_type")
+  facilityActorId  String?        @map("facility_actor_id") @db.Uuid
+  processDate      DateTime       @map("process_date")
+  inputQuantityKg  Decimal?       @map("input_quantity_kg") @db.Decimal(14, 3)
+  outputQuantityKg Decimal?       @map("output_quantity_kg") @db.Decimal(14, 3)
+  notes            String?
 
-  batch            Batch              @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  facilityActor    SupplyChainActor?  @relation("ProcessingFacility", fields: [facilityActorId], references: [id], onDelete: SetNull)
+  batch             Batch              @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  facilityActor     SupplyChainActor?  @relation("ProcessingFacility", fields: [facilityActorId], references: [id], onDelete: SetNull)
   processedProducts ProcessedProduct[]
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -459,14 +463,14 @@ model ProcessedProduct {
 }
 
 model Packaging {
-  id                  String   @id @default(uuid()) @db.Uuid
-  batchId             String   @map("batch_id") @db.Uuid
-  processedProductId  String?  @map("processed_product_id") @db.Uuid
-  packageType         String   @map("package_type")
-  packageDate         DateTime @map("package_date")
-  unitCount           Int      @map("unit_count")
-  netWeightKg         Decimal? @map("net_weight_kg") @db.Decimal(14, 3)
-  lotNumber           String?  @map("lot_number")
+  id                 String   @id @default(uuid()) @db.Uuid
+  batchId            String   @map("batch_id") @db.Uuid
+  processedProductId String?  @map("processed_product_id") @db.Uuid
+  packageType        String   @map("package_type")
+  packageDate        DateTime @map("package_date")
+  unitCount          Int      @map("unit_count")
+  netWeightKg        Decimal? @map("net_weight_kg") @db.Decimal(14, 3)
+  lotNumber          String?  @map("lot_number")
 
   batch            Batch             @relation(fields: [batchId], references: [id], onDelete: Cascade)
   processedProduct ProcessedProduct? @relation(fields: [processedProductId], references: [id], onDelete: SetNull)
@@ -480,19 +484,19 @@ model Packaging {
 }
 
 model SupplyChainActor {
-  id              String    @id @default(uuid()) @db.Uuid
-  code            String    @unique
-  actorType       ActorType @map("actor_type")
-  name            String
-  contactName     String?   @map("contact_name")
-  contactPhone    String?   @map("contact_phone")
-  address         String?
+  id           String    @id @default(uuid()) @db.Uuid
+  code         String    @unique
+  actorType    ActorType @map("actor_type")
+  name         String
+  contactName  String?   @map("contact_name")
+  contactPhone String?   @map("contact_phone")
+  address      String?
 
-  warehouses          Warehouse[]
-  outgoingShipments   Shipment[] @relation("ShipmentSource")
-  incomingShipments   Shipment[] @relation("ShipmentDestination")
-  currentBatches      Batch[] @relation("BatchCurrentOwner")
-  processings         ProcessingRecord[] @relation("ProcessingFacility")
+  warehouses        Warehouse[]
+  outgoingShipments Shipment[]         @relation("ShipmentSource")
+  incomingShipments Shipment[]         @relation("ShipmentDestination")
+  currentBatches    Batch[]            @relation("BatchCurrentOwner")
+  processings       ProcessingRecord[] @relation("ProcessingFacility")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -502,12 +506,12 @@ model SupplyChainActor {
 }
 
 model Warehouse {
-  id            String @id @default(uuid()) @db.Uuid
-  actorId       String @map("actor_id") @db.Uuid
-  code          String
-  name          String
-  locationText  String @map("location_text")
-  capacityKg    Decimal? @map("capacity_kg") @db.Decimal(14, 3)
+  id           String   @id @default(uuid()) @db.Uuid
+  actorId      String   @map("actor_id") @db.Uuid
+  code         String
+  name         String
+  locationText String   @map("location_text")
+  capacityKg   Decimal? @map("capacity_kg") @db.Decimal(14, 3)
 
   actor         SupplyChainActor @relation(fields: [actorId], references: [id], onDelete: Cascade)
   warehouseLogs WarehouseLog[]
@@ -521,14 +525,14 @@ model Warehouse {
 }
 
 model WarehouseLog {
-  id            String           @id @default(uuid()) @db.Uuid
-  warehouseId   String           @map("warehouse_id") @db.Uuid
-  batchId       String           @map("batch_id") @db.Uuid
-  logType       WarehouseLogType @map("log_type")
-  quantityKg    Decimal          @map("quantity_kg") @db.Decimal(14, 3)
-  loggedAt      DateTime         @map("logged_at")
-  referenceNo   String?          @map("reference_no")
-  notes         String?
+  id          String           @id @default(uuid()) @db.Uuid
+  warehouseId String           @map("warehouse_id") @db.Uuid
+  batchId     String           @map("batch_id") @db.Uuid
+  logType     WarehouseLogType @map("log_type")
+  quantityKg  Decimal          @map("quantity_kg") @db.Decimal(14, 3)
+  loggedAt    DateTime         @map("logged_at")
+  referenceNo String?          @map("reference_no")
+  notes       String?
 
   warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
   batch     Batch     @relation(fields: [batchId], references: [id], onDelete: Restrict)
@@ -542,21 +546,21 @@ model WarehouseLog {
 }
 
 model Shipment {
-  id                    String         @id @default(uuid()) @db.Uuid
-  batchId               String         @map("batch_id") @db.Uuid
-  shipmentCode          String         @unique @map("shipment_code")
-  sourceActorId         String         @map("source_actor_id") @db.Uuid
-  destinationActorId    String         @map("destination_actor_id") @db.Uuid
-  carrierName           String         @map("carrier_name")
-  vehicleNo             String?        @map("vehicle_no")
-  departedAt            DateTime?      @map("departed_at")
-  estimatedArrivalAt    DateTime?      @map("estimated_arrival_at")
-  deliveredAt           DateTime?      @map("delivered_at")
-  status                ShipmentStatus @default(PLANNED)
+  id                 String         @id @default(uuid()) @db.Uuid
+  batchId            String         @map("batch_id") @db.Uuid
+  shipmentCode       String         @unique @map("shipment_code")
+  sourceActorId      String         @map("source_actor_id") @db.Uuid
+  destinationActorId String         @map("destination_actor_id") @db.Uuid
+  carrierName        String         @map("carrier_name")
+  vehicleNo          String?        @map("vehicle_no")
+  departedAt         DateTime?      @map("departed_at")
+  estimatedArrivalAt DateTime?      @map("estimated_arrival_at")
+  deliveredAt        DateTime?      @map("delivered_at")
+  status             ShipmentStatus @default(PLANNED)
 
-  batch            Batch            @relation(fields: [batchId], references: [id], onDelete: Restrict)
-  sourceActor      SupplyChainActor @relation("ShipmentSource", fields: [sourceActorId], references: [id], onDelete: Restrict)
-  destinationActor SupplyChainActor @relation("ShipmentDestination", fields: [destinationActorId], references: [id], onDelete: Restrict)
+  batch            Batch              @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  sourceActor      SupplyChainActor   @relation("ShipmentSource", fields: [sourceActorId], references: [id], onDelete: Restrict)
+  destinationActor SupplyChainActor   @relation("ShipmentDestination", fields: [destinationActorId], references: [id], onDelete: Restrict)
   trackingLogs     ShipmentTracking[]
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -570,13 +574,13 @@ model Shipment {
 }
 
 model ShipmentTracking {
-  id             String   @id @default(uuid()) @db.Uuid
-  shipmentId      String   @map("shipment_id") @db.Uuid
-  eventTime       DateTime @map("event_time")
-  locationText    String   @map("location_text")
-  latitude        Decimal? @db.Decimal(10, 7)
-  longitude       Decimal? @db.Decimal(10, 7)
-  statusMessage   String   @map("status_message")
+  id            String   @id @default(uuid()) @db.Uuid
+  shipmentId    String   @map("shipment_id") @db.Uuid
+  eventTime     DateTime @map("event_time")
+  locationText  String   @map("location_text")
+  latitude      Decimal? @db.Decimal(10, 7)
+  longitude     Decimal? @db.Decimal(10, 7)
+  statusMessage String   @map("status_message")
 
   shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
 
@@ -588,17 +592,17 @@ model ShipmentTracking {
 }
 
 model QrCode {
-  id           String       @id @default(uuid()) @db.Uuid
-  batchId       String       @map("batch_id") @db.Uuid
-  qrToken      String       @unique @map("qr_token")
-  qrPayload    Json         @map("qr_payload")
-  qrImageUrl   String?      @map("qr_image_url")
-  status       QrCodeStatus @default(ACTIVE)
-  generatedAt  DateTime     @map("generated_at")
-  expiresAt    DateTime?    @map("expires_at")
+  id          String       @id @default(uuid()) @db.Uuid
+  batchId     String       @map("batch_id") @db.Uuid
+  qrToken     String       @unique @map("qr_token")
+  qrPayload   Json         @map("qr_payload")
+  qrImageUrl  String?      @map("qr_image_url")
+  status      QrCodeStatus @default(ACTIVE)
+  generatedAt DateTime     @map("generated_at")
+  expiresAt   DateTime?    @map("expires_at")
 
-  batch      Batch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  scanLogs    QrScanLog[]
+  batch    Batch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  scanLogs QrScanLog[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -609,16 +613,16 @@ model QrCode {
 }
 
 model QrScanLog {
-  id              String   @id @default(uuid()) @db.Uuid
-  qrCodeId        String   @map("qr_code_id") @db.Uuid
-  scannedAt       DateTime @map("scanned_at")
-  scannerType     String?  @map("scanner_type")
-  scannerUserId   String?  @map("scanner_user_id") @db.Uuid
-  ipAddress       String?  @map("ip_address")
-  userAgent       String?  @map("user_agent")
-  geoLocation     String?  @map("geo_location")
+  id            String   @id @default(uuid()) @db.Uuid
+  qrCodeId      String   @map("qr_code_id") @db.Uuid
+  scannedAt     DateTime @map("scanned_at")
+  scannerType   String?  @map("scanner_type")
+  scannerUserId String?  @map("scanner_user_id") @db.Uuid
+  ipAddress     String?  @map("ip_address")
+  userAgent     String?  @map("user_agent")
+  geoLocation   String?  @map("geo_location")
 
-  qrCode       QrCode @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
+  qrCode QrCode @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -629,14 +633,14 @@ model QrScanLog {
 }
 
 model Certification {
-  id                 String              @id @default(uuid()) @db.Uuid
-  batchId            String              @map("batch_id") @db.Uuid
-  certType           String              @map("cert_type")
-  certCode           String              @unique @map("cert_code")
-  issuingAuthority   String              @map("issuing_authority")
-  issueDate          DateTime            @map("issue_date")
-  expiryDate         DateTime?           @map("expiry_date")
-  status             CertificationStatus @default(PENDING)
+  id               String              @id @default(uuid()) @db.Uuid
+  batchId          String              @map("batch_id") @db.Uuid
+  certType         String              @map("cert_type")
+  certCode         String              @unique @map("cert_code")
+  issuingAuthority String              @map("issuing_authority")
+  issueDate        DateTime            @map("issue_date")
+  expiryDate       DateTime?           @map("expiry_date")
+  status           CertificationStatus @default(PENDING)
 
   batch             Batch              @relation(fields: [batchId], references: [id], onDelete: Cascade)
   inspectionReports InspectionReport[]
@@ -672,15 +676,15 @@ model InspectionReport {
 }
 
 model TraceabilityLog {
-  id               String         @id @default(uuid()) @db.Uuid
-  batchId          String         @map("batch_id") @db.Uuid
-  stage            LifecycleStage
-  eventTime        DateTime       @map("event_time")
-  actorId          String?        @map("actor_id") @db.Uuid
-  sourceTable      String?        @map("source_table")
-  sourceRecordId   String?        @map("source_record_id") @db.Uuid
-  description      String?
-  metadata         Json?
+  id             String         @id @default(uuid()) @db.Uuid
+  batchId        String         @map("batch_id") @db.Uuid
+  stage          LifecycleStage
+  eventTime      DateTime       @map("event_time")
+  actorId        String?        @map("actor_id") @db.Uuid
+  sourceTable    String?        @map("source_table")
+  sourceRecordId String?        @map("source_record_id") @db.Uuid
+  description    String?
+  metadata       Json?
 
   batch Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
@@ -694,13 +698,13 @@ model TraceabilityLog {
 }
 
 model ProductLifecycle {
-  id                 String         @id @default(uuid()) @db.Uuid
-  batchId            String         @map("batch_id") @db.Uuid
-  farmId             String         @map("farm_id") @db.Uuid
-  currentStage       LifecycleStage @map("current_stage")
-  latestTraceLogId   String?        @map("latest_trace_log_id") @db.Uuid
-  lastUpdatedAt      DateTime       @map("last_updated_at")
-  consumerVisible    Boolean        @default(true) @map("consumer_visible")
+  id               String         @id @default(uuid()) @db.Uuid
+  batchId          String         @map("batch_id") @db.Uuid
+  farmId           String         @map("farm_id") @db.Uuid
+  currentStage     LifecycleStage @map("current_stage")
+  latestTraceLogId String?        @map("latest_trace_log_id") @db.Uuid
+  lastUpdatedAt    DateTime       @map("last_updated_at")
+  consumerVisible  Boolean        @default(true) @map("consumer_visible")
 
   batch Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
   farm  Farm  @relation(fields: [farmId], references: [id], onDelete: Restrict)
