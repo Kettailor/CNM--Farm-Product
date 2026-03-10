@@ -12,36 +12,25 @@ export class PrismaBatchRepository implements BatchRepository {
       data: {
         id: batch.id,
         farmId: batch.farmId,
-        code: batch.code,
-        cropName: batch.cropName,
-        quantityKg: batch.quantityKg,
+        batchCode: batch.code,
+        totalQuantityKg: batch.quantityKg,
         harvestDate: batch.harvestDate,
-        qrToken: batch.qrToken,
         status: batch.status
       }
     });
 
-    return new BatchEntity(
-      created.id,
-      created.farmId,
-      created.code,
-      created.cropName,
-      created.quantityKg,
-      created.harvestDate,
-      created.qrToken,
-      created.status
-    );
+    return new BatchEntity(created.id, created.farmId, created.batchCode, '', Number(created.totalQuantityKg), created.harvestDate, '', created.status);
   }
 
   async findByCode(code: string): Promise<BatchEntity | null> {
-    const batch = await this.prisma.batch.findUnique({ where: { code } });
+    const batch = await this.prisma.batch.findUnique({ where: { batchCode: code } });
     return batch
-      ? new BatchEntity(batch.id, batch.farmId, batch.code, batch.cropName, batch.quantityKg, batch.harvestDate, batch.qrToken, batch.status)
+      ? new BatchEntity(batch.id, batch.farmId, batch.batchCode, '', Number(batch.totalQuantityKg), batch.harvestDate, '', batch.status)
       : null;
   }
 
   async listByFarm(farmId: string): Promise<BatchEntity[]> {
     const batches = await this.prisma.batch.findMany({ where: { farmId } });
-    return batches.map((batch) => new BatchEntity(batch.id, batch.farmId, batch.code, batch.cropName, batch.quantityKg, batch.harvestDate, batch.qrToken, batch.status));
+    return batches.map((batch) => new BatchEntity(batch.id, batch.farmId, batch.batchCode, '', Number(batch.totalQuantityKg), batch.harvestDate, '', batch.status));
   }
 }

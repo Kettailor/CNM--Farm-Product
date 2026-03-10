@@ -16,6 +16,7 @@ export class RegisterUseCase {
     const user = new UserEntity(
       randomUUID(),
       dto.email,
+      dto.username,
       dto.fullName,
       await bcrypt.hash(dto.password, 12),
       dto.role

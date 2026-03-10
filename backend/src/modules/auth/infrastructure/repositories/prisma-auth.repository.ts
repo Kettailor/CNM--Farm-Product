@@ -8,8 +8,21 @@ export class PrismaAuthRepository implements AuthRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async findByEmail(email: string): Promise<UserEntity | null> {
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    return user ? new UserEntity(user.id, user.email, user.fullName, user.passwordHash, user.role) : null;
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { userRoles: { include: { role: true }, take: 1 } }
+    });
+
+    return user
+      ? new UserEntity(
+          user.id,
+          user.email,
+          user.username,
+          user.fullName,
+          user.passwordHash,
+          user.userRoles[0]?.role.code ?? 'FARM'
+        )
+      : null;
   }
 
   async save(user: UserEntity): Promise<UserEntity> {
@@ -17,12 +30,27 @@ export class PrismaAuthRepository implements AuthRepository {
       data: {
         id: user.id,
         email: user.email,
+        username: user.username,
         fullName: user.fullName,
         passwordHash: user.passwordHash,
-        role: user.role
-      }
+        userRoles: {
+          create: {
+            role: {
+              connect: { code: user.role }
+            }
+          }
+        }
+      },
+      include: { userRoles: { include: { role: true }, take: 1 } }
     });
 
-    return new UserEntity(created.id, created.email, created.fullName, created.passwordHash, created.role);
+    return new UserEntity(
+      created.id,
+      created.email,
+      created.username,
+      created.fullName,
+      created.passwordHash,
+      created.userRoles[0]?.role.code ?? user.role
+    );
   }
 }

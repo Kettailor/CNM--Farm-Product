@@ -8,38 +8,39 @@ export class PrismaTraceabilityRepository implements TraceabilityRepository {
 
   async getByBatchCode(batchCode: string): Promise<TraceabilityView | null> {
     const batch = await this.prisma.batch.findUnique({
-      where: { code: batchCode },
+      where: { batchCode },
       include: {
         farm: true,
-        processLogs: true,
-        shipments: true,
-        certifications: true
+        processingRecords: { include: { facilityActor: true } },
+        shipments: { include: { sourceActor: true, destinationActor: true } },
+        certifications: true,
+        qrCodes: { take: 1, orderBy: { generatedAt: 'desc' } }
       }
     });
 
     if (!batch) return null;
 
     return {
-      batchCode: batch.code,
-      qrToken: batch.qrToken,
-      farm: { id: batch.farm.id, name: batch.farm.name, location: batch.farm.location },
-      processing: batch.processLogs.map((log) => ({
-        step: log.step,
-        facility: log.facility,
-        processedAt: log.processedAt
+      batchCode: batch.batchCode,
+      qrToken: batch.qrCodes[0]?.qrToken ?? '',
+      farm: { id: batch.farm.id, name: batch.farm.name, location: batch.farm.locationText },
+      processing: batch.processingRecords.map((record) => ({
+        step: record.processingType,
+        facility: record.facilityActor?.name ?? 'N/A',
+        processedAt: record.processDate
       })),
-      shipments: batch.shipments.map((s) => ({
-        fromLocation: s.fromLocation,
-        toLocation: s.toLocation,
-        carrier: s.carrier,
-        departedAt: s.departedAt,
-        arrivedAt: s.arrivedAt
+      shipments: batch.shipments.map((shipment) => ({
+        fromLocation: shipment.sourceActor.name,
+        toLocation: shipment.destinationActor.name,
+        carrier: shipment.carrierName,
+        departedAt: shipment.departedAt ?? shipment.createdAt,
+        arrivedAt: shipment.deliveredAt
       })),
-      certifications: batch.certifications.map((c) => ({
-        standard: c.standard,
-        issuer: c.issuer,
-        issuedAt: c.issuedAt,
-        expiresAt: c.expiresAt
+      certifications: batch.certifications.map((certification) => ({
+        standard: certification.certType,
+        issuer: certification.issuingAuthority,
+        issuedAt: certification.issueDate,
+        expiresAt: certification.expiryDate ?? certification.issueDate
       }))
     };
   }
