@@ -6,16 +6,19 @@ services:
       context: ./frontend
     container_name: traceability_frontend
     depends_on:
-      - backend
+      backend:
+        condition: service_started
 
   backend:
     build:
       context: ./backend
     container_name: traceability_backend
+    restart: on-failure
     environment:
       DATABASE_URL: postgresql+psycopg://traceability:traceability@postgres:5432/traceability
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   postgres:
     image: postgres:16
@@ -28,13 +31,21 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U traceability -d traceability"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
 
   nginx:
     image: nginx:1.27-alpine
     container_name: traceability_nginx
     depends_on:
-      - frontend
-      - backend
+      frontend:
+        condition: service_started
+      backend:
+        condition: service_started
     ports:
       - "80:80"
     volumes:

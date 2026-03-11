@@ -1,8 +1,12 @@
+import time
+
 from fastapi import Depends, FastAPI, HTTPException, Response
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.database import Base, engine, get_db
+from app.db.database import Base, SessionLocal, engine, get_db
 from app.models.batch import Batch
 from app.schemas.batch import BatchOut
 from app.services.qr_service import create_qr_svg
@@ -10,8 +14,21 @@ from app.services.qr_service import create_qr_svg
 app = FastAPI(title=settings.app_name, version=settings.app_version)
 
 
+def wait_for_database(max_retries: int = 20, delay_seconds: int = 2) -> None:
+    for attempt in range(1, max_retries + 1):
+        try:
+            with SessionLocal() as db:
+                db.execute(text("SELECT 1"))
+            return
+        except OperationalError:
+            if attempt == max_retries:
+                raise
+            time.sleep(delay_seconds)
+
+
 @app.on_event("startup")
 def startup() -> None:
+    wait_for_database()
     Base.metadata.create_all(bind=engine)
 
 
