@@ -37,7 +37,7 @@ frontend/
   tsconfig.json
   tailwind.config.ts
   postcss.config.js
-  next.config.ts
+  next.config.js
 ```
 
 ## API Integration Example
