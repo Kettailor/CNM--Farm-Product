@@ -48,3 +48,13 @@ uvicorn app.main:app --reload
 - `GET /health`
 - `GET /api/batches/{batch_code}`
 - `GET /api/qr/{batch_code}`
+
+## Khắc phục lỗi frontend config trong Docker
+
+Nếu trước đó container frontend từng chạy với `next.config.ts`, hãy build lại sạch để tránh cache image cũ:
+
+```bash
+docker compose down --remove-orphans
+docker compose build --no-cache frontend
+docker compose up --build
+```
