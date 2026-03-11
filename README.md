@@ -54,7 +54,7 @@ uvicorn app.main:app --reload
 Nếu trước đó container frontend từng chạy với `next.config.ts`, hãy build lại sạch để tránh cache image cũ:
 
 ```bash
-docker compose down --remove-orphans
+docker compose down --remove-orphans --rmi local
 docker compose build --no-cache frontend
 docker compose up --build
 ```
