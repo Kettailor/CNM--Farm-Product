@@ -12,6 +12,25 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('Farmer');
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleRegister = async () => {
+    setError(null);
+    setSuccess(null);
+    setIsLoading(true);
+
+    try {
+      await api.register({ fullName, email, password, role });
+      setSuccess('Account created successfully.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to register.';
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-md p-6">
@@ -24,7 +43,9 @@ export default function RegisterPage() {
           <select className="w-full rounded-lg border border-slate-300 px-3 py-2" value={role} onChange={(e) => setRole(e.target.value)}>
             {roles.map((r) => <option key={r}>{r}</option>)}
           </select>
-          <Button onClick={() => api.register({ fullName, email, password, role })}>Create account</Button>
+          <Button onClick={handleRegister} disabled={isLoading}>{isLoading ? 'Creating...' : 'Create account'}</Button>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          {success && <p className="text-sm text-emerald-600">{success}</p>}
         </div>
       </div>
     </div>
