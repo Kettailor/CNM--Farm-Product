@@ -23,6 +23,9 @@ Dự án đã được chỉnh lại để phù hợp stack bạn yêu cầu:
 docker compose up --build
 ```
 
+> Nếu vẫn thấy log `next dev -p 3001 ...`, hãy chạy thêm `docker compose up --build --force-recreate` để đảm bảo container dùng image mới.
+
+
 Ứng dụng chạy qua Nginx tại `http://localhost`.
 
 ## Chạy kèm dịch vụ Fabric placeholder
@@ -58,3 +61,6 @@ docker compose down --remove-orphans --rmi local
 docker compose build --no-cache frontend
 docker compose up --build
 ```
+
+> Nếu vẫn thấy log `next dev -p 3001 ...`, hãy chạy thêm `docker compose up --build --force-recreate` để đảm bảo container dùng image mới.
+
