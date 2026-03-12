@@ -5,7 +5,9 @@ services:
     build:
       context: ./frontend
     container_name: traceability_frontend
-    command: ["sh", "-c", "find /app -name next.config.ts -delete && find /app -name next.config.mjs -delete && npx next dev -H 0.0.0.0 -p 3000"]
+    command: ["npm", "run", "dev"]
+    ports:
+      - "3000:3000"
     depends_on:
       backend:
         condition: service_started
