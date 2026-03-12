@@ -1,0 +1,68 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+    container_name: traceability_frontend
+    command: ["sh", "-c", "find /app -name next.config.ts -delete && find /app -name next.config.mjs -delete && npx next dev -H 0.0.0.0 -p 3000"]
+    depends_on:
+      backend:
+        condition: service_started
+
+  backend:
+    build:
+      context: ./backend
+    container_name: traceability_backend
+    restart: on-failure
+    environment:
+      DATABASE_URL: postgresql+psycopg://traceability:traceability@postgres:5432/traceability
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16
+    container_name: traceability_postgres
+    environment:
+      POSTGRES_DB: traceability
+      POSTGRES_USER: traceability
+      POSTGRES_PASSWORD: traceability
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U traceability -d traceability"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: traceability_nginx
+    depends_on:
+      frontend:
+        condition: service_started
+      backend:
+        condition: service_started
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+
+  fabric-orderer:
+    image: hyperledger/fabric-orderer:2.5
+    container_name: traceability_fabric_orderer
+    command: ["sh", "-c", "sleep infinity"]
+    profiles: ["fabric"]
+
+  fabric-peer:
+    image: hyperledger/fabric-peer:2.5
+    container_name: traceability_fabric_peer
+    command: ["sh", "-c", "sleep infinity"]
+    profiles: ["fabric"]
+
+volumes:
+  postgres_data:

@@ -1,24 +1,66 @@
 # Farm Product Traceability System
 
-## Projects
+Dự án đã được chỉnh lại để phù hợp stack bạn yêu cầu:
 
-- Backend (NestJS + Prisma): `backend/`
-- Frontend (Next.js + React + TailwindCSS): `frontend/`
+- **Frontend:** Next.js + React + Tailwind CSS
+- **Backend:** FastAPI (Python)
+- **Database:** PostgreSQL
+- **Blockchain:** Hyperledger Fabric (private network - profile `fabric`)
+- **Containerization:** Docker + Docker Compose
+- **Web Server:** Nginx reverse proxy
+- **QR System:** Dynamic QR Code bằng Python `segno`
 
-## Run Backend
+## Cấu trúc chính
+
+- `frontend/`: giao diện Next.js
+- `backend/`: API FastAPI + tạo QR SVG
+- `deploy/nginx/default.conf`: cấu hình Nginx
+- `docker-compose.yml`: orchestration cho toàn hệ thống
+
+## Chạy bằng Docker Compose
+
+```bash
+docker compose up --build
+```
+
+> Nếu vẫn thấy log `next dev -p 3001 ...`, hãy chạy thêm `docker compose up --build --force-recreate` để đảm bảo container dùng image mới.
+
+
+Ứng dụng chạy qua Nginx tại `http://localhost`.
+
+## Chạy kèm dịch vụ Fabric placeholder
+
+```bash
+docker compose --profile fabric up --build
+```
+
+> Hai service Fabric (`fabric-orderer`, `fabric-peer`) đang ở dạng placeholder để tích hợp chaincode/msp/network config ở bước tiếp theo.
+
+## Chạy backend riêng (không Docker)
 
 ```bash
 cd backend
-cp .env.example .env
-npm install
-npm run prisma:generate
-npm run dev
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
 ```
 
-## Run Frontend
+## Endpoint mẫu
+
+- `GET /health`
+- `GET /api/batches/{batch_code}`
+- `GET /api/qr/{batch_code}`
+
+## Khắc phục lỗi frontend config trong Docker
+
+Nếu trước đó container frontend từng chạy với `next.config.ts`, hãy build lại sạch để tránh cache image cũ:
 
 ```bash
-cd frontend
-npm install
-npm run dev
+docker compose down --remove-orphans --rmi local
+docker compose build --no-cache frontend
+docker compose up --build
 ```
+
+> Nếu vẫn thấy log `next dev -p 3001 ...`, hãy chạy thêm `docker compose up --build --force-recreate` để đảm bảo container dùng image mới.
+
