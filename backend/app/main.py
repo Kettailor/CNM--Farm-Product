@@ -1,6 +1,7 @@
 import time
 
 from fastapi import Depends, FastAPI, HTTPException, Response
+from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
@@ -8,10 +9,28 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.database import Base, SessionLocal, engine, get_db
 from app.models.batch import Batch
+from app.modules.auth.use_cases import InMemoryAuthRepository, LoginUseCase, RegisterUseCase
 from app.schemas.batch import BatchOut
 from app.services.qr_service import create_qr_svg
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
+
+
+class RegisterPayload(BaseModel):
+    email: str
+    fullName: str
+    password: str
+    role: str
+
+
+class LoginPayload(BaseModel):
+    email: str
+    password: str
+
+
+auth_repository = InMemoryAuthRepository()
+register_use_case = RegisterUseCase(auth_repository)
+login_use_case = LoginUseCase(auth_repository)
 
 
 def wait_for_database(max_retries: int = 20, delay_seconds: int = 2) -> None:
@@ -35,6 +54,21 @@ def startup() -> None:
 @app.get("/health")
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/api/auth/register")
+def register(payload: RegisterPayload) -> dict[str, str]:
+    return register_use_case.execute(
+        email=payload.email,
+        full_name=payload.fullName,
+        password=payload.password,
+        role=payload.role,
+    )
+
+
+@app.post("/api/auth/login")
+def login(payload: LoginPayload) -> dict[str, str]:
+    return login_use_case.execute(email=payload.email, password=payload.password)
 
 
 @app.get("/api/batches/{batch_code}", response_model=BatchOut)
