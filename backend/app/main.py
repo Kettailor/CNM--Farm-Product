@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.database import Base, SessionLocal, engine, get_db
 from app.models.batch import Batch
+from app.modules.auth.use_cases import InMemoryAuthRepository, LoginUseCase, RegisterUseCase
 from app.schemas.batch import BatchOut
 from app.services.qr_service import create_qr_svg
 
@@ -27,7 +28,9 @@ class LoginPayload(BaseModel):
     password: str
 
 
-users: dict[str, dict[str, str]] = {}
+auth_repository = InMemoryAuthRepository()
+register_use_case = RegisterUseCase(auth_repository)
+login_use_case = LoginUseCase(auth_repository)
 
 
 def wait_for_database(max_retries: int = 20, delay_seconds: int = 2) -> None:
@@ -55,38 +58,17 @@ def health_check() -> dict[str, str]:
 
 @app.post("/api/auth/register")
 def register(payload: RegisterPayload) -> dict[str, str]:
-    email = payload.email.lower()
-    if email in users:
-        raise HTTPException(status_code=409, detail="User already exists")
-
-    users[email] = {
-        "email": email,
-        "full_name": payload.fullName,
-        "password": payload.password,
-        "role": payload.role,
-    }
-
-    return {
-        "message": "Register successful",
-        "email": email,
-        "fullName": payload.fullName,
-        "role": payload.role,
-    }
+    return register_use_case.execute(
+        email=payload.email,
+        full_name=payload.fullName,
+        password=payload.password,
+        role=payload.role,
+    )
 
 
 @app.post("/api/auth/login")
 def login(payload: LoginPayload) -> dict[str, str]:
-    email = payload.email.lower()
-    user = users.get(email)
-    if not user or user["password"] != payload.password:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-
-    return {
-        "message": "Login successful",
-        "accessToken": f"demo-token-{email}",
-        "fullName": user["full_name"],
-        "role": user["role"],
-    }
+    return login_use_case.execute(email=payload.email, password=payload.password)
 
 
 @app.get("/api/batches/{batch_code}", response_model=BatchOut)

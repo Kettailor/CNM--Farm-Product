@@ -17,6 +17,12 @@ Dự án đã được chỉnh lại để phù hợp stack bạn yêu cầu:
 - `deploy/nginx/default.conf`: cấu hình Nginx
 - `docker-compose.yml`: orchestration cho toàn hệ thống
 
+## Use cases in project
+
+- **Register account:** User submits register form in frontend (`/register`) -> frontend calls `POST /api/auth/register` -> backend `RegisterUseCase` validates and stores user in repository.
+- **Login:** User submits login form in frontend (`/login`) -> frontend calls `POST /api/auth/login` -> backend `LoginUseCase` validates credentials and returns token-like response.
+- **Traceability lookup:** Consumer scans QR / enters batch code -> frontend calls batch/traceability APIs via `/api` proxy -> backend resolves data from PostgreSQL.
+
 ## Chạy bằng Docker Compose
 
 ```bash
@@ -49,6 +55,8 @@ uvicorn app.main:app --reload
 ## Endpoint mẫu
 
 - `GET /health`
+- `POST /api/auth/register`
+- `POST /api/auth/login`
 - `GET /api/batches/{batch_code}`
 - `GET /api/qr/{batch_code}`
 
