@@ -1,3 +1,5 @@
+import { getAuthToken } from '@/lib/auth';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? '/api';
 
 class ApiError extends Error {
@@ -10,6 +12,12 @@ class ApiError extends Error {
 async function parseErrorMessage(response: Response, fallback: string): Promise<string> {
   try {
     const payload = await response.json();
+    if (typeof payload?.message === 'string') {
+      return payload.message;
+    }
+    if (Array.isArray(payload?.message)) {
+      return payload.message.join(', ');
+    }
     if (payload?.detail && typeof payload.detail === 'string') {
       return payload.detail;
     }
@@ -21,7 +29,11 @@ async function parseErrorMessage(response: Response, fallback: string): Promise<
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, { cache: 'no-store' });
+  const token = getAuthToken();
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    cache: 'no-store',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined
+  });
   if (!response.ok) {
     const message = await parseErrorMessage(response, `GET ${path} failed`);
     throw new ApiError(message, response.status);
@@ -35,11 +47,12 @@ export async function apiPost<TBody extends object, TResponse>(
   body: TBody,
   token?: string
 ): Promise<TResponse> {
+  const authToken = token ?? getAuthToken();
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
     },
     body: JSON.stringify(body)
   });
@@ -53,7 +66,8 @@ export async function apiPost<TBody extends object, TResponse>(
 }
 
 export const api = {
-  login: (payload: { email: string; password: string }) => apiPost('/auth/login', payload),
+  login: (payload: { email: string; password: string }) =>
+    apiPost<{ email: string; password: string }, { accessToken: string }>('/auth/login', payload),
   register: (payload: { email: string; fullName: string; password: string; role: string }) =>
     apiPost('/auth/register', payload),
   farms: () => apiGet('/farms/owner/demo-owner-id'),

@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { setAuthToken } from '@/lib/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -19,8 +20,10 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await api.login({ email, password });
-      router.push('/');
+      const response = await api.login({ email, password });
+      setAuthToken(response.accessToken);
+      router.push('/dashboard');
+      router.refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unable to login.';
       setError(message);
