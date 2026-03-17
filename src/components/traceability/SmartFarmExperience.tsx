@@ -20,6 +20,12 @@ type FormState = {
   email: string;
   phone: string;
   farmName: string;
+  farmCode: string;
+  farmLine1: string;
+  city: string;
+  state: string;
+  country: string;
+  paddockSize: string;
   address: string;
   lat: string;
   lng: string;
@@ -29,6 +35,8 @@ type FormState = {
   annualRainfall: string;
   unitLength: string;
   unitMass: string;
+  unitTemperature: string;
+  unitVolume: string;
   hearFrom: string[];
   verifiedLocation: FarmLocation | null;
 };
@@ -38,6 +46,12 @@ const initialForm: FormState = {
   email: "",
   phone: "",
   farmName: "",
+  farmCode: "ID 001",
+  farmLine1: "",
+  city: "",
+  state: "",
+  country: "Việt Nam",
+  paddockSize: "1",
   address: "",
   lat: "",
   lng: "",
@@ -45,8 +59,10 @@ const initialForm: FormState = {
   resources: ["Bồn chứa nước", "Máy bơm"],
   landArea: "Hecta",
   annualRainfall: "1000",
-  unitLength: "Mét (m, km)",
-  unitMass: "Kg / Tấn",
+  unitLength: "Metric",
+  unitMass: "Metric",
+  unitTemperature: "Celsius",
+  unitVolume: "Metric",
   hearFrom: ["Sự kiện"],
   verifiedLocation: null,
 };
@@ -100,7 +116,7 @@ export default function SmartFarmExperience() {
 
   const canContinue = useMemo(() => {
     if (step === 1) return form.fullName && form.email && form.phone;
-    if (step === 2) return form.farmName;
+    if (step === 2) return form.farmName && form.city && form.state && form.country;
     if (step === 3) {
       const lat = Number(form.lat);
       const lng = Number(form.lng);
@@ -157,6 +173,10 @@ export default function SmartFarmExperience() {
         ...initialForm,
         fullName: "Nguyễn Văn A",
         farmName: "Ket Farm",
+        farmLine1: "Đường Cao Tốc Thành Phố Hồ Chí Minh - Long Thành - Dầu Giây",
+        city: "Thành phố Hồ Chí Minh",
+        state: "Hồ Chí Minh",
+        country: "Việt Nam",
         address: "Long Thành, Đồng Nai",
         lat: "10.8082",
         lng: "106.8464",
@@ -258,12 +278,60 @@ export default function SmartFarmExperience() {
 
               {step === 2 && (
                 <>
-                  <h2>Tên nông trại</h2>
-                  <input
-                    placeholder="Nhập tên nông trại"
-                    value={form.farmName}
-                    onChange={(e) => setForm({ ...form, farmName: e.target.value })}
-                  />
+                  <h2>Thông tin nông trại</h2>
+                  <p className={styles.note}>Thiết lập hồ sơ nông trại theo cấu trúc vận hành thực tế để dùng cho tracking và truy xuất.</p>
+                  <div className={styles.farmInfoLayout}>
+                    <div className={styles.farmThumb}>
+                      <iframe
+                        title="Farm mini map"
+                        src={`https://www.google.com/maps?q=${encodeURIComponent(form.address || "Việt Nam")}&z=12&output=embed`}
+                        loading="lazy"
+                      />
+                      <span>{form.farmCode}</span>
+                    </div>
+                    <div className={styles.formGrid}>
+                      <input
+                        placeholder="Farm Name"
+                        value={form.farmName}
+                        onChange={(e) => setForm({ ...form, farmName: e.target.value })}
+                      />
+                      <input
+                        placeholder="Mã nông trại (VD: ID 001)"
+                        value={form.farmCode}
+                        onChange={(e) => setForm({ ...form, farmCode: e.target.value })}
+                      />
+                      <input
+                        placeholder="Paddocks (hectares)"
+                        value={form.paddockSize}
+                        onChange={(e) => setForm({ ...form, paddockSize: e.target.value })}
+                      />
+                      <input
+                        placeholder="Line 1 / Tuyến đường"
+                        value={form.farmLine1}
+                        onChange={(e) => setForm({ ...form, farmLine1: e.target.value })}
+                      />
+                      <input
+                        placeholder="City"
+                        value={form.city}
+                        onChange={(e) => setForm({ ...form, city: e.target.value })}
+                      />
+                      <input
+                        placeholder="State"
+                        value={form.state}
+                        onChange={(e) => setForm({ ...form, state: e.target.value })}
+                      />
+                      <input
+                        placeholder="Country"
+                        value={form.country}
+                        onChange={(e) => setForm({ ...form, country: e.target.value })}
+                      />
+                      <input
+                        placeholder="Vị trí hiển thị (lat,lng)"
+                        value={form.lat && form.lng ? `${form.lat}, ${form.lng}` : "Sẽ cập nhật sau bước vị trí"}
+                        readOnly
+                      />
+                    </div>
+                  </div>
                 </>
               )}
 
@@ -446,7 +514,7 @@ export default function SmartFarmExperience() {
 
               {step === 5 && (
                 <>
-                  <h2>Đơn vị & thiết lập</h2>
+                  <h2>Standard Units</h2>
                   <div className={styles.formGrid}>
                     <select
                       value={form.landArea}
@@ -464,15 +532,29 @@ export default function SmartFarmExperience() {
                       value={form.unitLength}
                       onChange={(e) => setForm({ ...form, unitLength: e.target.value })}
                     >
-                      <option>Mét (m, km)</option>
-                      <option>Feet</option>
+                      <option>Metric</option>
+                      <option>Imperial</option>
                     </select>
                     <select
                       value={form.unitMass}
                       onChange={(e) => setForm({ ...form, unitMass: e.target.value })}
                     >
-                      <option>Kg / Tấn</option>
-                      <option>Pound</option>
+                      <option>Metric</option>
+                      <option>Imperial</option>
+                    </select>
+                    <select
+                      value={form.unitTemperature}
+                      onChange={(e) => setForm({ ...form, unitTemperature: e.target.value })}
+                    >
+                      <option>Celsius</option>
+                      <option>Fahrenheit</option>
+                    </select>
+                    <select
+                      value={form.unitVolume}
+                      onChange={(e) => setForm({ ...form, unitVolume: e.target.value })}
+                    >
+                      <option>Metric</option>
+                      <option>Imperial</option>
                     </select>
                   </div>
                 </>
