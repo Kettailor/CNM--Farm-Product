@@ -1,74 +1,36 @@
-# Farm Product Traceability System
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-Dự án đã được chỉnh lại để phù hợp stack bạn yêu cầu:
+## Getting Started
 
-- **Frontend:** Next.js + React + Tailwind CSS
-- **Backend:** FastAPI (Python)
-- **Database:** PostgreSQL
-- **Blockchain:** Hyperledger Fabric (private network - profile `fabric`)
-- **Containerization:** Docker + Docker Compose
-- **Web Server:** Nginx reverse proxy
-- **QR System:** Dynamic QR Code bằng Python `segno`
-
-## Cấu trúc chính
-
-- `frontend/`: giao diện Next.js
-- `backend/`: API FastAPI + tạo QR SVG
-- `deploy/nginx/default.conf`: cấu hình Nginx
-- `docker-compose.yml`: orchestration cho toàn hệ thống
-
-## Use cases in project
-
-- **Register account:** User submits register form in frontend (`/register`) -> frontend calls `POST /api/auth/register` -> backend `RegisterUseCase` validates and stores user in repository.
-- **Login:** User submits login form in frontend (`/login`) -> frontend calls `POST /api/auth/login` -> backend `LoginUseCase` validates credentials and returns token-like response.
-- **Traceability lookup:** Consumer scans QR / enters batch code -> frontend calls batch/traceability APIs via `/api` proxy -> backend resolves data from PostgreSQL.
-
-## Chạy bằng Docker Compose
+First, run the development server:
 
 ```bash
-docker compose up --build
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-> Nếu vẫn thấy log `next dev -p 3001 ...`, hãy chạy thêm `docker compose up --build --force-recreate` để đảm bảo container dùng image mới.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-Ứng dụng chạy qua Nginx tại `http://localhost`.
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Chạy kèm dịch vụ Fabric placeholder
+## Learn More
 
-```bash
-docker compose --profile fabric up --build
-```
+To learn more about Next.js, take a look at the following resources:
 
-> Hai service Fabric (`fabric-orderer`, `fabric-peer`) đang ở dạng placeholder để tích hợp chaincode/msp/network config ở bước tiếp theo.
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-## Chạy backend riêng (không Docker)
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
+## Deploy on Vercel
 
-## Endpoint mẫu
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-- `GET /health`
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `GET /api/batches/{batch_code}`
-- `GET /api/qr/{batch_code}`
-
-## Khắc phục lỗi frontend config trong Docker
-
-Nếu trước đó container frontend từng chạy với `next.config.ts`, hãy build lại sạch để tránh cache image cũ:
-
-```bash
-docker compose down --remove-orphans --rmi local
-docker compose build --no-cache frontend
-docker compose up --build
-```
-
-> Nếu vẫn thấy log `next dev -p 3001 ...`, hãy chạy thêm `docker compose up --build --force-recreate` để đảm bảo container dùng image mới.
-
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
