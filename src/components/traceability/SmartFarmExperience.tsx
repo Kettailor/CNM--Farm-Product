@@ -11,6 +11,8 @@ type FarmLocation = {
   updatedAt: string;
 };
 
+type LocationInputMode = "search" | "coordinates" | "pin";
+
 const ONBOARDING_STORAGE_KEY = "farmdeck.smart.onboarding";
 
 type FormState = {
@@ -71,11 +73,30 @@ const stepDescriptions = [
   "Hoàn tất đăng ký và bắt đầu quản lý nông trại thông minh.",
 ];
 
+const getCoordinatesFromGoogleMapsLink = (link: string) => {
+  const decoded = decodeURIComponent(link);
+  const patterns = [/@(-?\d+\.\d+),(-?\d+\.\d+)/, /q=(-?\d+\.\d+),(-?\d+\.\d+)/, /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/];
+
+  for (const pattern of patterns) {
+    const match = decoded.match(pattern);
+    if (match) {
+      return { lat: match[1], lng: match[2] };
+    }
+  }
+
+  return null;
+};
+
 export default function SmartFarmExperience() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [step, setStep] = useState(0);
+  const [locationMode, setLocationMode] = useState<LocationInputMode>("search");
+  const [googleMapsLink, setGoogleMapsLink] = useState("");
   const [form, setForm] = useState<FormState>(initialForm);
+
+  const mapQuery = form.lat && form.lng ? `${form.lat},${form.lng}` : form.address || "Việt Nam";
+  const mapEmbedUrl = `https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&z=15&output=embed`;
 
   const canContinue = useMemo(() => {
     if (step === 1) return form.fullName && form.email && form.phone;
@@ -250,14 +271,104 @@ export default function SmartFarmExperience() {
                 <>
                   <h2>Vị trí nông trại</h2>
                   <p className={styles.note}>
-                    Vị trí này là dữ liệu xác thực cho tracking toàn nông trại. Hãy nhập địa chỉ và
-                    tọa độ thực tế để phục vụ bản đồ vận hành và truy xuất nguồn gốc.
+                    Vị trí tracking được xác thực cho toàn bộ nông trại. Bạn có thể chọn nhiều chế
+                    độ nhập: tìm theo Google Maps, nhập tọa độ vật lý, hoặc dán link ghim Google
+                    Maps.
                   </p>
+
+                  <div className={styles.modeTabs}>
+                    <button
+                      type="button"
+                      className={locationMode === "search" ? styles.modeTabActive : styles.modeTab}
+                      onClick={() => setLocationMode("search")}
+                    >
+                      Địa chỉ Google Maps
+                    </button>
+                    <button
+                      type="button"
+                      className={locationMode === "coordinates" ? styles.modeTabActive : styles.modeTab}
+                      onClick={() => setLocationMode("coordinates")}
+                    >
+                      Tọa độ vật lý
+                    </button>
+                    <button
+                      type="button"
+                      className={locationMode === "pin" ? styles.modeTabActive : styles.modeTab}
+                      onClick={() => setLocationMode("pin")}
+                    >
+                      Ghim từ Google Maps
+                    </button>
+                  </div>
+
                   <textarea
-                    placeholder="Nhập địa chỉ nông trại"
+                    placeholder="Nhập địa chỉ nông trại (ví dụ: Long Thành, Đồng Nai)"
                     value={form.address}
                     onChange={(e) => setForm({ ...form, address: e.target.value })}
                   />
+
+                  {locationMode === "coordinates" && (
+                    <div className={styles.formGrid}>
+                      <input
+                        type="number"
+                        step="0.0001"
+                        placeholder="Vĩ độ (lat)"
+                        value={form.lat}
+                        onChange={(e) => setForm({ ...form, lat: e.target.value })}
+                      />
+                      <input
+                        type="number"
+                        step="0.0001"
+                        placeholder="Kinh độ (lng)"
+                        value={form.lng}
+                        onChange={(e) => setForm({ ...form, lng: e.target.value })}
+                      />
+                    </div>
+                  )}
+
+                  {locationMode === "search" && (
+                    <div className={styles.inlineActions}>
+                      <button
+                        type="button"
+                        className={styles.secondaryBtn}
+                        onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(form.address)}`, "_blank")}
+                      >
+                        Tìm trên Google Maps
+                      </button>
+                      <small>Nhập địa chỉ phía trên, hệ thống sẽ hiển thị trực tiếp trên bản đồ.</small>
+                    </div>
+                  )}
+
+                  {locationMode === "pin" && (
+                    <div className={styles.pinBox}>
+                      <input
+                        placeholder="Dán link Google Maps sau khi ghim vị trí"
+                        value={googleMapsLink}
+                        onChange={(e) => setGoogleMapsLink(e.target.value)}
+                      />
+                      <div className={styles.inlineActions}>
+                        <button
+                          type="button"
+                          className={styles.secondaryBtn}
+                          onClick={() => {
+                            const coordinates = getCoordinatesFromGoogleMapsLink(googleMapsLink);
+                            if (coordinates) {
+                              setForm({ ...form, lat: coordinates.lat, lng: coordinates.lng });
+                            }
+                          }}
+                        >
+                          Đọc tọa độ từ link
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.secondaryBtn}
+                          onClick={() => window.open("https://www.google.com/maps", "_blank")}
+                        >
+                          Mở Google Maps để ghim
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className={styles.formGrid}>
                     <input
                       type="number"
@@ -274,7 +385,15 @@ export default function SmartFarmExperience() {
                       onChange={(e) => setForm({ ...form, lng: e.target.value })}
                     />
                   </div>
-                  <img src="/assets/img/gallery/gl1.jpg" alt="Bản đồ" className={styles.mapPreview} />
+
+                  <iframe
+                    title="Google Maps Farm Location"
+                    className={styles.googleMap}
+                    src={mapEmbedUrl}
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+
                   {form.verifiedLocation && (
                     <p className={styles.savedLocation}>
                       Vị trí đã lưu: {form.verifiedLocation.lat.toFixed(4)}, {form.verifiedLocation.lng.toFixed(4)}
