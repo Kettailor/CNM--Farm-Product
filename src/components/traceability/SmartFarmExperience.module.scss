@@ -147,7 +147,23 @@
     line-height: 1.6;
   }
 
-  input,
+  .note {
+    margin-bottom: 12px;
+    color: #1f2937;
+    background: #f0f9e7;
+    border: 1px solid #d6eabf;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .savedLocation {
+    margin-top: 10px;
+    color: #256317;
+    font-weight: 600;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]),
   textarea,
   select {
     width: 100%;
@@ -192,11 +208,28 @@
   margin-bottom: 10px;
 
   label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 10px;
     color: #374151;
     font-size: 15px;
+    width: fit-content;
+    max-width: 100%;
+    line-height: 1.45;
+  }
+
+  input[type="checkbox"] {
+    width: 16px;
+    min-width: 16px;
+    height: 16px;
+    margin-top: 2px;
+    accent-color: #5fae1d;
+  }
+
+  span {
+    flex: 1;
+    white-space: normal;
+    word-break: break-word;
   }
 }
 

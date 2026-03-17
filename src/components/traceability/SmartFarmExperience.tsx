@@ -4,6 +4,15 @@ import React, { useEffect, useMemo, useState } from "react";
 import SmartFarmDashboard from "./SmartFarmDashboard";
 import styles from "./SmartFarmExperience.module.scss";
 
+type FarmLocation = {
+  address: string;
+  lat: number;
+  lng: number;
+  updatedAt: string;
+};
+
+const ONBOARDING_STORAGE_KEY = "farmdeck.smart.onboarding";
+
 type FormState = {
   fullName: string;
   email: string;
@@ -19,6 +28,7 @@ type FormState = {
   unitLength: string;
   unitMass: string;
   hearFrom: string[];
+  verifiedLocation: FarmLocation | null;
 };
 
 const initialForm: FormState = {
@@ -36,6 +46,7 @@ const initialForm: FormState = {
   unitLength: "Mét (m, km)",
   unitMass: "Kg / Tấn",
   hearFrom: ["Sự kiện"],
+  verifiedLocation: null,
 };
 
 const stepTitles = [
@@ -69,14 +80,56 @@ export default function SmartFarmExperience() {
   const canContinue = useMemo(() => {
     if (step === 1) return form.fullName && form.email && form.phone;
     if (step === 2) return form.farmName;
-    if (step === 3) return form.address || (form.lat && form.lng);
+    if (step === 3) {
+      const lat = Number(form.lat);
+      const lng = Number(form.lng);
+      return Boolean(
+        form.address.trim() &&
+          Number.isFinite(lat) &&
+          Number.isFinite(lng) &&
+          Math.abs(lat) <= 90 &&
+          Math.abs(lng) <= 180
+      );
+    }
     if (step === 4) return form.farmTypes.length > 0;
     if (step === 6) return form.hearFrom.length > 0;
     return true;
   }, [form, step]);
 
+  const saveForm = (nextForm: FormState) => {
+    setForm(nextForm);
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(nextForm));
+  };
+
+  const saveVerifiedLocation = () => {
+    const lat = Number(form.lat);
+    const lng = Number(form.lng);
+    if (!form.address.trim() || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return;
+    }
+
+    saveForm({
+      ...form,
+      verifiedLocation: {
+        address: form.address.trim(),
+        lat,
+        lng,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  };
 
   useEffect(() => {
+    const stored = localStorage.getItem(ONBOARDING_STORAGE_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as FormState;
+        setForm({ ...initialForm, ...parsed });
+      } catch {
+        localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+      }
+    }
+
     const params = new URLSearchParams(window.location.search);
     if (params.get("dashboard") === "1") {
       setForm({
@@ -84,10 +137,19 @@ export default function SmartFarmExperience() {
         fullName: "Nguyễn Văn A",
         farmName: "Ket Farm",
         address: "Long Thành, Đồng Nai",
+        lat: "10.8082",
+        lng: "106.8464",
+        verifiedLocation: {
+          address: "Long Thành, Đồng Nai",
+          lat: 10.8082,
+          lng: 106.8464,
+          updatedAt: new Date().toISOString(),
+        },
       });
       setCompleted(true);
     }
   }, []);
+
   if (completed) {
     return (
       <SmartFarmDashboard
@@ -95,6 +157,8 @@ export default function SmartFarmExperience() {
           fullName: form.fullName,
           farmName: form.farmName,
           address: form.address,
+          lat: form.verifiedLocation?.lat,
+          lng: form.verifiedLocation?.lng,
         }}
       />
     );
@@ -185,6 +249,10 @@ export default function SmartFarmExperience() {
               {step === 3 && (
                 <>
                   <h2>Vị trí nông trại</h2>
+                  <p className={styles.note}>
+                    Vị trí này là dữ liệu xác thực cho tracking toàn nông trại. Hãy nhập địa chỉ và
+                    tọa độ thực tế để phục vụ bản đồ vận hành và truy xuất nguồn gốc.
+                  </p>
                   <textarea
                     placeholder="Nhập địa chỉ nông trại"
                     value={form.address}
@@ -192,17 +260,26 @@ export default function SmartFarmExperience() {
                   />
                   <div className={styles.formGrid}>
                     <input
+                      type="number"
+                      step="0.0001"
                       placeholder="Vĩ độ (lat)"
                       value={form.lat}
                       onChange={(e) => setForm({ ...form, lat: e.target.value })}
                     />
                     <input
+                      type="number"
+                      step="0.0001"
                       placeholder="Kinh độ (lng)"
                       value={form.lng}
                       onChange={(e) => setForm({ ...form, lng: e.target.value })}
                     />
                   </div>
                   <img src="/assets/img/gallery/gl1.jpg" alt="Bản đồ" className={styles.mapPreview} />
+                  {form.verifiedLocation && (
+                    <p className={styles.savedLocation}>
+                      Vị trí đã lưu: {form.verifiedLocation.lat.toFixed(4)}, {form.verifiedLocation.lng.toFixed(4)}
+                    </p>
+                  )}
                 </>
               )}
 
@@ -222,7 +299,7 @@ export default function SmartFarmExperience() {
                             setForm({ ...form, farmTypes: next });
                           }}
                         />
-                        {item}
+                        <span>{item}</span>
                       </label>
                     ))}
                   </div>
@@ -241,7 +318,7 @@ export default function SmartFarmExperience() {
                             setForm({ ...form, resources: next });
                           }}
                         />
-                        {item}
+                        <span>{item}</span>
                       </label>
                     ))}
                   </div>
@@ -298,7 +375,7 @@ export default function SmartFarmExperience() {
                             setForm({ ...form, hearFrom: next });
                           }}
                         />
-                        {item}
+                        <span>{item}</span>
                       </label>
                     ))}
                   </div>
@@ -330,12 +407,25 @@ export default function SmartFarmExperience() {
                   <button
                     className={styles.nextBtn}
                     disabled={!canContinue}
-                    onClick={() => setStep((prev) => prev + 1)}
+                    onClick={() => {
+                      if (step === 3) {
+                        saveVerifiedLocation();
+                      } else {
+                        localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(form));
+                      }
+                      setStep((prev) => prev + 1);
+                    }}
                   >
                     Tiếp tục →
                   </button>
                 ) : (
-                  <button className={styles.nextBtn} onClick={() => setCompleted(true)}>
+                  <button
+                    className={styles.nextBtn}
+                    onClick={() => {
+                      localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(form));
+                      setCompleted(true);
+                    }}
+                  >
                     Hoàn tất
                   </button>
                 )}

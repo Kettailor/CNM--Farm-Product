@@ -7,6 +7,8 @@ type DashboardProfile = {
   fullName: string;
   farmName: string;
   address: string;
+  lat?: number;
+  lng?: number;
 };
 
 type SmartFarmDashboardProps = {
@@ -147,7 +149,12 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                 <h1>Farm Map</h1>
                 <p>Phân bổ tài nguyên theo vị trí và theo từng thời điểm vận hành.</p>
               </div>
-              <span>{profile?.address || "Long Thành, Đồng Nai"}</span>
+              <span>
+                {profile?.address || "Long Thành, Đồng Nai"}
+                {profile?.lat !== undefined && profile?.lng !== undefined
+                  ? ` · ${profile.lat.toFixed(4)}, ${profile.lng.toFixed(4)}`
+                  : ""}
+              </span>
             </header>
 
             <article className={styles.noticeCard}>
@@ -251,7 +258,12 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                 <h1>{farmName}</h1>
                 <p>Tổng quan vận hành nông trại thông minh cho {profile?.fullName || "quản trị viên"}.</p>
               </div>
-              <span>{profile?.address || "Long Thành, Đồng Nai"}</span>
+              <span>
+                {profile?.address || "Long Thành, Đồng Nai"}
+                {profile?.lat !== undefined && profile?.lng !== undefined
+                  ? ` · ${profile.lat.toFixed(4)}, ${profile.lng.toFixed(4)}`
+                  : ""}
+              </span>
             </header>
 
             <section className={styles.pillRow}>
