@@ -1,255 +1,202 @@
-.page {
+.layout {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 250px 1fr;
-  background: #f3f5f7;
-  color: #1f2937;
+  grid-template-columns: 280px 1fr;
+  background: #ececec;
 }
 
 .sidebar {
-  background: #ffffff;
-  border-right: 1px solid #e5e7eb;
-  padding: 28px 20px;
+  background: #efefef;
+  border-right: 1px solid #d8d8d8;
+  padding: 12px;
+  overflow: auto;
+
+  h2 {
+    margin: 0 0 14px;
+    color: #53a51a;
+    font-size: 38px;
+    font-weight: 800;
+  }
 
   ul {
     list-style: none;
-    padding: 0;
     margin: 0;
+    padding: 0;
     display: grid;
-    gap: 8px;
+    gap: 4px;
+  }
+
+  li {
+    padding: 10px 10px;
+    border-radius: 6px;
+    color: #46505a;
+    font-weight: 500;
+    font-size: 15px;
   }
 }
 
-.logo {
-  color: #4d9b10;
-  font-weight: 800;
-  margin: 0 0 6px;
-}
-
-.sidebarTitle {
-  font-size: 12px;
-  color: #6b7280;
-  margin-bottom: 18px;
-}
-
-.menuBtn,
-.menuActive {
-  border: none;
-  width: 100%;
-  text-align: left;
-  border-radius: 10px;
-  padding: 10px 12px;
-  background: transparent;
-  font-weight: 500;
-}
-
-.menuBtn:hover {
-  background: #f3f4f6;
-}
-
-.menuActive {
-  background: #e7f7d9;
-  color: #2f6b08;
+.activeMenu {
+  background: #dfe9d8;
+  color: #2e6c10 !important;
 }
 
 .main {
-  padding: 26px;
+  padding: 10px 16px 18px;
 }
 
-.header {
+.topbar {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 20px;
+  gap: 20px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #f7f7f7;
+  border: 1px solid #dcdcdc;
 
   h1 {
     margin: 0;
-    font-size: 30px;
+    font-size: 32px;
+    color: #1f2937;
   }
 
   p {
-    margin-top: 6px;
-    color: #6b7280;
+    margin: 4px 0 0;
+    color: #5f6b78;
   }
 
-  small {
-    color: #4b5563;
-    display: block;
-    margin-top: 6px;
+  span {
+    align-self: center;
+    color: #4a5562;
     font-weight: 500;
   }
 }
 
-.actionButton {
-  border: none;
-  background: #5ba615;
-  color: #fff;
-  border-radius: 10px;
-  padding: 10px 16px;
-  font-weight: 600;
-}
-
-.sensorGrid {
+.pillRow {
+  margin-top: 10px;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-  margin-bottom: 16px;
-}
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 8px;
 
-.sensorCard {
-  background: white;
-  border-radius: 14px;
-  padding: 14px;
-  border: 1px solid #e5e7eb;
-
-  h3 {
-    margin: 0;
-    font-size: 14px;
-    font-weight: 600;
+  article {
+    border: 1px solid #d7d7d7;
+    border-radius: 8px;
+    background: white;
+    padding: 8px;
+    text-align: center;
   }
 
-  span {
-    color: #6b7280;
-    font-size: 13px;
-  }
-}
-
-.sensorValue {
-  margin: 8px 0 6px;
-  font-size: 24px;
-  font-weight: 800;
-  color: #2f6b08;
-}
-
-.contentGrid {
-  display: grid;
-  grid-template-columns: 290px 1fr 320px;
-  gap: 14px;
-}
-
-.batchList,
-.batchDetail,
-.mapCard {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  padding: 14px;
-}
-
-.sectionHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-
-  h2 {
-    font-size: 18px;
-    margin: 0;
+  b {
+    display: block;
+    color: #3f8d16;
+    font-size: 15px;
   }
 
   small {
-    color: #6b7280;
+    color: #5b6774;
+    font-size: 12px;
   }
 }
 
-.batchItem,
-.batchActive {
-  width: 100%;
-  margin-bottom: 10px;
+.mapWidget {
+  margin-top: 10px;
+  border: 1px solid #d7d7d7;
+  background: #fff;
   border-radius: 10px;
   padding: 10px;
-  border: 1px solid #e5e7eb;
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  gap: 12px;
+
+  h3 {
+    margin: 0;
+  }
+
+  p {
+    margin: 6px 0 0;
+    color: #5f6b78;
+  }
+
+  img {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 8px;
+  }
+}
+
+.widgetGrid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.widgetCard {
+  border: 1px solid #d6d6d6;
+  border-radius: 10px;
   background: #fff;
+  padding: 10px;
+
+  ul {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 4px;
+  }
+
+  li {
+    color: #4d5865;
+    font-size: 13px;
+    padding-bottom: 4px;
+    border-bottom: 1px dashed #ececec;
+  }
+}
+
+.widgetHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  text-align: left;
 
-  p {
-    margin: 4px 0 0;
-    color: #6b7280;
-    font-size: 13px;
+  h4 {
+    margin: 0;
+    font-size: 18px;
   }
 
   span {
-    font-size: 12px;
-    font-weight: 600;
-    color: #2f6b08;
+    font-size: 11px;
+    color: #fff;
+    background: #f05454;
+    border-radius: 4px;
+    padding: 2px 6px;
   }
 }
 
-.batchActive {
-  border-color: #7cbc3e;
-  background: #f6fff0;
-}
+@media (max-width: 1400px) {
+  .pillRow {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
 
-.detailRows {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  border-bottom: 1px solid #e5e7eb;
-  padding-bottom: 12px;
-  margin-bottom: 12px;
-
-  p {
-    margin: 0;
-    font-size: 14px;
+  .widgetGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-.timeline {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 8px;
+@media (max-width: 980px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
 
-  li {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px;
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
+  .mapWidget {
+    grid-template-columns: 1fr;
 
-    span,
-    time {
-      color: #6b7280;
-      font-size: 13px;
-      display: block;
+    img {
+      height: 220px;
     }
   }
-}
 
-.mapCard {
-  img {
-    width: 100%;
-    border-radius: 12px;
-    margin: 10px 0;
-    height: 220px;
-    object-fit: cover;
-  }
-
-  p {
-    color: #4b5563;
-    margin: 0;
-    font-size: 14px;
-  }
-}
-
-@media (max-width: 1200px) {
-  .sensorGrid,
-  .contentGrid,
-  .detailRows {
+  .pillRow,
+  .widgetGrid {
     grid-template-columns: 1fr;
-  }
-
-  .page {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    border-right: none;
-    border-bottom: 1px solid #e5e7eb;
   }
 }

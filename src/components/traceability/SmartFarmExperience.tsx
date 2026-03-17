@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import SmartFarmDashboard from "./SmartFarmDashboard";
 import styles from "./SmartFarmExperience.module.scss";
 
@@ -64,6 +64,19 @@ export default function SmartFarmExperience() {
     return true;
   }, [form, step]);
 
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("dashboard") === "1") {
+      setForm({
+        ...initialForm,
+        fullName: "Nguyễn Văn A",
+        farmName: "Ket Farm",
+        address: "Long Thành, Đồng Nai",
+      });
+      setCompleted(true);
+    }
+  }, []);
   if (completed) {
     return (
       <SmartFarmDashboard
