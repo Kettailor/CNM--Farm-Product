@@ -87,7 +87,17 @@ const sensorCards = [
   { title: "Lượng mưa 24h", value: "12 mm", note: "Tưới tự động đã giảm 15%" },
 ];
 
-export default function SmartFarmDashboard() {
+type DashboardProfile = {
+  fullName: string;
+  farmName: string;
+  address: string;
+};
+
+type SmartFarmDashboardProps = {
+  profile?: DashboardProfile;
+};
+
+export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps) {
   const [selectedMenu, setSelectedMenu] = useState("Truy xuất nguồn gốc");
   const [selectedBatchId, setSelectedBatchId] = useState(batches[0].id);
 
@@ -100,7 +110,7 @@ export default function SmartFarmDashboard() {
     <div className={styles.page}>
       <aside className={styles.sidebar}>
         <h2 className={styles.logo}>farmdeck</h2>
-        <p className={styles.sidebarTitle}>Smart Agriculture</p>
+        <p className={styles.sidebarTitle}>{profile?.farmName || "Smart Agriculture"}</p>
         <ul>
           {menuItems.map((item) => (
             <li key={item}>
@@ -118,8 +128,9 @@ export default function SmartFarmDashboard() {
       <main className={styles.main}>
         <header className={styles.header}>
           <div>
-            <h1>Quản lý nông sản thông minh</h1>
+            <h1>Quản lý nông sản thông minh {profile?.fullName ? `- ${profile.fullName}` : ""}</h1>
             <p>Giám sát mùa vụ, theo dõi lô hàng và truy xuất nguồn gốc theo thời gian thực.</p>
+            {profile?.address && <small>Địa chỉ nông trại: {profile.address}</small>}
           </div>
           <button className={styles.actionButton}>+ Tạo lô mới</button>
         </header>

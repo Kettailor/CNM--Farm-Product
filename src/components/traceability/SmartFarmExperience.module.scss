@@ -1,0 +1,188 @@
+.wrapper {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(120deg, #19410a, #6dbb2f);
+  padding: 24px;
+}
+
+.hero {
+  max-width: 820px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 20px;
+  padding: 42px;
+
+  h1 {
+    margin: 0 0 12px;
+    font-size: 42px;
+  }
+
+  p {
+    margin: 0 0 20px;
+    color: #4b5563;
+    line-height: 1.6;
+  }
+
+  button {
+    border: none;
+    border-radius: 10px;
+    background: #59a915;
+    color: #fff;
+    padding: 12px 18px;
+    font-weight: 700;
+  }
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 20;
+  padding: 16px;
+}
+
+.modal {
+  width: min(1200px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  background: #fff;
+  border-radius: 14px;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+}
+
+.stepper {
+  border-right: 1px solid #e5e7eb;
+  padding: 20px;
+}
+
+.stepRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+
+  p {
+    margin: 0;
+    color: #6b7280;
+  }
+}
+
+.circle,
+.activeCircle {
+  height: 30px;
+  width: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: #fff;
+  background: #9ca3af;
+}
+
+.activeCircle {
+  background: #60b61a;
+}
+
+.activeTitle {
+  color: #111827 !important;
+  font-weight: 700;
+}
+
+.content {
+  padding: 24px;
+
+  h2 {
+    margin: 0 0 12px;
+  }
+
+  h3 {
+    margin: 14px 0 10px;
+    font-size: 18px;
+  }
+
+  input,
+  textarea,
+  select {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+
+  textarea {
+    min-height: 80px;
+  }
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.mapPreview {
+  width: 100%;
+  border-radius: 10px;
+  height: 230px;
+  object-fit: cover;
+}
+
+.checkGroup {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+
+  label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.backBtn,
+.nextBtn {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-weight: 700;
+}
+
+.backBtn {
+  background: #4b5563;
+  color: #fff;
+}
+
+.nextBtn {
+  background: #59a915;
+  color: #fff;
+}
+
+.nextBtn:disabled {
+  opacity: 0.5;
+}
+
+@media (max-width: 960px) {
+  .modal {
+    grid-template-columns: 1fr;
+  }
+
+  .stepper {
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}

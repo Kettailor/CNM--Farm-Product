@@ -1,13 +1,13 @@
 import React from 'react';
 import { Metadata } from 'next';
-import SmartFarmDashboard from '@/components/traceability/SmartFarmDashboard';
+import SmartFarmExperience from '@/components/traceability/SmartFarmExperience';
 
 export const metadata: Metadata = {
-  title: 'Nông sản thông minh - Truy xuất nguồn gốc',
+  title: 'Nông sản thông minh - Đăng ký & quản lý truy xuất nguồn gốc',
   description:
-    'Giao diện quản lý nông sản thông minh: theo dõi cảm biến, quản lý lô hàng và truy xuất nguồn gốc.',
+    'Website giới thiệu, onboarding đăng ký tài khoản nông trại và hệ thống quản lý truy xuất nguồn gốc.',
 };
 
 export default function HomePage() {
-  return <SmartFarmDashboard />;
+  return <SmartFarmExperience />;
 }
