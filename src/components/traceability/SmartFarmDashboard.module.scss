@@ -1,21 +1,23 @@
 .layout {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 280px 1fr;
-  background: #ececec;
+  grid-template-columns: 260px 1fr;
+  background: #f3f6f8;
+  color: #1f2937;
 }
 
 .sidebar {
-  background: #efefef;
-  border-right: 1px solid #d8d8d8;
-  padding: 12px;
+  background: #ffffff;
+  border-right: 1px solid #e5e7eb;
+  padding: 18px 12px;
   overflow: auto;
 
   h2 {
-    margin: 0 0 14px;
-    color: #53a51a;
-    font-size: 38px;
+    margin: 0 0 16px;
+    color: #4d9f17;
+    font-size: 34px;
     font-weight: 800;
+    letter-spacing: -0.02em;
   }
 
   ul {
@@ -27,70 +29,97 @@
   }
 
   li {
-    padding: 10px;
-    border-radius: 6px;
-    color: #46505a;
+    padding: 9px 11px;
+    border-radius: 10px;
+    color: #4b5563;
     font-weight: 500;
+    font-size: 14px;
     cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: #f3f7f0;
+      color: #2f6b10;
+    }
   }
 }
 
 .activeMenu {
-  background: #dfe9d8;
-  color: #2e6c10 !important;
+  background: #e9f6df;
+  color: #2f6b10 !important;
+  font-weight: 700 !important;
 }
 
 .main {
-  padding: 10px 16px 18px;
+  padding: 18px;
 }
 
 .topbar {
   display: flex;
   justify-content: space-between;
-  gap: 20px;
-  padding: 12px 16px;
-  border-radius: 10px;
-  background: #f7f7f7;
-  border: 1px solid #dcdcdc;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
 
   h1 {
     margin: 0;
-    font-size: 32px;
+    font-size: 30px;
+    line-height: 1.1;
   }
 
   p {
-    margin: 4px 0 0;
-    color: #5f6b78;
+    margin: 6px 0 0;
+    color: #6b7280;
+    font-size: 14px;
   }
 
   span {
-    align-self: center;
-    color: #4a5562;
-    font-weight: 500;
+    background: #f4f8f2;
+    color: #355f18;
+    border: 1px solid #dbead1;
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-size: 13px;
+    white-space: nowrap;
   }
 }
 
-.noticeCard {
-  margin-top: 10px;
-  border: 1px solid #d7d7d7;
+.noticeCard,
+.mapControls,
+.allocationPanel,
+.mapWidget {
+  margin-top: 12px;
+  border: 1px solid #e5e7eb;
   background: #fff;
-  border-radius: 10px;
-  padding: 12px;
+  border-radius: 14px;
+  padding: 14px;
+}
 
-  h3 { margin: 0 0 6px; }
-  p { margin: 0; color: #5f6b78; }
+.noticeCard {
+  h3 {
+    margin: 0 0 6px;
+    font-size: 18px;
+  }
+
+  p {
+    margin: 0;
+    color: #6b7280;
+    line-height: 1.55;
+  }
 }
 
 .kpiGrid,
 .pillRow {
-  margin-top: 10px;
+  margin-top: 12px;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 
   article {
-    border: 1px solid #d7d7d7;
-    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
     background: white;
     padding: 10px;
     text-align: center;
@@ -99,27 +128,28 @@
   b {
     display: block;
     color: #3f8d16;
-    font-size: 26px;
   }
 
   small {
-    color: #5b6774;
+    color: #6b7280;
     font-size: 12px;
   }
 }
 
-.pillRow {
-  grid-template-columns: repeat(10, minmax(0, 1fr));
+.kpiGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 
-  b { font-size: 15px; }
+  b {
+    font-size: 28px;
+  }
 }
 
-.mapControls {
-  margin-top: 10px;
-  border: 1px solid #d7d7d7;
-  border-radius: 10px;
-  background: #fff;
-  padding: 10px;
+.pillRow {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+
+  b {
+    font-size: 16px;
+  }
 }
 
 .toggleRow {
@@ -130,17 +160,18 @@
 
 .toggleBtn,
 .toggleActive {
-  border: 1px solid #c8c8c8;
-  background: #f7f7f7;
-  border-radius: 20px;
+  border: 1px solid #d1d5db;
+  background: #f8fafc;
+  border-radius: 999px;
   padding: 6px 10px;
-  font-size: 13px;
+  font-size: 12px;
+  color: #374151;
 }
 
 .toggleActive {
-  background: #69bc21;
+  background: #67b622;
   color: #fff;
-  border-color: #69bc21;
+  border-color: #67b622;
 }
 
 .configRow {
@@ -151,7 +182,7 @@
 
   label {
     font-size: 13px;
-    color: #4d5865;
+    color: #4b5563;
     display: grid;
     gap: 6px;
   }
@@ -159,15 +190,17 @@
   select,
   input {
     border: 1px solid #d1d5db;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 8px;
+    font-size: 14px;
+    background: #fff;
   }
 }
 
 .mapFrame {
-  margin-top: 10px;
-  border: 1px solid #d7d7d7;
-  border-radius: 10px;
+  margin-top: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
   overflow: hidden;
   position: relative;
 
@@ -175,90 +208,105 @@
     width: 100%;
     height: 560px;
     object-fit: cover;
-    filter: brightness(0.7);
+    filter: brightness(0.72);
   }
 }
 
 .overlayHint {
   position: absolute;
   left: 50%;
-  top: 46%;
+  top: 44%;
   transform: translate(-50%, -50%);
   color: #fff;
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 700;
   text-align: center;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 }
 
 .hexGrid {
   position: absolute;
   inset: 0;
   display: grid;
-  grid-template-columns: repeat(3, 180px);
-  gap: 16px;
+  grid-template-columns: repeat(3, 170px);
+  gap: 12px;
   align-content: center;
   justify-content: center;
 }
 
 .hex {
   clip-path: polygon(25% 6%, 75% 6%, 100% 50%, 75% 94%, 25% 94%, 0 50%);
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  min-height: 170px;
-  background: rgba(56, 189, 70, 0.35);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  min-height: 156px;
   color: #fff;
   display: grid;
   place-content: center;
   text-align: center;
-  gap: 4px;
+  gap: 3px;
+  backdrop-filter: blur(1px);
 
-  strong { font-size: 14px; }
-  span { font-size: 12px; }
+  strong {
+    font-size: 14px;
+  }
+
+  span {
+    font-size: 11px;
+  }
 }
 
-.healthy { background: rgba(67, 176, 42, 0.4); }
-.warning { background: rgba(240, 173, 45, 0.45); }
+.healthy { background: rgba(40, 167, 69, 0.45); }
+.warning { background: rgba(243, 156, 18, 0.45); }
 .critical { background: rgba(220, 53, 69, 0.45); }
-.hexSelected { border-color: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,0.35); }
+
+.hexSelected {
+  border-color: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.32);
+}
 
 .allocationPanel {
-  margin-top: 10px;
-  border: 1px solid #d7d7d7;
-  border-radius: 10px;
-  background: #fff;
-  padding: 12px;
+  h3 {
+    margin: 0 0 6px;
+    font-size: 18px;
+  }
 
-  h3 { margin: 0 0 6px; }
-  p { margin: 4px 0; color: #4d5865; }
+  p {
+    margin: 4px 0;
+    color: #4b5563;
+  }
 }
 
 .mapWidget {
-  margin-top: 10px;
-  border: 1px solid #d7d7d7;
-  background: #fff;
-  border-radius: 10px;
-  padding: 10px;
   display: grid;
-  grid-template-columns: 1fr 420px;
+  grid-template-columns: 1fr 320px;
   gap: 12px;
+
+  h3 {
+    margin: 0;
+  }
+
+  p {
+    margin: 8px 0 0;
+    color: #6b7280;
+  }
 
   img {
     width: 100%;
-    height: 120px;
+    height: 108px;
     object-fit: cover;
-    border-radius: 8px;
+    border-radius: 10px;
   }
 }
 
 .widgetGrid {
-  margin-top: 10px;
+  margin-top: 12px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
 .widgetCard {
-  border: 1px solid #d6d6d6;
-  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
   background: #fff;
   padding: 10px;
 
@@ -267,14 +315,14 @@
     margin: 8px 0 0;
     padding: 0;
     display: grid;
-    gap: 4px;
+    gap: 5px;
   }
 
   li {
-    color: #4d5865;
+    color: #4b5563;
     font-size: 13px;
-    padding-bottom: 4px;
-    border-bottom: 1px dashed #ececec;
+    padding-bottom: 5px;
+    border-bottom: 1px dashed #eef2f7;
   }
 }
 
@@ -285,7 +333,7 @@
 
   h4 {
     margin: 0;
-    font-size: 18px;
+    font-size: 16px;
   }
 
   span {
@@ -297,15 +345,18 @@
   }
 }
 
-@media (max-width: 1400px) {
-  .pillRow { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 1280px) {
   .widgetGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 980px) {
   .layout { grid-template-columns: 1fr; }
-  .kpiGrid, .pillRow, .widgetGrid, .configRow { grid-template-columns: 1fr; }
+  .kpiGrid,
+  .pillRow,
+  .widgetGrid,
+  .configRow,
+  .mapWidget { grid-template-columns: 1fr; }
   .hexGrid { grid-template-columns: 1fr; }
   .mapFrame img { height: 760px; }
-  .overlayHint { font-size: 22px; }
+  .overlayHint { font-size: 20px; width: 90%; }
 }
