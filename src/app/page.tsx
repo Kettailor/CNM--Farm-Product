@@ -1,18 +1,13 @@
-
-import React from 'react'
+import React from 'react';
 import { Metadata } from 'next';
-import HomeOne from '@/components/homes/home';
-import Wrapper from '@/layouts/Wrapper';
+import SmartFarmDashboard from '@/components/traceability/SmartFarmDashboard';
 
 export const metadata: Metadata = {
-  title: 'FarmHub - Agriculture Farming Next js Template',
-  description: 'Introducing Farmhub - the ultimate Next template for showcasing your agricultural or organic business. Designed with a sleek and modern aesthetic, Farmhub effortlessly captures the essence of sustainable farming and food production.',
+  title: 'Nông sản thông minh - Truy xuất nguồn gốc',
+  description:
+    'Giao diện quản lý nông sản thông minh: theo dõi cảm biến, quản lý lô hàng và truy xuất nguồn gốc.',
 };
 
-export default function index() {
-  return (
-    <Wrapper>
-      <HomeOne />
-    </Wrapper>
-  )
+export default function HomePage() {
+  return <SmartFarmDashboard />;
 }
