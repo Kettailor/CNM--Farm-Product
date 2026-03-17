@@ -1,0 +1,209 @@
+.wrapper {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 15% 20%, #6dbb2f 0%, #255b0c 45%, #163c06 100%);
+  padding: 24px;
+}
+
+.hero {
+  max-width: 860px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 20px;
+  padding: 44px;
+  box-shadow: 0 24px 65px rgba(0, 0, 0, 0.2);
+
+  h1 {
+    margin: 0 0 12px;
+    font-size: 40px;
+    line-height: 1.15;
+    color: #152238;
+  }
+
+  p {
+    margin: 0 0 22px;
+    color: #4b5563;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  button {
+    border: none;
+    border-radius: 12px;
+    background: #5fae1d;
+    color: #fff;
+    padding: 12px 20px;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+  }
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 30;
+  padding: 16px;
+}
+
+.modal {
+  width: min(1180px, 100%);
+  max-height: 92vh;
+  overflow: auto;
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+}
+
+.stepper {
+  border-right: 1px solid #edf0f2;
+  padding: 18px 14px;
+  background: #f9fbf8;
+}
+
+.stepRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 11px;
+
+  p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 14px;
+  }
+}
+
+.circle,
+.activeCircle {
+  height: 30px;
+  width: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+  background: #9ca3af;
+}
+
+.activeCircle {
+  background: #5fae1d;
+}
+
+.activeTitle {
+  color: #111827 !important;
+  font-weight: 700;
+}
+
+.content {
+  padding: 22px;
+
+  h2 {
+    margin: 0 0 12px;
+    color: #111827;
+  }
+
+  h3 {
+    margin: 12px 0 8px;
+    font-size: 17px;
+    color: #1f2937;
+  }
+
+  input,
+  textarea,
+  select {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 10px;
+    font-size: 14px;
+    color: #111827;
+    background: #fff;
+  }
+
+  textarea {
+    min-height: 88px;
+    resize: vertical;
+  }
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.mapPreview {
+  width: 100%;
+  border-radius: 10px;
+  height: 220px;
+  object-fit: cover;
+}
+
+.checkGroup {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 10px;
+
+  label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #374151;
+    font-size: 14px;
+  }
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.backBtn,
+.nextBtn {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.backBtn {
+  background: #4b5563;
+  color: #fff;
+}
+
+.nextBtn {
+  background: #5fae1d;
+  color: #fff;
+}
+
+.nextBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 960px) {
+  .modal {
+    grid-template-columns: 1fr;
+  }
+
+  .stepper {
+    border-right: none;
+    border-bottom: 1px solid #edf0f2;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}
