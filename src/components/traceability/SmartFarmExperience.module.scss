@@ -44,45 +44,67 @@
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
   display: grid;
   place-items: center;
   z-index: 30;
-  padding: 16px;
+  padding: 20px;
 }
 
 .modal {
-  width: min(1180px, 100%);
+  width: min(1120px, 100%);
   max-height: 92vh;
   overflow: auto;
   background: #fff;
-  border-radius: 16px;
+  border-radius: 20px;
   border: 1px solid #e5e7eb;
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.24);
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 320px 1fr;
 }
 
 .stepper {
   border-right: 1px solid #edf0f2;
-  padding: 18px 14px;
-  background: #f9fbf8;
+  padding: 24px 18px;
+  background: linear-gradient(180deg, #f6fbf1 0%, #f8fafc 100%);
+}
+
+.stepperTitle {
+  margin: 0 0 14px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #4b5563;
+  font-weight: 700;
 }
 
 .stepRow {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  align-items: start;
   gap: 10px;
-  margin-bottom: 11px;
+  margin-bottom: 14px;
 
   p {
     margin: 0;
     color: #6b7280;
-    font-size: 14px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  small {
+    display: block;
+    margin-top: 3px;
+    color: #6b7280;
+    font-size: 12px;
+    line-height: 1.45;
   }
 }
 
 .circle,
-.activeCircle {
+.activeCircle,
+.doneCircle {
   height: 30px;
   width: 30px;
   border-radius: 999px;
@@ -94,27 +116,35 @@
   background: #9ca3af;
 }
 
-.activeCircle {
+.activeCircle,
+.doneCircle {
   background: #5fae1d;
 }
 
 .activeTitle {
   color: #111827 !important;
-  font-weight: 700;
 }
 
 .content {
-  padding: 22px;
+  padding: 30px;
 
   h2 {
-    margin: 0 0 12px;
+    margin: 0 0 10px;
     color: #111827;
+    font-size: 30px;
+    line-height: 1.2;
   }
 
   h3 {
-    margin: 12px 0 8px;
-    font-size: 17px;
+    margin: 16px 0 8px;
+    font-size: 18px;
     color: #1f2937;
+  }
+
+  p {
+    margin: 0 0 12px;
+    color: #4b5563;
+    line-height: 1.6;
   }
 
   input,
@@ -123,11 +153,17 @@
     width: 100%;
     border: 1px solid #d1d5db;
     border-radius: 10px;
-    padding: 10px;
+    padding: 11px 12px;
     margin-bottom: 10px;
-    font-size: 14px;
+    font-size: 15px;
     color: #111827;
     background: #fff;
+
+    &:focus {
+      outline: none;
+      border-color: #63b125;
+      box-shadow: 0 0 0 3px rgba(95, 174, 29, 0.15);
+    }
   }
 
   textarea {
@@ -144,14 +180,15 @@
 
 .mapPreview {
   width: 100%;
-  border-radius: 10px;
+  border-radius: 12px;
   height: 220px;
   object-fit: cover;
+  border: 1px solid #d1d5db;
 }
 
 .checkGroup {
   display: grid;
-  gap: 7px;
+  gap: 8px;
   margin-bottom: 10px;
 
   label {
@@ -159,21 +196,21 @@
     align-items: center;
     gap: 8px;
     color: #374151;
-    font-size: 14px;
+    font-size: 15px;
   }
 }
 
 .actions {
   display: flex;
   gap: 10px;
-  margin-top: 14px;
+  margin-top: 18px;
 }
 
 .backBtn,
 .nextBtn {
   border: none;
   border-radius: 10px;
-  padding: 10px 14px;
+  padding: 11px 16px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -205,5 +242,13 @@
 
   .formGrid {
     grid-template-columns: 1fr;
+  }
+
+  .content {
+    padding: 22px;
+
+    h2 {
+      font-size: 25px;
+    }
   }
 }

@@ -39,14 +39,25 @@ const initialForm: FormState = {
 };
 
 const stepTitles = [
-  "Farmdeck Onboarding",
+  "Chào mừng",
   "Thông tin cá nhân",
-  "Farm Name",
-  "Locate Your Farm",
-  "Farm Type & Size",
-  "Units & Settings",
-  "How did you hear about Farmdeck?",
+  "Tên nông trại",
+  "Vị trí nông trại",
+  "Loại hình & quy mô",
+  "Đơn vị & thiết lập",
+  "Bạn biết Farmdeck từ đâu?",
   "Hoàn tất",
+];
+
+const stepDescriptions = [
+  "Thiết lập hệ thống quản lý nông trại và truy xuất nguồn gốc chỉ trong vài bước.",
+  "Điền thông tin người quản lý để kích hoạt tài khoản.",
+  "Tên hiển thị này sẽ xuất hiện trên dashboard và tem truy xuất.",
+  "Xác định vị trí để hệ thống gợi ý khí hậu và bản đồ mùa vụ chính xác hơn.",
+  "Chọn nhóm sản xuất và tài nguyên hiện có để cá nhân hóa quy trình.",
+  "Thiết lập đơn vị đo phù hợp cho báo cáo và nhật ký vận hành.",
+  "Thông tin giúp đội ngũ hỗ trợ kết nối chương trình phù hợp cho bạn.",
+  "Hoàn tất đăng ký và bắt đầu quản lý nông trại thông minh.",
 ];
 
 export default function SmartFarmExperience() {
@@ -104,10 +115,24 @@ export default function SmartFarmExperience() {
         <section className={styles.modalOverlay}>
           <div className={styles.modal}>
             <aside className={styles.stepper}>
+              <p className={styles.stepperTitle}>Quy trình đăng ký</p>
               {stepTitles.map((title, index) => (
                 <div key={title} className={styles.stepRow}>
-                  <span className={index === step ? styles.activeCircle : styles.circle}>{index + 1}</span>
-                  <p className={index === step ? styles.activeTitle : ""}>{title}</p>
+                  <span
+                    className={
+                      index === step
+                        ? styles.activeCircle
+                        : index < step
+                          ? styles.doneCircle
+                          : styles.circle
+                    }
+                  >
+                    {index + 1}
+                  </span>
+                  <div>
+                    <p className={index === step ? styles.activeTitle : ""}>{title}</p>
+                    <small>{stepDescriptions[index]}</small>
+                  </div>
                 </div>
               ))}
             </aside>
@@ -115,7 +140,7 @@ export default function SmartFarmExperience() {
             <div className={styles.content}>
               {step === 0 && (
                 <>
-                  <h2>Welcome to Farmdeck</h2>
+                  <h2>Chào mừng đến với Farmdeck</h2>
                   <p>
                     Chúng tôi sẽ giúp bạn thiết lập tài khoản với thông tin cá nhân và thông tin
                     nông trại chỉ trong vài phút.
@@ -148,7 +173,7 @@ export default function SmartFarmExperience() {
 
               {step === 2 && (
                 <>
-                  <h2>Farm Name</h2>
+                  <h2>Tên nông trại</h2>
                   <input
                     placeholder="Nhập tên nông trại"
                     value={form.farmName}
@@ -159,7 +184,7 @@ export default function SmartFarmExperience() {
 
               {step === 3 && (
                 <>
-                  <h2>Locate Your Farm</h2>
+                  <h2>Vị trí nông trại</h2>
                   <textarea
                     placeholder="Nhập địa chỉ nông trại"
                     value={form.address}
@@ -183,7 +208,7 @@ export default function SmartFarmExperience() {
 
               {step === 4 && (
                 <>
-                  <h2>Farm Type & Size</h2>
+                  <h2>Loại hình & quy mô</h2>
                   <div className={styles.checkGroup}>
                     {["Chăn nuôi", "Trồng trọt", "Nông nghiệp hữu cơ", "Nuôi trồng thủy sản"].map((item) => (
                       <label key={item}>
@@ -225,7 +250,7 @@ export default function SmartFarmExperience() {
 
               {step === 5 && (
                 <>
-                  <h2>Units & Settings</h2>
+                  <h2>Đơn vị & thiết lập</h2>
                   <div className={styles.formGrid}>
                     <select
                       value={form.landArea}
@@ -259,7 +284,7 @@ export default function SmartFarmExperience() {
 
               {step === 6 && (
                 <>
-                  <h2>How did you hear about Farmdeck?</h2>
+                  <h2>Bạn biết Farmdeck từ đâu?</h2>
                   <div className={styles.checkGroup}>
                     {["Sự kiện", "Báo chí", "Mạng xã hội", "Bạn bè giới thiệu", "Radio"].map((item) => (
                       <label key={item}>
@@ -282,7 +307,7 @@ export default function SmartFarmExperience() {
 
               {step === 7 && (
                 <>
-                  <h2>Congratulations!</h2>
+                  <h2>Chúc mừng!</h2>
                   <p>Tài khoản của bạn đã sẵn sàng. Nhấn Hoàn tất để vào hệ thống quản lý.</p>
                 </>
               )}
@@ -298,7 +323,7 @@ export default function SmartFarmExperience() {
                     setStep((prev) => prev - 1);
                   }}
                 >
-                  ← Back
+                  ← Quay lại
                 </button>
 
                 {step < 7 ? (
@@ -307,7 +332,7 @@ export default function SmartFarmExperience() {
                     disabled={!canContinue}
                     onClick={() => setStep((prev) => prev + 1)}
                   >
-                    Continue →
+                    Tiếp tục →
                   </button>
                 ) : (
                   <button className={styles.nextBtn} onClick={() => setCompleted(true)}>
