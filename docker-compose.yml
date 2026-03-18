@@ -1,0 +1,38 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: farmhub-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://farmhub:farmhub@db:5432/farmhub
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: farmhub-db
+    environment:
+      POSTGRES_DB: farmhub
+      POSTGRES_USER: farmhub
+      POSTGRES_PASSWORD: farmhub
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docs/database/farm_traceability_schema.sql:/docker-entrypoint-initdb.d/01_farm_traceability_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U farmhub -d farmhub"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

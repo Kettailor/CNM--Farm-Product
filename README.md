@@ -42,3 +42,25 @@ A comprehensive PostgreSQL schema for the smart farm and product traceability do
 - `docs/database/farm_traceability_schema.sql`
 - `docs/database/README.md`
 
+
+## Run the full project with Docker
+
+This repository now includes a Docker setup for the full project:
+
+- `Dockerfile` for the Next.js application
+- `docker-compose.yml` for the app + PostgreSQL database
+- automatic database initialization from `docs/database/farm_traceability_schema.sql`
+- deployment guide at `docs/database/docker-deployment.md`
+
+### Start
+
+```bash
+docker compose up --build
+```
+
+### Stop
+
+```bash
+docker compose down
+```
+
