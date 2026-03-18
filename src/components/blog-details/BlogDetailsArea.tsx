@@ -7,7 +7,7 @@ import React from 'react'
 export default function BlogDetailsArea() {
 
   // const selectHandler = (e: any) => { };
-  const selectHandler = (e: unknown) => { };
+  const selectHandler = () => { };
 
 
 
