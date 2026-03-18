@@ -15,6 +15,9 @@ type LocationMode = "search" | "pin" | "manual";
 
 type FormState = {
   fullName: string;
+  username: string;
+  password: string;
+  confirmPassword: string;
   email: string;
   phone: string;
   farmName: string;
@@ -25,8 +28,6 @@ type FormState = {
   cropTypes: string[];
   livestockTypes: string[];
   resources: string[];
-  otherFarmType: string;
-  otherResource: string;
   annualRainfall: string;
   animalLoadUnit: string;
   landArea: string;
@@ -48,6 +49,9 @@ const ONBOARDING_STORAGE_KEY = "farmdeck.smart.onboarding";
 
 const initialForm: FormState = {
   fullName: "",
+  username: "",
+  password: "",
+  confirmPassword: "",
   email: "",
   phone: "",
   farmName: "",
@@ -58,18 +62,16 @@ const initialForm: FormState = {
   cropTypes: [],
   livestockTypes: [],
   resources: [],
-  otherFarmType: "",
-  otherResource: "",
   annualRainfall: "1000",
   animalLoadUnit: "DSE",
-  landArea: "Hectare",
+  landArea: "Hecta",
   carryingCapacity: "1",
   carryingUnit: "SDH/100mm",
-  unitLength: "Metric (metres, kilometres)",
-  unitMass: "Metric (kg, tonnes)",
-  springStart: "1st September",
-  unitTemperature: "Celcius (°C)",
-  unitVolume: "Metric (litres, megalitres)",
+  unitLength: "Mét (m, km)",
+  unitMass: "Mét (kg, tấn)",
+  springStart: "01 Tháng 09",
+  unitTemperature: "Độ C (°C)",
+  unitVolume: "Mét (lít, megalit)",
   hearFrom: [],
   hearFromEventDetails: [],
   hearFromNewsDetails: [],
@@ -78,51 +80,30 @@ const initialForm: FormState = {
 };
 
 const stepTitles = [
-  "Farmdeck Onboarding",
-  "Farm Name",
-  "Locate Your Farm",
-  "Farm Type & Size",
-  "Units & Settings",
-  "How did you hear about Farmdeck?",
-  "Congratulations! 🎉",
+  "Giới thiệu hệ thống",
+  "Thông tin tài khoản",
+  "Định vị nông trại",
+  "Loại hình & quy mô nông trại",
+  "Đơn vị đo & cài đặt",
+  "Bạn biết Farmdeck từ đâu?",
+  "Hoàn tất đăng ký 🎉",
 ];
 
 const sourceOptions = [
-  "Event",
-  "Newspaper",
-  "Online blog or publication",
-  "Peer recommendation",
+  "Sự kiện",
+  "Báo in",
+  "Blog hoặc ấn phẩm trực tuyến",
+  "Người quen giới thiệu",
   "Radio",
-  "Search engine (Google, Yahoo, etc.)",
-  "Social Media",
-  "Television",
-  "Billboard",
-  "Other (please specify)",
+  "Công cụ tìm kiếm (Google, Yahoo,...)",
+  "Mạng xã hội",
+  "Truyền hình",
+  "Biển quảng cáo",
+  "Khác (vui lòng ghi rõ)",
 ];
 
-const eventOptions = [
-  "AgQuip",
-  "AgSmart Expo",
-  "AgTech Field Day",
-  "Beef Week",
-  "Elders FarmFest",
-  "IoT Impact Conference and Expo",
-  "Sheepvention",
-  "Tamworth Career Expo",
-  "Tocal Field Days",
-  "Other",
-];
-
-const newspaperOptions = [
-  "The Farmer",
-  "The Land",
-  "Ad Journal",
-  "Queensland Country Life",
-  "Stock & Land",
-  "Stock Journal",
-  "Farm Weekly",
-  "Other",
-];
+const eventOptions = ["AgQuip", "AgSmart Expo", "AgTech Field Day", "Beef Week", "Khác"];
+const newspaperOptions = ["The Farmer", "The Land", "Stock Journal", "Farm Weekly", "Khác"];
 
 const toggleValue = (list: string[], value: string, checked: boolean) =>
   checked ? [...list, value] : list.filter((item) => item !== value);
@@ -133,16 +114,27 @@ export default function SmartFarmExperience() {
   const [step, setStep] = useState(0);
   const [locationMode, setLocationMode] = useState<LocationMode>("search");
   const [form, setForm] = useState<FormState>(initialForm);
+  const [mapHistory, setMapHistory] = useState<string[]>([]);
+
+  const isAccountValid = useMemo(() => {
+    const hasValues =
+      form.fullName.trim() &&
+      form.username.trim() &&
+      form.password.trim() &&
+      form.confirmPassword.trim() &&
+      form.farmName.trim();
+    return Boolean(hasValues && form.password === form.confirmPassword);
+  }, [form]);
 
   const canContinue = useMemo(() => {
-    if (step === 1) return Boolean(form.farmName.trim());
+    if (step === 1) return isAccountValid;
     if (step === 2) return Boolean(form.verifiedLocation);
     if (step === 3) return form.farmTypes.length > 0;
     if (step === 5) return form.hearFrom.length > 0;
     return true;
-  }, [form, step]);
+  }, [form, isAccountValid, step]);
 
-  const mapQuery = form.lat && form.lng ? `${form.lat},${form.lng}` : form.address || "Vietnam";
+  const mapQuery = form.lat && form.lng ? `${form.lat},${form.lng}` : form.address || "Việt Nam";
   const mapEmbedUrl = `https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&z=14&output=embed`;
 
   const saveForm = (nextForm: FormState) => {
@@ -180,12 +172,26 @@ export default function SmartFarmExperience() {
     }
   }, []);
 
+  useEffect(() => {
+    if (step !== 2 || !mapQuery.trim()) return;
+
+    const timer = setTimeout(() => {
+      setMapHistory((prev) => {
+        if (prev[0] === mapQuery) return prev;
+        const next = [mapQuery, ...prev.filter((item) => item !== mapQuery)].slice(0, 6);
+        return next;
+      });
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [mapQuery, step]);
+
   if (completed) {
     return (
       <SmartFarmDashboard
         profile={{
           fullName: form.fullName || "Nguyễn Văn A",
-          farmName: form.farmName || "Ket Farm",
+          farmName: form.farmName || "Nông trại mẫu",
           address: form.address,
           lat: form.verifiedLocation?.lat,
           lng: form.verifiedLocation?.lng,
@@ -198,7 +204,7 @@ export default function SmartFarmExperience() {
     <div className={styles.wrapper}>
       <section className={styles.hero}>
         <h1>Nền tảng quản lý nông sản thông minh</h1>
-        <p>Theo dõi lô nông sản, giám sát IoT, và truy xuất nguồn gốc minh bạch từ nông trại đến người dùng.</p>
+        <p>Theo dõi lô nông sản, giám sát IoT và truy xuất nguồn gốc minh bạch từ nông trại đến người dùng.</p>
         <button onClick={() => setShowOnboarding(true)}>Đăng ký & bắt đầu quản lý</button>
       </section>
 
@@ -221,56 +227,73 @@ export default function SmartFarmExperience() {
               {step === 0 && (
                 <div className={styles.stepBody}>
                   <p>
-                    Welcome to <b>Farmdeck</b> - your all-in-one platform for smarter, more efficient farm
-                    management. Whether you are tracking livestock, monitoring paddocks, managing water resources,
-                    or handling daily operations, Farmdeck helps you stay in control.
+                    Chào mừng bạn đến với <b>Farmdeck</b> - nền tảng tất cả trong một để quản lý nông trại hiệu quả,
+                    theo dõi vận hành hằng ngày và truy xuất nguồn gốc sản phẩm.
                   </p>
                   <p>
-                    To make your experience as seamless as possible, let's start by learning a little about your
-                    farm, operations, and business goals. This quick setup takes less than a minute.
+                    Thiết lập này chỉ mất chưa đến một phút. Chúng tôi sẽ thu thập thông tin cơ bản để cá nhân hoá hệ
+                    thống theo mô hình nông trại của bạn.
                   </p>
-                  <p>When you are ready, click Continue.</p>
+                  <p>Khi sẵn sàng, bấm "Tiếp tục".</p>
                 </div>
               )}
 
               {step === 1 && (
                 <div className={styles.stepBody}>
-                  <p>Let us begin with your farm name.</p>
+                  <p>Vui lòng nhập thông tin tài khoản để phục vụ đăng nhập và quản lý nông trại.</p>
                   <input
-                    placeholder="Farm name"
+                    placeholder="Họ và tên"
+                    value={form.fullName}
+                    onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                  />
+                  <input
+                    placeholder="Tên tài khoản đăng nhập"
+                    value={form.username}
+                    onChange={(e) => setForm({ ...form, username: e.target.value })}
+                  />
+                  <input
+                    type="password"
+                    placeholder="Mật khẩu"
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  />
+                  <input
+                    type="password"
+                    placeholder="Nhập lại mật khẩu"
+                    value={form.confirmPassword}
+                    onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                  />
+                  <input
+                    placeholder="Tên nông trại"
                     value={form.farmName}
                     onChange={(e) => setForm({ ...form, farmName: e.target.value })}
                   />
-                  <p>When you are done, click Continue.</p>
+                  {!isAccountValid && <p className={styles.tip}>Tên tài khoản/mật khẩu chưa hợp lệ hoặc chưa khớp.</p>}
                 </div>
               )}
 
               {step === 2 && (
                 <div className={styles.stepBody}>
-                  <p>
-                    Help us tailor Farmdeck to your needs by letting us know where your farm is located. A full
-                    address is best as it centres your homestead on the map.
-                  </p>
-                  <p className={styles.tip}>💡 TIP: For remote spots, manual entry is your best bet.</p>
-                  <p>How would you like to share your location? (Select one option)</p>
+                  <p>Vui lòng chia sẻ vị trí nông trại để hệ thống theo dõi bản đồ và truy xuất chính xác hơn.</p>
+                  <p className={styles.tip}>💡 Bạn có thể chọn 1 trong 3 cách. Dù chọn cách nào vẫn có live view bản đồ.</p>
 
                   <div className={styles.radioGroup}>
                     <label>
                       <input type="radio" checked={locationMode === "search"} onChange={() => setLocationMode("search")} />
-                      Search using Google Maps (enter your address or Plus Code)
+                      Tìm kiếm địa chỉ bằng Google Maps
                     </label>
                     <label>
                       <input type="radio" checked={locationMode === "pin"} onChange={() => setLocationMode("pin")} />
-                      Select your location directly on the map
+                      Chọn vị trí trực tiếp trên bản đồ
                     </label>
                     <label>
                       <input type="radio" checked={locationMode === "manual"} onChange={() => setLocationMode("manual")} />
-                      Enter your location lat/lon with 4+ decimal places
+                      Nhập thủ công kinh độ / vĩ độ (>= 4 chữ số thập phân)
                     </label>
                   </div>
 
                   <textarea
-                    placeholder="Enter your address"
+                    placeholder="Nhập địa chỉ hoặc Plus Code"
                     value={form.address}
                     onChange={(e) => setForm({ ...form, address: e.target.value, verifiedLocation: null })}
                   />
@@ -280,56 +303,52 @@ export default function SmartFarmExperience() {
                       <input
                         type="number"
                         step="0.0001"
-                        placeholder="Latitude"
+                        placeholder="Vĩ độ"
                         value={form.lat}
                         onChange={(e) => setForm({ ...form, lat: e.target.value, verifiedLocation: null })}
                       />
                       <input
                         type="number"
                         step="0.0001"
-                        placeholder="Longitude"
+                        placeholder="Kinh độ"
                         value={form.lng}
                         onChange={(e) => setForm({ ...form, lng: e.target.value, verifiedLocation: null })}
                       />
-                      <button className={styles.backBtn} type="button" onClick={validateLocation}>✥ Validate</button>
+                      <button className={styles.backBtn} type="button" onClick={validateLocation}>
+                        Xác thực vị trí
+                      </button>
                     </div>
                   )}
 
-                  {locationMode === "pin" && <iframe title="Google map" className={styles.googleMap} src={mapEmbedUrl} loading="lazy" />}
-                  {form.verifiedLocation && <p className={styles.validText}>✓ Location verified</p>}
-                  <p>When you are done, click Continue.</p>
+                  <iframe title="Bản đồ Google" className={styles.googleMap} src={mapEmbedUrl} loading="lazy" />
+                  <p className={styles.tip}>Danh sách theo dõi truy vấn Google Maps:</p>
+                  <ul className={styles.mapHistory}>
+                    {mapHistory.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+
+                  {form.verifiedLocation && <p className={styles.validText}>✓ Đã xác thực vị trí thành công</p>}
                 </div>
               )}
 
               {step === 3 && (
                 <div className={styles.stepBody}>
-                  <p>
-                    We would love to learn more about your operation. What does your farm include? (Select all that
-                    apply, at least one option is required)
-                  </p>
+                  <p>Vui lòng chọn loại hình đang có trên nông trại (chọn ít nhất 1 mục).</p>
 
                   <div className={styles.checkGroup}>
                     <label>
                       <input
                         type="checkbox"
-                        checked={form.farmTypes.includes("Livestock")}
-                        onChange={(e) => setForm({ ...form, farmTypes: toggleValue(form.farmTypes, "Livestock", e.target.checked) })}
+                        checked={form.farmTypes.includes("Chăn nuôi")}
+                        onChange={(e) => setForm({ ...form, farmTypes: toggleValue(form.farmTypes, "Chăn nuôi", e.target.checked) })}
                       />
-                      🐂 Livestock - Manage cattle, sheep, goats, and more.
+                      🐂 Chăn nuôi
                     </label>
-                    {form.farmTypes.includes("Livestock") && (
+                    {form.farmTypes.includes("Chăn nuôi") && (
                       <div className={styles.subGroup}>
-                        <p>Livestock Farming? Let us get the details. Select the animals you raise on your farm:</p>
-                        {[
-                          "Cattle",
-                          "Sheep",
-                          "Goats",
-                          "Horses",
-                          "Pigs",
-                          "Poultry",
-                          "Alpacas",
-                          "Other",
-                        ].map((item) => (
+                        <p>Chọn vật nuôi bạn đang nuôi:</p>
+                        {["Bò", "Cừu", "Dê", "Ngựa", "Heo", "Gia cầm", "Khác"].map((item) => (
                           <label key={item}>
                             <input
                               type="checkbox"
@@ -347,15 +366,15 @@ export default function SmartFarmExperience() {
                     <label>
                       <input
                         type="checkbox"
-                        checked={form.farmTypes.includes("Crops")}
-                        onChange={(e) => setForm({ ...form, farmTypes: toggleValue(form.farmTypes, "Crops", e.target.checked) })}
+                        checked={form.farmTypes.includes("Cây trồng")}
+                        onChange={(e) => setForm({ ...form, farmTypes: toggleValue(form.farmTypes, "Cây trồng", e.target.checked) })}
                       />
-                      🌾 Crops - From pastures to orchards.
+                      🌾 Cây trồng
                     </label>
-                    {form.farmTypes.includes("Crops") && (
+                    {form.farmTypes.includes("Cây trồng") && (
                       <div className={styles.subGroup}>
-                        <p>Crops Growing food, fodder, or commercial crops? Let us know what is in your paddocks:</p>
-                        {["Pastures", "Fruit Production", "Nut Farming", "Grain Farming", "Vegetable Farming", "Other"].map((item) => (
+                        <p>Chọn nhóm cây trồng chính:</p>
+                        {["Đồng cỏ", "Cây ăn quả", "Ngũ cốc", "Rau màu", "Khác"].map((item) => (
                           <label key={item}>
                             <input
                               type="checkbox"
@@ -371,99 +390,67 @@ export default function SmartFarmExperience() {
                     <label>
                       <input
                         type="checkbox"
-                        checked={form.farmTypes.includes("Farming Resources & Equipment")}
+                        checked={form.farmTypes.includes("Tài nguyên & thiết bị")}
                         onChange={(e) =>
-                          setForm({ ...form, farmTypes: toggleValue(form.farmTypes, "Farming Resources & Equipment", e.target.checked) })
+                          setForm({ ...form, farmTypes: toggleValue(form.farmTypes, "Tài nguyên & thiết bị", e.target.checked) })
                         }
                       />
-                      🚜 Farming Resources & Equipment - Track water, machinery, farm tools.
+                      🚜 Tài nguyên & thiết bị
                     </label>
-                    {form.farmTypes.includes("Farming Resources & Equipment") && (
-                      <div className={styles.subGroup}>
-                        <p>Keeping your farm running smoothly takes the right resources. What do you use?</p>
-                        {[
-                          "Water Tanks",
-                          "Troughs",
-                          "Dams",
-                          "Rain Gauges",
-                          "Pumps",
-                          "Tractor",
-                          "Other Farming Equipment",
-                        ].map((item) => (
-                          <label key={item}>
-                            <input
-                              type="checkbox"
-                              checked={form.resources.includes(item)}
-                              onChange={(e) => setForm({ ...form, resources: toggleValue(form.resources, item, e.target.checked) })}
-                            />
-                            {item}
-                          </label>
-                        ))}
-                      </div>
-                    )}
-
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={form.farmTypes.includes("Other")}
-                        onChange={(e) => setForm({ ...form, farmTypes: toggleValue(form.farmTypes, "Other", e.target.checked) })}
-                      />
-                      ❔ Other (please specify).
-                    </label>
-                    {form.farmTypes.includes("Other") && (
-                      <input
-                        placeholder="Please specify"
-                        value={form.otherFarmType}
-                        onChange={(e) => setForm({ ...form, otherFarmType: e.target.value })}
-                      />
-                    )}
                   </div>
                 </div>
               )}
 
               {step === 4 && (
                 <div className={styles.stepBody}>
-                  <p>
-                    Every farm operates differently, so let's make sure Farmdeck presents information in the units
-                    that best suits your operation.
-                  </p>
-                  <p className={styles.tip}>💡 TIP: If the defaults work for you, feel free to skip this step.</p>
-                  <p>Select your preferred units:</p>
-
+                  <p>Thiết lập đơn vị đo để bảng điều khiển phù hợp với nhu cầu vận hành của bạn.</p>
                   <div className={styles.unitsGrid}>
-                    <label>Animal Load Units:</label>
-                    <select value={form.animalLoadUnit} onChange={(e) => setForm({ ...form, animalLoadUnit: e.target.value })}><option>DSE</option></select>
-                    <label>Annual Rainfall (mm):</label>
+                    <label>Đơn vị tải vật nuôi:</label>
+                    <select value={form.animalLoadUnit} onChange={(e) => setForm({ ...form, animalLoadUnit: e.target.value })}>
+                      <option>DSE</option>
+                    </select>
+                    <label>Lượng mưa năm (mm):</label>
                     <input value={form.annualRainfall} onChange={(e) => setForm({ ...form, annualRainfall: e.target.value })} />
-                    <label>Land Area Measurement:</label>
-                    <select value={form.landArea} onChange={(e) => setForm({ ...form, landArea: e.target.value })}><option>Hectare</option></select>
-                    <label>Carrying Capacity:</label>
+                    <label>Đơn vị diện tích đất:</label>
+                    <select value={form.landArea} onChange={(e) => setForm({ ...form, landArea: e.target.value })}>
+                      <option>Hecta</option>
+                    </select>
+                    <label>Sức tải:</label>
                     <input value={form.carryingCapacity} onChange={(e) => setForm({ ...form, carryingCapacity: e.target.value })} />
-                    <label>Carrying Capacity Units:</label>
-                    <select value={form.carryingUnit} onChange={(e) => setForm({ ...form, carryingUnit: e.target.value })}><option>SDH/100mm</option></select>
-                    <label>Length Units:</label>
-                    <select value={form.unitLength} onChange={(e) => setForm({ ...form, unitLength: e.target.value })}><option>Metric (metres, kilometres)</option></select>
-                    <label>Mass Units:</label>
-                    <select value={form.unitMass} onChange={(e) => setForm({ ...form, unitMass: e.target.value })}><option>Metric (kg, tonnes)</option></select>
-                    <label>Spring Start:</label>
-                    <select value={form.springStart} onChange={(e) => setForm({ ...form, springStart: e.target.value })}><option>1st September</option></select>
-                    <label>Temperature Units:</label>
-                    <select value={form.unitTemperature} onChange={(e) => setForm({ ...form, unitTemperature: e.target.value })}><option>Celcius (°C)</option></select>
-                    <label>Volume Units:</label>
-                    <select value={form.unitVolume} onChange={(e) => setForm({ ...form, unitVolume: e.target.value })}><option>Metric (litres, megalitres)</option></select>
+                    <label>Đơn vị sức tải:</label>
+                    <select value={form.carryingUnit} onChange={(e) => setForm({ ...form, carryingUnit: e.target.value })}>
+                      <option>SDH/100mm</option>
+                    </select>
+                    <label>Đơn vị chiều dài:</label>
+                    <select value={form.unitLength} onChange={(e) => setForm({ ...form, unitLength: e.target.value })}>
+                      <option>Mét (m, km)</option>
+                    </select>
+                    <label>Đơn vị khối lượng:</label>
+                    <select value={form.unitMass} onChange={(e) => setForm({ ...form, unitMass: e.target.value })}>
+                      <option>Kg, tấn</option>
+                    </select>
+                    <label>Mốc bắt đầu mùa xuân:</label>
+                    <select value={form.springStart} onChange={(e) => setForm({ ...form, springStart: e.target.value })}>
+                      <option>01 Tháng 09</option>
+                    </select>
+                    <label>Đơn vị nhiệt độ:</label>
+                    <select
+                      value={form.unitTemperature}
+                      onChange={(e) => setForm({ ...form, unitTemperature: e.target.value })}
+                    >
+                      <option>Độ C (°C)</option>
+                    </select>
+                    <label>Đơn vị thể tích:</label>
+                    <select value={form.unitVolume} onChange={(e) => setForm({ ...form, unitVolume: e.target.value })}>
+                      <option>Lít, megalit</option>
+                    </select>
                   </div>
-                  <p>When you are done, click Continue.</p>
                 </div>
               )}
 
               {step === 5 && (
                 <div className={styles.stepBody}>
-                  <p>
-                    We would love to know how you found out about Farmdeck! Understanding where our community comes
-                    from helps us improve and reach more farmers like you.
-                  </p>
-                  <p>Did you hear about us at a field day, through a mate, or online? Select all that apply.</p>
-                  <p>Select at least one option:</p>
+                  <p>Bạn biết Farmdeck từ kênh nào? (chọn tất cả mục phù hợp)</p>
 
                   <div className={styles.checkGroup}>
                     {sourceOptions.map((item) => (
@@ -477,9 +464,9 @@ export default function SmartFarmExperience() {
                       </label>
                     ))}
 
-                    {form.hearFrom.includes("Event") && (
+                    {form.hearFrom.includes("Sự kiện") && (
                       <div className={styles.subGroup}>
-                        <p>Which event did you hear about us at?</p>
+                        <p>Bạn biết qua sự kiện nào?</p>
                         {eventOptions.map((item) => (
                           <label key={item}>
                             <input
@@ -495,9 +482,9 @@ export default function SmartFarmExperience() {
                       </div>
                     )}
 
-                    {form.hearFrom.includes("Newspaper") && (
+                    {form.hearFrom.includes("Báo in") && (
                       <div className={styles.subGroup}>
-                        <p>Which publication did you see us in?</p>
+                        <p>Bạn thấy chúng tôi trên báo nào?</p>
                         {newspaperOptions.map((item) => (
                           <label key={item}>
                             <input
@@ -513,11 +500,11 @@ export default function SmartFarmExperience() {
                       </div>
                     )}
 
-                    {form.hearFrom.includes("Other (please specify)") && (
+                    {form.hearFrom.includes("Khác (vui lòng ghi rõ)") && (
                       <>
-                        <p>Please tell us how you heard about us:</p>
+                        <p>Vui lòng ghi rõ:</p>
                         <input
-                          placeholder="Please specify"
+                          placeholder="Nhập nội dung"
                           value={form.hearFromOtherText}
                           onChange={(e) => setForm({ ...form, hearFromOtherText: e.target.value })}
                         />
@@ -529,8 +516,8 @@ export default function SmartFarmExperience() {
 
               {step === 6 && (
                 <div className={styles.stepBody}>
-                  <p>You are all set up and ready to go.</p>
-                  <p>Click Done to explore your dashboard and start using Farmdeck today!</p>
+                  <p>Bạn đã hoàn tất đăng ký.</p>
+                  <p>Nhấn "Hoàn tất" để vào bảng điều khiển và bắt đầu quản lý truy xuất nông sản.</p>
                 </div>
               )}
 
@@ -545,7 +532,7 @@ export default function SmartFarmExperience() {
                     setStep((prev) => prev - 1);
                   }}
                 >
-                  ↑ Back
+                  ← Quay lại
                 </button>
 
                 {step < 6 ? (
@@ -559,11 +546,11 @@ export default function SmartFarmExperience() {
                       setStep((prev) => prev + 1);
                     }}
                   >
-                    ↓ Continue
+                    Tiếp tục →
                   </button>
                 ) : (
                   <button className={styles.nextBtn} onClick={() => setCompleted(true)}>
-                    ▣ Done
+                    Hoàn tất
                   </button>
                 )}
               </div>
