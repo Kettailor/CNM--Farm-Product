@@ -197,6 +197,18 @@
   font-weight: 700;
 }
 
+
+.mapHistory {
+  margin: 0 0 10px;
+  padding-left: 18px;
+
+  li {
+    color: #384152;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+}
+
 .unitsGrid {
   display: grid;
   grid-template-columns: 1fr 2fr;
