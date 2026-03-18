@@ -90,7 +90,8 @@
 .noticeCard,
 .mapControls,
 .allocationPanel,
-.mapWidget {
+.mapWidget,
+.editorPanel {
   margin-top: 12px;
   border: 1px solid #e5e7eb;
   background: #fff;
@@ -152,35 +153,19 @@
 
 .kpiGrid,
 .pillRow {
-  article {
-    text-align: center;
-  }
-
-  b {
-    display: block;
-    color: #3f8d16;
-  }
-
-  small {
-    color: #6b7280;
-    font-size: 12px;
-  }
+  article { text-align: center; }
+  b { display: block; color: #3f8d16; }
+  small { color: #6b7280; font-size: 12px; }
 }
 
 .kpiGrid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-
-  b {
-    font-size: 28px;
-  }
+  b { font-size: 28px; }
 }
 
 .pillRow {
   grid-template-columns: repeat(5, minmax(0, 1fr));
-
-  b {
-    font-size: 16px;
-  }
+  b { font-size: 16px; }
 }
 
 .toggleRow,
@@ -190,14 +175,13 @@
   gap: 8px;
 }
 
-.toggleRow {
-  flex-wrap: wrap;
-}
+.toggleRow { flex-wrap: wrap; }
 
 .toggleBtn,
 .toggleActive,
 .allocateBtn,
-.zoomActions button {
+.zoomActions button,
+.createBtn {
   border: 1px solid #d1d5db;
   background: #f8fafc;
   border-radius: 999px;
@@ -208,11 +192,14 @@
 
 .toggleActive,
 .allocateBtn,
-.zoomActions button {
+.zoomActions button,
+.createBtn {
   background: #67b622;
   color: #fff;
   border-color: #67b622;
 }
+
+.createBtn { width: auto !important; }
 
 .zoomBar {
   margin-top: 10px;
@@ -220,9 +207,7 @@
   justify-content: space-between;
 
   strong,
-  b {
-    color: #183153;
-  }
+  b { color: #183153; }
 
   span {
     display: block;
@@ -248,7 +233,8 @@
   }
 }
 
-.configRow {
+.configRow,
+.editorGrid {
   margin-top: 10px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -277,23 +263,11 @@
   }
 }
 
-.searchField {
-  grid-column: span 2;
-}
-
-.mapWidget {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
-  gap: 14px;
-}
+.searchField { grid-column: span 2; }
+.mapWidget { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr); gap: 14px; }
 
 .mapFrame,
 .mapPreview {
-  --map-scale: 1;
-  --grid-cell-size: 170px;
-  --grid-background-size: 170px 150px;
-  --grid-offset-x: 0px;
-  --grid-offset-y: 0px;
   border: 1px solid #e5e7eb;
   border-radius: 14px;
   overflow: hidden;
@@ -302,11 +276,10 @@
   background: #e5e7eb;
 }
 
-.mapPreview {
-  height: 420px;
-}
+.mapPreview { height: 420px; }
 
 .mapViewport {
+  --map-scale: 1;
   position: absolute;
   inset: 0;
   overflow: hidden;
@@ -340,48 +313,41 @@
 }
 
 .gridOverlay {
+  --grid-size: 72px;
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.28) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.28) 1px, transparent 1px);
-  background-size: var(--grid-background-size);
-  background-position: var(--grid-offset-x) var(--grid-offset-y);
+    linear-gradient(rgba(255, 255, 255, 0.26) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.26) 1px, transparent 1px);
+  background-size: var(--grid-size) var(--grid-size);
   z-index: 1;
   pointer-events: none;
 }
 
-.hexGrid {
+.areaLayer {
   position: absolute;
   inset: 0;
-  display: grid;
-  grid-template-columns: repeat(3, var(--grid-cell-size));
-  gap: calc(var(--grid-cell-size) * 0.1);
-  align-content: center;
-  justify-content: center;
   z-index: 2;
-  pointer-events: none;
-  transform: translate(var(--grid-offset-x), var(--grid-offset-y));
 }
 
-.hex {
-  clip-path: polygon(25% 6%, 75% 6%, 100% 50%, 75% 94%, 25% 94%, 0 50%);
-  border: 2px solid rgba(255, 255, 255, 0.55);
-  min-height: calc(var(--grid-cell-size) * 0.9);
+.areaBox {
+  position: absolute;
+  border: 2px solid rgba(255, 255, 255, 0.78);
+  border-radius: 16px;
   color: #fff;
   display: grid;
-  place-content: center;
+  align-content: center;
+  justify-items: center;
   text-align: center;
   gap: 4px;
-  background: rgba(17, 24, 39, 0.25);
+  padding: 10px;
   backdrop-filter: blur(2px);
-  padding: 14px;
-  pointer-events: auto;
+  box-shadow: 0 18px 32px rgba(17, 24, 39, 0.16);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 18px 32px rgba(17, 24, 39, 0.25);
+    box-shadow: 0 20px 36px rgba(17, 24, 39, 0.22);
   }
 
   em {
@@ -391,27 +357,16 @@
     letter-spacing: 0.08em;
   }
 
-  strong {
-    font-size: 14px;
-  }
-
-  span {
-    font-size: 11px;
-  }
+  strong { font-size: 14px; }
+  span { font-size: 11px; }
 }
 
-.hexSelected {
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.8), 0 18px 32px rgba(17, 24, 39, 0.25);
-}
-
+.areaSelected { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9), 0 22px 38px rgba(17, 24, 39, 0.22); }
 .healthy { background: rgba(40, 167, 69, 0.48); }
-.warning { background: rgba(243, 156, 18, 0.48); }
-.critical { background: rgba(220, 53, 69, 0.52); }
+.warning { background: rgba(243, 156, 18, 0.5); }
+.critical { background: rgba(220, 53, 69, 0.55); }
 
-.resourcePanel {
-  display: grid;
-  gap: 12px;
-}
+.resourcePanel { display: grid; gap: 12px; }
 
 .panelHeader,
 .resourceListHeader,
@@ -422,15 +377,11 @@
   gap: 12px;
 
   h3,
-  h4 {
-    margin: 0;
-  }
+  h4 { margin: 0; }
 
   p,
   small,
-  span {
-    color: #6b7280;
-  }
+  span { color: #6b7280; }
 }
 
 .zoneMeta {
@@ -461,7 +412,7 @@
 .resourceList {
   display: grid;
   gap: 10px;
-  max-height: 420px;
+  max-height: 300px;
   overflow: auto;
   padding-right: 2px;
 }
@@ -474,14 +425,8 @@
   gap: 10px;
   background: #fff;
 
-  small {
-    color: #6b7280;
-  }
-
-  strong {
-    display: block;
-    margin-top: 4px;
-  }
+  small { color: #6b7280; }
+  strong { display: block; margin-top: 4px; }
 
   ul {
     margin: 0;
@@ -502,23 +447,14 @@
   color: #fff;
 }
 
-.allocationPanel {
-  overflow: hidden;
-}
+.allocationPanel { overflow: hidden; }
 
 .tableWrap {
   overflow: auto;
   margin-top: 12px;
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 840px;
-  }
-
-  thead {
-    background: #f4f8f2;
-  }
+  table { width: 100%; border-collapse: collapse; min-width: 840px; }
+  thead { background: #f4f8f2; }
 
   th,
   td {
@@ -532,16 +468,12 @@
     cursor: pointer;
     transition: background 0.2s ease;
 
-    &:hover {
-      background: #f9fbfa;
-    }
+    &:hover { background: #f9fbfa; }
   }
 
   td:first-child {
     strong,
-    span {
-      display: block;
-    }
+    span { display: block; }
 
     span {
       color: #6b7280;
@@ -562,10 +494,7 @@
   border-radius: 12px;
   padding: 12px;
 
-  h3 {
-    margin: 0 0 10px;
-    font-size: 16px;
-  }
+  h3 { margin: 0 0 10px; font-size: 16px; }
 
   ul {
     margin: 0;
@@ -580,7 +509,8 @@
 @media (max-width: 1280px) {
   .summaryColumns,
   .kpiGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .configRow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .configRow,
+  .editorGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .searchField { grid-column: span 2; }
   .mapWidget { grid-template-columns: 1fr; }
 }
@@ -589,25 +519,24 @@
   .layout { grid-template-columns: 1fr; }
   .sidebar { display: none; }
   .pillRow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .hexGrid { grid-template-columns: repeat(2, var(--grid-cell-size)); }
 }
 
 @media (max-width: 640px) {
   .main { padding: 12px; }
   .topbar {
     flex-direction: column;
-
     span { white-space: normal; }
   }
+
   .summaryColumns,
   .kpiGrid,
   .configRow,
+  .editorGrid,
   .zoneMeta,
   .widgetGrid,
   .pillRow { grid-template-columns: 1fr; }
+
   .searchField { grid-column: span 1; }
-  .hexGrid { grid-template-columns: 1fr; }
-  .mapFrame,
-  .mapPreview { height: 780px; }
+  .mapFrame { height: 780px; }
   .mapPreview { height: 420px; }
 }

@@ -30,6 +30,13 @@ type ResourceItem = {
   quantity: number;
 };
 
+type ZoneLayout = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 type Zone = {
   id: string;
   name: string;
@@ -37,6 +44,7 @@ type Zone = {
   status: ZoneStatus;
   occupancy: number;
   coverage: string;
+  layout: ZoneLayout;
   resources: ResourceItem[];
 };
 
@@ -90,6 +98,7 @@ const initialZones: Zone[] = [
     status: "healthy",
     occupancy: 72,
     coverage: "4.3 ha",
+    layout: { x: 108, y: 118, width: 138, height: 104 },
     resources: [
       { id: "z1-r1", type: "water", name: "Tank 01", status: "healthy", lastSeen: "2 phút trước", quantity: 3 },
       { id: "z1-r2", type: "livestock", name: "Cattle group 01", status: "healthy", lastSeen: "5 phút trước", quantity: 22 },
@@ -103,6 +112,7 @@ const initialZones: Zone[] = [
     status: "warning",
     occupancy: 58,
     coverage: "3.8 ha",
+    layout: { x: 276, y: 104, width: 126, height: 112 },
     resources: [
       { id: "z2-r1", type: "water", name: "Water line 02", status: "warning", lastSeen: "12 phút trước", quantity: 2 },
       { id: "z2-r2", type: "livestock", name: "Cattle group 02", status: "healthy", lastSeen: "7 phút trước", quantity: 15 },
@@ -116,6 +126,7 @@ const initialZones: Zone[] = [
     status: "healthy",
     occupancy: 66,
     coverage: "5.1 ha",
+    layout: { x: 442, y: 136, width: 144, height: 116 },
     resources: [
       { id: "z3-r1", type: "water", name: "Reservoir B1", status: "healthy", lastSeen: "4 phút trước", quantity: 4 },
       { id: "z3-r2", type: "livestock", name: "Goat group B1", status: "healthy", lastSeen: "10 phút trước", quantity: 18 },
@@ -129,6 +140,7 @@ const initialZones: Zone[] = [
     status: "critical",
     occupancy: 84,
     coverage: "2.9 ha",
+    layout: { x: 194, y: 284, width: 128, height: 96 },
     resources: [
       { id: "z4-r1", type: "water", name: "Pump line B2", status: "critical", lastSeen: "28 phút trước", quantity: 1 },
       { id: "z4-r2", type: "livestock", name: "Isolation pen B2", status: "warning", lastSeen: "14 phút trước", quantity: 7 },
@@ -142,6 +154,7 @@ const initialZones: Zone[] = [
     status: "warning",
     occupancy: 49,
     coverage: "3.2 ha",
+    layout: { x: 350, y: 304, width: 136, height: 100 },
     resources: [
       { id: "z5-r1", type: "water", name: "Drip line C1", status: "healthy", lastSeen: "6 phút trước", quantity: 2 },
       { id: "z5-r2", type: "livestock", name: "Nursery group C1", status: "warning", lastSeen: "13 phút trước", quantity: 10 },
@@ -155,6 +168,7 @@ const initialZones: Zone[] = [
     status: "healthy",
     occupancy: 63,
     coverage: "4.8 ha",
+    layout: { x: 522, y: 288, width: 148, height: 112 },
     resources: [
       { id: "z6-r1", type: "water", name: "Lake C2", status: "healthy", lastSeen: "3 phút trước", quantity: 3 },
       { id: "z6-r2", type: "livestock", name: "Cattle group C2", status: "healthy", lastSeen: "4 phút trước", quantity: 14 },
@@ -190,6 +204,7 @@ const resourceTypeOptions: Array<ResourceType | "all"> = ["all", "water", "lives
 export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps) {
   const farmName = profile?.farmName || "Ket Farm";
   const areaUnit = profile?.areaUnit || "Hecta";
+  const defaultGridArea = profile?.defaultGridArea || 1;
   const mapQuery = profile?.lat !== undefined && profile?.lng !== undefined
     ? `${profile.lat},${profile.lng}`
     : profile?.address || "Long Thành, Đồng Nai";
@@ -209,10 +224,6 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
   const [resourceFilter, setResourceFilter] = useState<ResourceType | "all">("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [zoom, setZoom] = useState(17);
-  const [cellArea, setCellArea] = useState(profile?.defaultGridArea || 1);
-  const [gridOffsetX, setGridOffsetX] = useState(0);
-  const [gridOffsetY, setGridOffsetY] = useState(0);
-
   const satelliteEmbedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&t=k&z=${zoom}&ie=UTF8&iwloc=&output=embed`;
 
   const totals = useMemo(() => {
@@ -247,6 +258,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
   }, [resourceFilter, searchTerm, statusFilter, zones]);
 
   const selected = useMemo(() => zones.find((zone) => zone.id === selectedZone) ?? zones[0], [selectedZone, zones]);
+  const zoomScale = 1 + (zoom - 17) * 0.12;
 
   const summaryColumns = useMemo(
     () => [
@@ -256,9 +268,9 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
         detail: "Khung map cố định, khóa pan, chỉ cho phóng to / thu nhỏ.",
       },
       {
-        title: "Diện tích 1 grid",
-        value: `${cellArea.toFixed(1)} ${areaUnit}`,
-        detail: "Grid scale theo diện tích ô đất mặc định đã nhập.",
+        title: "Area mặc định",
+        value: `${defaultGridArea.toFixed(1)} ${areaUnit}`,
+        detail: "Các ô area độc lập, có thể sửa riêng từng ô.",
       },
       {
         title: "Grid cần xử lý",
@@ -274,19 +286,46 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
         detail: "Map luôn neo theo vị trí gốc khi tạo farm.",
       },
     ],
-    [areaUnit, cellArea, profile?.lat, profile?.lng, zoom, zones]
+    [areaUnit, defaultGridArea, profile?.lat, profile?.lng, zoom, zones]
   );
 
-  const zoomScale = 1 + (zoom - 17) * 0.12;
-  const cellSize = Math.max(108, Math.min(210, 174 * zoomScale * (1 / Math.sqrt(Math.max(cellArea, 0.35)))));
-  const gridBackgroundSize = `${cellSize}px ${Math.round(cellSize * 0.88)}px`;
-  const gridStyle = {
-    "--map-scale": zoomScale.toFixed(2),
-    "--grid-cell-size": `${cellSize}px`,
-    "--grid-background-size": gridBackgroundSize,
-    "--grid-offset-x": `${gridOffsetX}px`,
-    "--grid-offset-y": `${gridOffsetY}px`,
-  } as CSSProperties;
+  const updateZoneLayout = (zoneId: string, field: keyof ZoneLayout, value: number) => {
+    setZones((prev) =>
+      prev.map((zone) => {
+        if (zone.id !== zoneId) return zone;
+        return {
+          ...zone,
+          layout: {
+            ...zone.layout,
+            [field]: value,
+          },
+        };
+      })
+    );
+  };
+
+  const addZone = () => {
+    const nextIndex = zones.length + 1;
+    const code = `N${nextIndex}`;
+    const newZone: Zone = {
+      id: `z-${Date.now()}`,
+      name: `Area ${code}`,
+      code,
+      status: "healthy",
+      occupancy: 40,
+      coverage: `${defaultGridArea.toFixed(1)} ${areaUnit}`,
+      layout: {
+        x: 90 + (nextIndex % 4) * 70,
+        y: 120 + (nextIndex % 3) * 60,
+        width: 130,
+        height: 96,
+      },
+      resources: [],
+    };
+
+    setZones((prev) => [...prev, newZone]);
+    setSelectedZone(newZone.id);
+  };
 
   const allocateResource = (zoneId: string) => {
     setZones((prev) =>
@@ -350,7 +389,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
             <header className={styles.topbar}>
               <div>
                 <h1>Farm Map</h1>
-                <p>Bản đồ vệ tinh chi tiết, cố định khung nhìn, chỉ hỗ trợ zoom và đồng bộ kích cỡ grid theo diện tích ô đất.</p>
+                <p>Bản đồ vệ tinh cố định, zoom đến đâu thì từng ô area scale đúng đến đó và có thể chỉnh sửa độc lập.</p>
               </div>
               <span>
                 {profile?.address || "Long Thành, Đồng Nai"}
@@ -361,11 +400,10 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
             </header>
 
             <article className={styles.noticeCard}>
-              <h3>Chế độ bản đồ mới</h3>
+              <h3>Chế độ area độc lập</h3>
               <p>
-                Map dùng lớp vệ tinh chi tiết và bị khóa thao tác kéo. Người dùng chỉ có thể tăng / giảm zoom.
-                Grid phủ lên map sẽ tự scale theo diện tích ô đất mặc định và theo mức zoom hiện tại. Nếu cần,
-                có thể tinh chỉnh vị trí phủ của grid theo trục X/Y để khớp đúng khu đất thực tế.
+                Mỗi ô area giờ là một khối riêng có vị trí và kích thước độc lập. Khi zoom map, từng ô sẽ scale cùng tỉ lệ,
+                giống thao tác thiết lập area trên bản đồ. Bạn cũng có thể tạo area mới hoặc chỉnh từng area riêng ngay trong panel.
               </p>
             </article>
 
@@ -383,7 +421,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
               <article><b>{totals.totalAssets}</b><small>Assets</small></article>
               <article><b>{totals.sensors}</b><small>Sensors</small></article>
               <article><b>{totals.livestock}</b><small>Livestock</small></article>
-              <article><b>{zones.length}</b><small>Paddocks</small></article>
+              <article><b>{zones.length}</b><small>Areas</small></article>
             </section>
 
             <section className={styles.mapControls}>
@@ -402,12 +440,13 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
               <div className={styles.zoomBar}>
                 <div>
                   <strong>Zoom map</strong>
-                  <span>Khóa pan, chỉ cho thao tác thu/phóng.</span>
+                  <span>Map bị khóa pan, chỉ cho thao tác thu/phóng.</span>
                 </div>
                 <div className={styles.zoomActions}>
                   <button onClick={() => setZoom((prev) => Math.max(15, prev - 1))}>-</button>
                   <b>{zoom}</b>
                   <button onClick={() => setZoom((prev) => Math.min(20, prev + 1))}>+</button>
+                  <button className={styles.createBtn} onClick={addZone}>+ Area</button>
                 </div>
               </div>
 
@@ -450,39 +489,6 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                     ))}
                   </select>
                 </label>
-                <label>
-                  Diện tích 1 grid ({areaUnit})
-                  <input
-                    type="range"
-                    min={0.5}
-                    max={5}
-                    step={0.5}
-                    value={cellArea}
-                    onChange={(e) => setCellArea(Number(e.target.value))}
-                  />
-                </label>
-                <label>
-                  Dịch grid ngang
-                  <input
-                    type="range"
-                    min={-180}
-                    max={180}
-                    step={10}
-                    value={gridOffsetX}
-                    onChange={(e) => setGridOffsetX(Number(e.target.value))}
-                  />
-                </label>
-                <label>
-                  Dịch grid dọc
-                  <input
-                    type="range"
-                    min={-180}
-                    max={180}
-                    step={10}
-                    value={gridOffsetY}
-                    onChange={(e) => setGridOffsetY(Number(e.target.value))}
-                  />
-                </label>
                 <label className={styles.searchField}>
                   Tìm grid / tài nguyên
                   <input
@@ -496,25 +502,33 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
             </section>
 
             <section className={styles.mapWidget}>
-              <div className={styles.mapFrame} style={gridStyle}>
-                <div className={styles.mapViewport}>
+              <div className={styles.mapFrame}>
+                <div className={styles.mapViewport} style={{ "--map-scale": `${zoomScale}` } as CSSProperties}>
                   <iframe title="Farm satellite map" src={satelliteEmbedUrl} loading="lazy" tabIndex={-1} />
                 </div>
-                <div className={styles.overlayHint}>Map cố định · vệ tinh chi tiết · grid scale theo zoom + diện tích.</div>
-                <div className={styles.gridOverlay} aria-hidden="true" />
-                <div className={styles.hexGrid}>
+                <div className={styles.overlayHint}>Area overlay scale theo zoom map và chỉnh riêng từng ô.</div>
+                <div className={styles.gridOverlay} style={{ "--grid-size": `${72 * zoomScale}px` } as CSSProperties} aria-hidden="true" />
+                <div className={styles.areaLayer}>
                   {filteredZones.map((zone) => {
+                    const areaStyle = {
+                      left: `${zone.layout.x * zoomScale}px`,
+                      top: `${zone.layout.y * zoomScale}px`,
+                      width: `${zone.layout.width * zoomScale}px`,
+                      height: `${zone.layout.height * zoomScale}px`,
+                    };
                     const resourceTotal = zone.resources.reduce((sum, resource) => sum + resource.quantity, 0);
+
                     return (
                       <button
                         key={zone.id}
-                        className={`${styles.hex} ${styles[zone.status]} ${zone.id === selectedZone ? styles.hexSelected : ""}`}
-                        onClick={() => allocateResource(zone.id)}
+                        className={`${styles.areaBox} ${styles[zone.status]} ${zone.id === selectedZone ? styles.areaSelected : ""}`}
+                        style={areaStyle}
+                        onClick={() => setSelectedZone(zone.id)}
                       >
                         <em>{zone.code}</em>
                         <strong>{zone.name}</strong>
-                        <span>{resourceTotal} tài nguyên</span>
                         <span>{zone.coverage}</span>
+                        <span>{resourceTotal} tài nguyên</span>
                       </button>
                     );
                   })}
@@ -524,7 +538,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
               <aside className={styles.resourcePanel}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <small>Chi tiết grid</small>
+                    <small>Chi tiết area</small>
                     <h3>{selected.name}</h3>
                   </div>
                   <button className={styles.allocateBtn} onClick={() => allocateResource(selected.id)}>
@@ -551,8 +565,33 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                   </article>
                 </div>
 
+                <div className={styles.editorPanel}>
+                  <div className={styles.resourceListHeader}>
+                    <h4>Chỉnh area độc lập</h4>
+                    <span>{selected.code}</span>
+                  </div>
+                  <div className={styles.editorGrid}>
+                    <label>
+                      Vị trí X
+                      <input type="range" min={0} max={560} value={selected.layout.x} onChange={(e) => updateZoneLayout(selected.id, "x", Number(e.target.value))} />
+                    </label>
+                    <label>
+                      Vị trí Y
+                      <input type="range" min={0} max={500} value={selected.layout.y} onChange={(e) => updateZoneLayout(selected.id, "y", Number(e.target.value))} />
+                    </label>
+                    <label>
+                      Rộng
+                      <input type="range" min={80} max={220} value={selected.layout.width} onChange={(e) => updateZoneLayout(selected.id, "width", Number(e.target.value))} />
+                    </label>
+                    <label>
+                      Cao
+                      <input type="range" min={60} max={180} value={selected.layout.height} onChange={(e) => updateZoneLayout(selected.id, "height", Number(e.target.value))} />
+                    </label>
+                  </div>
+                </div>
+
                 <div className={styles.resourceListHeader}>
-                  <h4>Tài nguyên đã gán trong grid</h4>
+                  <h4>Tài nguyên đã gán trong area</h4>
                   <span>{selected.resources.length} nhóm tài nguyên</span>
                 </div>
                 <div className={styles.resourceList}>
@@ -565,7 +604,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                       <span className={`${styles.statusPill} ${styles[resource.status]}`}>{statusLabels[resource.status]}</span>
                       <ul>
                         <li>Số lượng: {resource.quantity}</li>
-                        <li>Vị trí: Grid {selected.code}</li>
+                        <li>Vị trí: Area {selected.code}</li>
                         <li>Cập nhật: {resource.lastSeen}</li>
                       </ul>
                     </article>
@@ -576,21 +615,21 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
 
             <section className={styles.allocationPanel}>
               <div className={styles.panelTitle}>
-                <h3>Danh sách grid tóm tắt</h3>
-                <p>Bảng cột này giúp nhìn nhanh các thông số chính và vị trí tài nguyên đã gắn trên map.</p>
+                <h3>Danh sách area tóm tắt</h3>
+                <p>Mỗi area có kích thước và vị trí riêng, đã đồng bộ với zoom của map.</p>
               </div>
               <div className={styles.tableWrap}>
                 <table>
                   <thead>
                     <tr>
-                      <th>Grid</th>
+                      <th>Area</th>
                       <th>Trạng thái</th>
                       <th>Diện tích</th>
-                      <th>Mức lấp đầy</th>
+                      <th>Vị trí</th>
+                      <th>Kích thước</th>
                       <th>Nước tưới</th>
                       <th>Vật nuôi</th>
                       <th>Cảm biến</th>
-                      <th>Phương tiện</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -611,11 +650,11 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                           </td>
                           <td>{statusLabels[zone.status]}</td>
                           <td>{zone.coverage}</td>
-                          <td>{zone.occupancy}%</td>
+                          <td>{zone.layout.x}, {zone.layout.y}</td>
+                          <td>{zone.layout.width} × {zone.layout.height}</td>
                           <td>{grouped.water}</td>
                           <td>{grouped.livestock}</td>
                           <td>{grouped.sensors}</td>
-                          <td>{grouped.vehicle}</td>
                         </tr>
                       );
                     })}
@@ -629,7 +668,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
             <header className={styles.topbar}>
               <div>
                 <h1>{farmName}</h1>
-                <p>Digital operations overview for your farm. Chọn “Farm Map” ở menu trái để xem bản đồ phân bổ tài nguyên.</p>
+                <p>Digital operations overview for your farm. Chọn “Farm Map” ở menu trái để xem area map.</p>
               </div>
               <span>{profile?.fullName || "Farm owner"}</span>
             </header>
@@ -645,7 +684,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
 
             <section className={styles.mapWidget}>
               <div className={styles.mapPreview}>
-                <div className={styles.mapViewport}>
+                <div className={styles.mapViewport} style={{ "--map-scale": `${zoomScale}` } as CSSProperties}>
                   <iframe title="Farm overview satellite map" src={satelliteEmbedUrl} loading="lazy" tabIndex={-1} />
                 </div>
               </div>
