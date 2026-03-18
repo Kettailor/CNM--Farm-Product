@@ -81,13 +81,23 @@ You can inspect the running PostgreSQL database in two convenient ways:
 - Use Adminer in Docker: `docker compose --profile tools up -d adminer`
 - Use a VS Code plugin such as SQLTools + SQLTools PostgreSQL Driver
 
-Connection info:
+Connection info for desktop apps/plugins:
 
 - Host: `127.0.0.1`
 - Port: `5432`
 - Database: `farmhub`
 - Username: `farmhub`
 - Password: `farmhub`
+
+Connection info for Adminer at `http://localhost:8080`:
+
+- System: `PostgreSQL`
+- Server: `db`
+- Username: `farmhub`
+- Password: `farmhub`
+- Database: `farmhub`
+
+> In Adminer, do **not** use `localhost` as the server name. Adminer runs in a separate container, so `localhost` points to the Adminer container itself, not PostgreSQL.
 
 ### Windows note
 

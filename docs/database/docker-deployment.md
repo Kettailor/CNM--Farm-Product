@@ -100,13 +100,15 @@ Sau đó mở:
 
 - `http://localhost:8080`
 
-Thông tin đăng nhập:
+Thông tin đăng nhập trong Adminer:
 
 - System: `PostgreSQL`
-- Server: `db` (nếu truy cập từ container khác) hoặc `localhost`
+- Server: `db`
 - Username: `farmhub`
 - Password: `farmhub`
 - Database: `farmhub`
+
+> Không dùng `localhost` ở ô **Server** của Adminer. Adminer chạy trong container riêng, nên `localhost` sẽ trỏ về chính container Adminer và gây lỗi `connection refused` tới PostgreSQL.
 
 ### Cách 2: Dùng VS Code extension
 
