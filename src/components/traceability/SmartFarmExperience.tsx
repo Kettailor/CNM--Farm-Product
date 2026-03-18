@@ -347,6 +347,8 @@ export default function SmartFarmExperience() {
           address: form.address,
           lat: form.verifiedLocation?.lat,
           lng: form.verifiedLocation?.lng,
+          defaultGridArea: Number(form.carryingCapacity) || 1,
+          areaUnit: form.landArea || "Hecta",
         }}
       />
     );

@@ -183,15 +183,21 @@
   }
 }
 
-.toggleRow {
+.toggleRow,
+.zoomBar,
+.zoomActions {
   display: flex;
   gap: 8px;
+}
+
+.toggleRow {
   flex-wrap: wrap;
 }
 
 .toggleBtn,
 .toggleActive,
-.allocateBtn {
+.allocateBtn,
+.zoomActions button {
   border: 1px solid #d1d5db;
   background: #f8fafc;
   border-radius: 999px;
@@ -201,16 +207,51 @@
 }
 
 .toggleActive,
-.allocateBtn {
+.allocateBtn,
+.zoomActions button {
   background: #67b622;
   color: #fff;
   border-color: #67b622;
 }
 
+.zoomBar {
+  margin-top: 10px;
+  align-items: center;
+  justify-content: space-between;
+
+  strong,
+  b {
+    color: #183153;
+  }
+
+  span {
+    display: block;
+    color: #6b7280;
+    font-size: 13px;
+    margin-top: 2px;
+  }
+}
+
+.zoomActions {
+  align-items: center;
+
+  button {
+    width: 34px;
+    height: 34px;
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  b {
+    min-width: 36px;
+    text-align: center;
+  }
+}
+
 .configRow {
   margin-top: 10px;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 
   label {
@@ -229,6 +270,11 @@
     background: #fff;
     width: 100%;
   }
+
+  input[type="range"] {
+    padding: 0;
+    accent-color: #67b622;
+  }
 }
 
 .searchField {
@@ -243,27 +289,36 @@
 
 .mapFrame,
 .mapPreview {
+  --map-scale: 1;
+  --grid-cell-size: 170px;
+  --grid-background-size: 170px 150px;
+  --grid-offset-x: 0px;
+  --grid-offset-y: 0px;
   border: 1px solid #e5e7eb;
   border-radius: 14px;
   overflow: hidden;
   position: relative;
-  min-height: 620px;
+  height: 720px;
   background: #e5e7eb;
+}
+
+.mapPreview {
+  height: 420px;
+}
+
+.mapViewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
 
   iframe {
     width: 100%;
     height: 100%;
-    min-height: 620px;
     border: 0;
-    filter: saturate(1.05) contrast(1.02);
-  }
-}
-
-.mapPreview {
-  min-height: 420px;
-
-  iframe {
-    min-height: 420px;
+    transform: scale(var(--map-scale));
+    transform-origin: center center;
+    filter: saturate(1.12) contrast(1.08);
   }
 }
 
@@ -281,16 +336,17 @@
   padding: 8px 14px;
   border-radius: 999px;
   backdrop-filter: blur(8px);
-  z-index: 2;
+  z-index: 3;
 }
 
 .gridOverlay {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.25) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.25) 1px, transparent 1px);
-  background-size: 12.5% 16.66%;
+    linear-gradient(rgba(255, 255, 255, 0.28) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.28) 1px, transparent 1px);
+  background-size: var(--grid-background-size);
+  background-position: var(--grid-offset-x) var(--grid-offset-y);
   z-index: 1;
   pointer-events: none;
 }
@@ -299,18 +355,19 @@
   position: absolute;
   inset: 0;
   display: grid;
-  grid-template-columns: repeat(3, 160px);
-  gap: 14px;
+  grid-template-columns: repeat(3, var(--grid-cell-size));
+  gap: calc(var(--grid-cell-size) * 0.1);
   align-content: center;
   justify-content: center;
   z-index: 2;
   pointer-events: none;
+  transform: translate(var(--grid-offset-x), var(--grid-offset-y));
 }
 
 .hex {
   clip-path: polygon(25% 6%, 75% 6%, 100% 50%, 75% 94%, 25% 94%, 0 50%);
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  min-height: 156px;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  min-height: calc(var(--grid-cell-size) * 0.9);
   color: #fff;
   display: grid;
   place-content: center;
@@ -532,7 +589,7 @@
   .layout { grid-template-columns: 1fr; }
   .sidebar { display: none; }
   .pillRow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .hexGrid { grid-template-columns: repeat(2, 150px); }
+  .hexGrid { grid-template-columns: repeat(2, var(--grid-cell-size)); }
 }
 
 @media (max-width: 640px) {
@@ -551,9 +608,6 @@
   .searchField { grid-column: span 1; }
   .hexGrid { grid-template-columns: 1fr; }
   .mapFrame,
-  .mapPreview {
-    min-height: 780px;
-
-    iframe { min-height: 780px; }
-  }
+  .mapPreview { height: 780px; }
+  .mapPreview { height: 420px; }
 }
