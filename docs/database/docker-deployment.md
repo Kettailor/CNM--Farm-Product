@@ -17,6 +17,12 @@ Nếu bạn gặp lỗi kiểu:
 error during connect: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified
 ```
 
+hoặc:
+
+```text
+unable to get image 'cnm-farm-product-traceability-db' ...
+```
+
 thì nguyên nhân **không phải do `docker-compose.yml`**, mà là do **Docker Desktop / Docker Engine chưa chạy** hoặc **WSL2 backend chưa sẵn sàng**.
 
 Các bước xử lý:
@@ -46,7 +52,23 @@ docker context use desktop-linux
 wsl --status
 ```
 
-## 2. Khởi động
+## 2. Cách chạy nhanh nhất
+
+### Windows PowerShell
+
+```powershell
+./scripts/docker-up.ps1
+```
+
+### macOS / Linux / Git Bash
+
+```bash
+./scripts/docker-up.sh
+```
+
+Các script này sẽ kiểm tra Docker daemon trước khi chạy `docker compose up --build`.
+
+## 3. Khởi động thủ công
 
 ```bash
 docker compose up --build
@@ -63,7 +85,21 @@ Sau khi chạy:
   - User: `farmhub`
   - Password: `farmhub`
 
-## 3. Dừng hệ thống
+## 4. Dừng hệ thống
+
+### PowerShell
+
+```powershell
+./scripts/docker-down.ps1
+```
+
+### Bash
+
+```bash
+./scripts/docker-down.sh
+```
+
+Hoặc chạy trực tiếp:
 
 ```bash
 docker compose down
@@ -75,7 +111,7 @@ Nếu muốn xoá luôn volume database:
 docker compose down -v
 ```
 
-## 4. Cách schema được khởi tạo
+## 5. Cách schema được khởi tạo
 
 Service `db` mount file:
 
@@ -87,7 +123,7 @@ vào thư mục:
 
 PostgreSQL image sẽ tự chạy file này **ở lần khởi tạo volume đầu tiên**.
 
-## 5. Build image app riêng
+## 6. Build image app riêng
 
 ```bash
 docker build -t cnm-farm-product-traceability-app .
@@ -99,7 +135,7 @@ Chạy image riêng:
 docker run --rm -p 3000:3000 cnm-farm-product-traceability-app
 ```
 
-## 6. Kiểm tra nhanh sau khi Docker Desktop đã chạy
+## 7. Kiểm tra nhanh sau khi Docker Desktop đã chạy
 
 ```bash
 docker compose config
@@ -107,7 +143,7 @@ docker compose up --build
 docker compose ps
 ```
 
-## 7. Lưu ý triển khai thực tế
+## 8. Lưu ý triển khai thực tế
 
 - Đổi password DB trước khi dùng production.
 - Dùng `.env` hoặc secret manager thay vì hard-code biến môi trường.

@@ -58,6 +58,16 @@ This repository now includes a Docker setup for the full project:
 docker compose up --build
 ```
 
+Or use the helper scripts:
+
+```powershell
+./scripts/docker-up.ps1
+```
+
+```bash
+./scripts/docker-up.sh
+```
+
 ### Stop
 
 ```bash
@@ -66,5 +76,5 @@ docker compose down
 
 ### Windows note
 
-If you see an error like `open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified`, Docker Desktop is not running yet. Start Docker Desktop first, wait for the engine to become available, then run the compose command again. See `docs/database/docker-deployment.md` for troubleshooting steps.
+If you see an error like `open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified` or `unable to get image 'cnm-farm-product-traceability-db'`, Docker Desktop is not running yet. Start Docker Desktop first, wait for the engine to become available, then run the command again. See `docs/database/docker-deployment.md` for troubleshooting steps.
 
