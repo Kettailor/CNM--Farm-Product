@@ -74,6 +74,21 @@ Or use the helper scripts:
 docker compose down
 ```
 
+### View the database easily
+
+You can inspect the running PostgreSQL database in two convenient ways:
+
+- Use Adminer in Docker: `docker compose --profile tools up -d adminer`
+- Use a VS Code plugin such as SQLTools + SQLTools PostgreSQL Driver
+
+Connection info:
+
+- Host: `127.0.0.1`
+- Port: `5432`
+- Database: `farmhub`
+- Username: `farmhub`
+- Password: `farmhub`
+
 ### Windows note
 
 If you see an error like `open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified` or `unable to get image 'cnm-farm-product-traceability-db'`, Docker Desktop is not running yet. Start Docker Desktop first, wait for the engine to become available, then run the command again. See `docs/database/docker-deployment.md` for troubleshooting steps.
