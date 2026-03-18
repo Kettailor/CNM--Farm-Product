@@ -30,11 +30,11 @@ type ResourceItem = {
   quantity: number;
 };
 
-type ZoneLayout = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+type ZoneGeo = {
+  lat: number;
+  lng: number;
+  latSpan: number;
+  lngSpan: number;
 };
 
 type Zone = {
@@ -44,7 +44,7 @@ type Zone = {
   status: ZoneStatus;
   occupancy: number;
   coverage: string;
-  layout: ZoneLayout;
+  geo: ZoneGeo;
   resources: ResourceItem[];
 };
 
@@ -98,7 +98,7 @@ const initialZones: Zone[] = [
     status: "healthy",
     occupancy: 72,
     coverage: "4.3 ha",
-    layout: { x: 108, y: 118, width: 138, height: 104 },
+    geo: { lat: 10.8228, lng: 106.6267, latSpan: 0.0019, lngSpan: 0.0024 },
     resources: [
       { id: "z1-r1", type: "water", name: "Tank 01", status: "healthy", lastSeen: "2 phút trước", quantity: 3 },
       { id: "z1-r2", type: "livestock", name: "Cattle group 01", status: "healthy", lastSeen: "5 phút trước", quantity: 22 },
@@ -112,7 +112,7 @@ const initialZones: Zone[] = [
     status: "warning",
     occupancy: 58,
     coverage: "3.8 ha",
-    layout: { x: 276, y: 104, width: 126, height: 112 },
+    geo: { lat: 10.8231, lng: 106.6288, latSpan: 0.0021, lngSpan: 0.0022 },
     resources: [
       { id: "z2-r1", type: "water", name: "Water line 02", status: "warning", lastSeen: "12 phút trước", quantity: 2 },
       { id: "z2-r2", type: "livestock", name: "Cattle group 02", status: "healthy", lastSeen: "7 phút trước", quantity: 15 },
@@ -126,7 +126,7 @@ const initialZones: Zone[] = [
     status: "healthy",
     occupancy: 66,
     coverage: "5.1 ha",
-    layout: { x: 442, y: 136, width: 144, height: 116 },
+    geo: { lat: 10.8225, lng: 106.6310, latSpan: 0.0022, lngSpan: 0.0025 },
     resources: [
       { id: "z3-r1", type: "water", name: "Reservoir B1", status: "healthy", lastSeen: "4 phút trước", quantity: 4 },
       { id: "z3-r2", type: "livestock", name: "Goat group B1", status: "healthy", lastSeen: "10 phút trước", quantity: 18 },
@@ -140,7 +140,7 @@ const initialZones: Zone[] = [
     status: "critical",
     occupancy: 84,
     coverage: "2.9 ha",
-    layout: { x: 194, y: 284, width: 128, height: 96 },
+    geo: { lat: 10.8201, lng: 106.6279, latSpan: 0.0017, lngSpan: 0.0022 },
     resources: [
       { id: "z4-r1", type: "water", name: "Pump line B2", status: "critical", lastSeen: "28 phút trước", quantity: 1 },
       { id: "z4-r2", type: "livestock", name: "Isolation pen B2", status: "warning", lastSeen: "14 phút trước", quantity: 7 },
@@ -154,7 +154,7 @@ const initialZones: Zone[] = [
     status: "warning",
     occupancy: 49,
     coverage: "3.2 ha",
-    layout: { x: 350, y: 304, width: 136, height: 100 },
+    geo: { lat: 10.8197, lng: 106.6299, latSpan: 0.0018, lngSpan: 0.0023 },
     resources: [
       { id: "z5-r1", type: "water", name: "Drip line C1", status: "healthy", lastSeen: "6 phút trước", quantity: 2 },
       { id: "z5-r2", type: "livestock", name: "Nursery group C1", status: "warning", lastSeen: "13 phút trước", quantity: 10 },
@@ -168,7 +168,7 @@ const initialZones: Zone[] = [
     status: "healthy",
     occupancy: 63,
     coverage: "4.8 ha",
-    layout: { x: 522, y: 288, width: 148, height: 112 },
+    geo: { lat: 10.8200, lng: 106.6322, latSpan: 0.0020, lngSpan: 0.0026 },
     resources: [
       { id: "z6-r1", type: "water", name: "Lake C2", status: "healthy", lastSeen: "3 phút trước", quantity: 3 },
       { id: "z6-r2", type: "livestock", name: "Cattle group C2", status: "healthy", lastSeen: "4 phút trước", quantity: 14 },
@@ -205,6 +205,8 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
   const farmName = profile?.farmName || "Ket Farm";
   const areaUnit = profile?.areaUnit || "Hecta";
   const defaultGridArea = profile?.defaultGridArea || 1;
+  const originLat = profile?.lat ?? 10.8216;
+  const originLng = profile?.lng ?? 106.6295;
   const mapQuery = profile?.lat !== undefined && profile?.lng !== undefined
     ? `${profile.lat},${profile.lng}`
     : profile?.address || "Long Thành, Đồng Nai";
@@ -286,17 +288,17 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
         detail: "Map luôn neo theo vị trí gốc khi tạo farm.",
       },
     ],
-    [areaUnit, defaultGridArea, profile?.lat, profile?.lng, zoom, zones]
+    [areaUnit, defaultGridArea, originLat, originLng, zoom, zones]
   );
 
-  const updateZoneLayout = (zoneId: string, field: keyof ZoneLayout, value: number) => {
+  const updateZoneGeo = (zoneId: string, field: keyof ZoneGeo, value: number) => {
     setZones((prev) =>
       prev.map((zone) => {
         if (zone.id !== zoneId) return zone;
         return {
           ...zone,
-          layout: {
-            ...zone.layout,
+          geo: {
+            ...zone.geo,
             [field]: value,
           },
         };
@@ -314,17 +316,34 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
       status: "healthy",
       occupancy: 40,
       coverage: `${defaultGridArea.toFixed(1)} ${areaUnit}`,
-      layout: {
-        x: 90 + (nextIndex % 4) * 70,
-        y: 120 + (nextIndex % 3) * 60,
-        width: 130,
-        height: 96,
+      geo: {
+        lat: originLat + 0.0006 - (nextIndex % 3) * 0.0005,
+        lng: originLng - 0.001 + (nextIndex % 4) * 0.0008,
+        latSpan: 0.0018,
+        lngSpan: 0.0022,
       },
       resources: [],
     };
 
     setZones((prev) => [...prev, newZone]);
     setSelectedZone(newZone.id);
+  };
+
+  const projectionScale = 35000 * zoomScale;
+  const lngFactor = Math.cos((originLat * Math.PI) / 180);
+
+  const projectZone = (zone: Zone) => {
+    const x = 50 + (((zone.geo.lng - originLng) * lngFactor * projectionScale) / 960) * 100;
+    const y = 50 - (((zone.geo.lat - originLat) * projectionScale) / 720) * 100;
+    const width = ((zone.geo.lngSpan * lngFactor * projectionScale) / 960) * 100;
+    const height = ((zone.geo.latSpan * projectionScale) / 720) * 100;
+
+    return {
+      left: `${x - width / 2}%`,
+      top: `${y - height / 2}%`,
+      width: `${width}%`,
+      height: `${height}%`,
+    };
   };
 
   const allocateResource = (zoneId: string) => {
@@ -510,12 +529,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                 <div className={styles.gridOverlay} style={{ "--grid-size": `${72 * zoomScale}px` } as CSSProperties} aria-hidden="true" />
                 <div className={styles.areaLayer}>
                   {filteredZones.map((zone) => {
-                    const areaStyle = {
-                      left: `${zone.layout.x * zoomScale}px`,
-                      top: `${zone.layout.y * zoomScale}px`,
-                      width: `${zone.layout.width * zoomScale}px`,
-                      height: `${zone.layout.height * zoomScale}px`,
-                    };
+                    const areaStyle = projectZone(zone);
                     const resourceTotal = zone.resources.reduce((sum, resource) => sum + resource.quantity, 0);
 
                     return (
@@ -572,20 +586,20 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                   </div>
                   <div className={styles.editorGrid}>
                     <label>
-                      Vị trí X
-                      <input type="range" min={0} max={560} value={selected.layout.x} onChange={(e) => updateZoneLayout(selected.id, "x", Number(e.target.value))} />
+                      Tâm latitude
+                      <input type="range" min={originLat - 0.006} max={originLat + 0.006} step={0.0001} value={selected.geo.lat} onChange={(e) => updateZoneGeo(selected.id, "lat", Number(e.target.value))} />
                     </label>
                     <label>
-                      Vị trí Y
-                      <input type="range" min={0} max={500} value={selected.layout.y} onChange={(e) => updateZoneLayout(selected.id, "y", Number(e.target.value))} />
+                      Tâm longitude
+                      <input type="range" min={originLng - 0.008} max={originLng + 0.008} step={0.0001} value={selected.geo.lng} onChange={(e) => updateZoneGeo(selected.id, "lng", Number(e.target.value))} />
                     </label>
                     <label>
-                      Rộng
-                      <input type="range" min={80} max={220} value={selected.layout.width} onChange={(e) => updateZoneLayout(selected.id, "width", Number(e.target.value))} />
+                      Độ rộng kinh độ
+                      <input type="range" min={0.0008} max={0.004} step={0.0001} value={selected.geo.lngSpan} onChange={(e) => updateZoneGeo(selected.id, "lngSpan", Number(e.target.value))} />
                     </label>
                     <label>
-                      Cao
-                      <input type="range" min={60} max={180} value={selected.layout.height} onChange={(e) => updateZoneLayout(selected.id, "height", Number(e.target.value))} />
+                      Độ cao vĩ độ
+                      <input type="range" min={0.0008} max={0.004} step={0.0001} value={selected.geo.latSpan} onChange={(e) => updateZoneGeo(selected.id, "latSpan", Number(e.target.value))} />
                     </label>
                   </div>
                 </div>
@@ -650,8 +664,8 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                           </td>
                           <td>{statusLabels[zone.status]}</td>
                           <td>{zone.coverage}</td>
-                          <td>{zone.layout.x}, {zone.layout.y}</td>
-                          <td>{zone.layout.width} × {zone.layout.height}</td>
+                          <td>{zone.geo.lat.toFixed(4)}, {zone.geo.lng.toFixed(4)}</td>
+                          <td>{zone.geo.latSpan.toFixed(4)} × {zone.geo.lngSpan.toFixed(4)}</td>
                           <td>{grouped.water}</td>
                           <td>{grouped.livestock}</td>
                           <td>{grouped.sensors}</td>
