@@ -177,6 +177,48 @@
   padding-left: 12px;
 }
 
+
+.searchBox {
+  position: relative;
+}
+
+.suggestionList {
+  display: grid;
+  gap: 8px;
+  margin: -2px 0 12px;
+  padding: 10px;
+  border: 1px solid #d9dde3;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+}
+
+.suggestionItem {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 10px 12px;
+  text-align: left;
+  display: grid;
+  gap: 3px;
+  cursor: pointer;
+
+  strong {
+    color: #172238;
+    font-size: 14px;
+  }
+
+  span {
+    color: #6b7280;
+    font-size: 12px;
+  }
+
+  &:hover {
+    border-color: #5cbc12;
+    background: #f2fae9;
+  }
+}
+
 .coordRow {
   display: grid;
   grid-template-columns: 1fr 1fr auto;
