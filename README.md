@@ -106,6 +106,13 @@ Once you log in to Adminer, you can inspect the database like this:
 - Click a table name to see its columns, indexes, foreign keys, and data rows.
 - Use **SQL command** to run queries such as `SELECT * FROM farm.some_table LIMIT 20;` or joins to inspect relationships.
 
+If you do **not** see any tables, the most common reason is that you are connected to the wrong database/schema or the PostgreSQL volume was created before the init SQL ran. This project creates tables inside the `farm` schema, not the default `public` schema, and the bootstrap SQL only runs the first time the `postgres_data` volume is created. To recreate the schema from scratch, run:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
 ### Windows note
 
 If you see an error like `open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified` or `unable to get image 'cnm-farm-product-traceability-db'`, Docker Desktop is not running yet. Start Docker Desktop first, wait for the engine to become available, then run the command again. See `docs/database/docker-deployment.md` for troubleshooting steps.

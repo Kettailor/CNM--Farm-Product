@@ -163,6 +163,42 @@ Các lệnh hữu ích trong `psql`:
 - `\d farm.ten_bang` → xem cột, index, foreign key của một bảng
 - `\q` → thoát
 
+### Nếu không thấy database / table nào
+
+Các nguyên nhân thường gặp:
+
+1. Bạn đang login sai server trong Adminer. Hãy dùng `Server = db`, không dùng `localhost`.
+2. Bạn đang mở schema `public`, trong khi project này tạo bảng ở schema `farm`.
+3. Volume `postgres_data` đã được tạo từ trước, nên file init SQL không chạy lại. PostgreSQL chỉ chạy script trong `/docker-entrypoint-initdb.d/` ở lần khởi tạo volume đầu tiên.
+
+Cách kiểm tra nhanh bằng `psql`:
+
+```bash
+docker compose exec db psql -U farmhub -d farmhub -c "\dn"
+docker compose exec db psql -U farmhub -d farmhub -c "\dt farm.*"
+```
+
+Nếu kết quả chưa có bảng và bạn muốn khởi tạo lại từ đầu:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+> Lưu ý: `docker compose down -v` sẽ xoá luôn volume database hiện tại.
+
+Nếu bạn không muốn xoá volume, có thể import lại schema thủ công:
+
+```bash
+docker compose exec -T db psql -U farmhub -d farmhub < docs/database/farm_traceability_schema.sql
+```
+
+Sau đó kiểm tra lại:
+
+```bash
+docker compose exec db psql -U farmhub -d farmhub -c "\dt farm.*"
+```
+
 ### Cách 2: Dùng VS Code extension
 
 Nếu bạn thích xem schema/table ngay trong VS Code, nên dùng:
