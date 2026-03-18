@@ -64,3 +64,7 @@ docker compose up --build
 docker compose down
 ```
 
+### Windows note
+
+If you see an error like `open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified`, Docker Desktop is not running yet. Start Docker Desktop first, wait for the engine to become available, then run the compose command again. See `docs/database/docker-deployment.md` for troubleshooting steps.
+
