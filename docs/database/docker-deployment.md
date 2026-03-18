@@ -100,13 +100,104 @@ Sau đó mở:
 
 - `http://localhost:8080`
 
-Thông tin đăng nhập:
+Thông tin đăng nhập trong Adminer:
 
 - System: `PostgreSQL`
-- Server: `db` (nếu truy cập từ container khác) hoặc `localhost`
+- Server: `db`
 - Username: `farmhub`
 - Password: `farmhub`
 - Database: `farmhub`
+
+> Không dùng `localhost` ở ô **Server** của Adminer. Adminer chạy trong container riêng, nên `localhost` sẽ trỏ về chính container Adminer và gây lỗi `connection refused` tới PostgreSQL.
+
+Sau khi đăng nhập Adminer, bạn có thể xem nhanh thông tin database như sau:
+
+- **Databases**: xem danh sách database trên PostgreSQL server.
+- **Schema** / **Tables and views**: xem schema, bảng, view.
+- Chọn một **table** để xem:
+  - cấu trúc cột
+  - khóa chính / index
+  - foreign key / liên kết giữa các bảng
+  - dữ liệu hiện có
+- **SQL command**: chạy query tự do để inspect dữ liệu hoặc quan hệ bảng.
+
+Ví dụ query:
+
+```sql
+SELECT table_schema, table_name
+FROM information_schema.tables
+WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+ORDER BY table_schema, table_name;
+```
+
+```sql
+SELECT
+  tc.table_schema,
+  tc.table_name,
+  kcu.column_name,
+  ccu.table_schema AS foreign_table_schema,
+  ccu.table_name AS foreign_table_name,
+  ccu.column_name AS foreign_column_name
+FROM information_schema.table_constraints AS tc
+JOIN information_schema.key_column_usage AS kcu
+  ON tc.constraint_name = kcu.constraint_name
+ AND tc.table_schema = kcu.table_schema
+JOIN information_schema.constraint_column_usage AS ccu
+  ON ccu.constraint_name = tc.constraint_name
+ AND ccu.table_schema = tc.table_schema
+WHERE tc.constraint_type = 'FOREIGN KEY'
+ORDER BY tc.table_schema, tc.table_name, kcu.column_name;
+```
+
+Nếu bạn thích terminal hơn, có thể vào PostgreSQL container rồi dùng `psql`:
+
+```bash
+docker compose exec db psql -U farmhub -d farmhub
+```
+
+Các lệnh hữu ích trong `psql`:
+
+- `\l` → danh sách database
+- `\dn` → danh sách schema
+- `\dt farm.*` → danh sách bảng trong schema `farm`
+- `\d farm.ten_bang` → xem cột, index, foreign key của một bảng
+- `\q` → thoát
+
+### Nếu không thấy database / table nào
+
+Các nguyên nhân thường gặp:
+
+1. Bạn đang login sai server trong Adminer. Hãy dùng `Server = db`, không dùng `localhost`.
+2. Bạn đang mở schema `public`, trong khi project này tạo bảng ở schema `farm`.
+3. Volume `postgres_data` đã được tạo từ trước, nên file init SQL không chạy lại. PostgreSQL chỉ chạy script trong `/docker-entrypoint-initdb.d/` ở lần khởi tạo volume đầu tiên.
+
+Cách kiểm tra nhanh bằng `psql`:
+
+```bash
+docker compose exec db psql -U farmhub -d farmhub -c "\dn"
+docker compose exec db psql -U farmhub -d farmhub -c "\dt farm.*"
+```
+
+Nếu kết quả chưa có bảng và bạn muốn khởi tạo lại từ đầu:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+> Lưu ý: `docker compose down -v` sẽ xoá luôn volume database hiện tại.
+
+Nếu bạn không muốn xoá volume, có thể import lại schema thủ công:
+
+```bash
+docker compose exec -T db psql -U farmhub -d farmhub < docs/database/farm_traceability_schema.sql
+```
+
+Sau đó kiểm tra lại:
+
+```bash
+docker compose exec db psql -U farmhub -d farmhub -c "\dt farm.*"
+```
 
 ### Cách 2: Dùng VS Code extension
 

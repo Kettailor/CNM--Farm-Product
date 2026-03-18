@@ -81,13 +81,37 @@ You can inspect the running PostgreSQL database in two convenient ways:
 - Use Adminer in Docker: `docker compose --profile tools up -d adminer`
 - Use a VS Code plugin such as SQLTools + SQLTools PostgreSQL Driver
 
-Connection info:
+Connection info for desktop apps/plugins:
 
 - Host: `127.0.0.1`
 - Port: `5432`
 - Database: `farmhub`
 - Username: `farmhub`
 - Password: `farmhub`
+
+Connection info for Adminer at `http://localhost:8080`:
+
+- System: `PostgreSQL`
+- Server: `db`
+- Username: `farmhub`
+- Password: `farmhub`
+- Database: `farmhub`
+
+> In Adminer, do **not** use `localhost` as the server name. Adminer runs in a separate container, so `localhost` points to the Adminer container itself, not PostgreSQL.
+
+Once you log in to Adminer, you can inspect the database like this:
+
+- Use **Databases** to see the list of available databases on the server.
+- Open the `farmhub` database, then use **Schema** / **Tables and views** to browse tables.
+- Click a table name to see its columns, indexes, foreign keys, and data rows.
+- Use **SQL command** to run queries such as `SELECT * FROM farm.some_table LIMIT 20;` or joins to inspect relationships.
+
+If you do **not** see any tables, the most common reason is that you are connected to the wrong database/schema or the PostgreSQL volume was created before the init SQL ran. This project creates tables inside the `farm` schema, not the default `public` schema, and the bootstrap SQL only runs the first time the `postgres_data` volume is created. To recreate the schema from scratch, run:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
 
 ### Windows note
 
