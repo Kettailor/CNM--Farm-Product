@@ -11,7 +11,7 @@ type FarmLocation = {
   updatedAt: string;
 };
 
-type LocationMode = "search" | "pin" | "manual";
+type LocationMode = "search" | "link" | "manual";
 
 type FormState = {
   fullName: string;
@@ -19,6 +19,7 @@ type FormState = {
   phone: string;
   farmName: string;
   address: string;
+  mapLink: string;
   lat: string;
   lng: string;
   farmTypes: string[];
@@ -52,6 +53,7 @@ const initialForm: FormState = {
   phone: "",
   farmName: "",
   address: "",
+  mapLink: "",
   lat: "",
   lng: "",
   farmTypes: [],
@@ -127,6 +129,22 @@ const newspaperOptions = [
 const toggleValue = (list: string[], value: string, checked: boolean) =>
   checked ? [...list, value] : list.filter((item) => item !== value);
 
+const extractCoordinatesFromGoogleMapsLink = (value: string) => {
+  if (!value.trim()) return null;
+
+  const directMatch = value.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+  if (directMatch) {
+    return { lat: directMatch[1], lng: directMatch[2] };
+  }
+
+  const qMatch = value.match(/[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+  if (qMatch) {
+    return { lat: qMatch[1], lng: qMatch[2] };
+  }
+
+  return null;
+};
+
 export default function SmartFarmExperience() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [completed, setCompleted] = useState(false);
@@ -151,18 +169,29 @@ export default function SmartFarmExperience() {
   };
 
   const validateLocation = () => {
-    const lat = Number(form.lat);
-    const lng = Number(form.lng);
-    if (!form.address.trim() || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-      return;
+    const nextForm = { ...form };
+
+    if (locationMode === "link") {
+      const coords = extractCoordinatesFromGoogleMapsLink(form.mapLink);
+      if (coords) {
+        nextForm.lat = coords.lat;
+        nextForm.lng = coords.lng;
+      }
     }
 
+    const lat = Number(nextForm.lat);
+    const lng = Number(nextForm.lng);
+    const hasAddress = nextForm.address.trim().length > 0;
+    const hasCoordinates = Number.isFinite(lat) && Number.isFinite(lng);
+
+    if (!hasAddress && !hasCoordinates) return;
+
     saveForm({
-      ...form,
+      ...nextForm,
       verifiedLocation: {
-        address: form.address.trim(),
-        lat,
-        lng,
+        address: nextForm.address.trim() || `${lat}, ${lng}`,
+        lat: hasCoordinates ? lat : 0,
+        lng: hasCoordinates ? lng : 0,
         updatedAt: new Date().toISOString(),
       },
     });
@@ -251,31 +280,62 @@ export default function SmartFarmExperience() {
                     Help us tailor Farmdeck to your needs by letting us know where your farm is located. A full
                     address is best as it centres your homestead on the map.
                   </p>
-                  <p className={styles.tip}>💡 TIP: For remote spots, manual entry is your best bet.</p>
+                  <p className={styles.tip}>💡 TIP: Chọn 1 trong 3 cách: nhập địa chỉ để xem live map, dán link Google Maps, hoặc nhập tọa độ.</p>
                   <p>How would you like to share your location? (Select one option)</p>
 
                   <div className={styles.radioGroup}>
                     <label>
                       <input type="radio" checked={locationMode === "search"} onChange={() => setLocationMode("search")} />
-                      Search using Google Maps (enter your address or Plus Code)
+                      Nhập địa chỉ / vị trí và xem live preview
                     </label>
                     <label>
-                      <input type="radio" checked={locationMode === "pin"} onChange={() => setLocationMode("pin")} />
-                      Select your location directly on the map
+                      <input type="radio" checked={locationMode === "link"} onChange={() => setLocationMode("link")} />
+                      Dán link Google Maps
                     </label>
                     <label>
                       <input type="radio" checked={locationMode === "manual"} onChange={() => setLocationMode("manual")} />
-                      Enter your location lat/lon with 4+ decimal places
+                      Nhập tọa độ Latitude / Longitude
                     </label>
                   </div>
 
-                  <textarea
-                    placeholder="Enter your address"
-                    value={form.address}
-                    onChange={(e) => setForm({ ...form, address: e.target.value, verifiedLocation: null })}
-                  />
+                  {locationMode === "search" && (
+                    <>
+                      <textarea
+                        placeholder="Nhập địa chỉ, tên khu vực hoặc Plus Code"
+                        value={form.address}
+                        onChange={(e) => setForm({ ...form, address: e.target.value, verifiedLocation: null })}
+                      />
+                      <iframe title="Google map live preview" className={styles.googleMap} src={mapEmbedUrl} loading="lazy" />
+                    </>
+                  )}
 
-                  {(locationMode === "manual" || locationMode === "pin") && (
+                  {locationMode === "link" && (
+                    <>
+                      <input
+                        type="url"
+                        placeholder="Dán link Google Maps tại đây"
+                        value={form.mapLink}
+                        onChange={(e) => {
+                          const coords = extractCoordinatesFromGoogleMapsLink(e.target.value);
+                          setForm({
+                            ...form,
+                            mapLink: e.target.value,
+                            lat: coords?.lat ?? form.lat,
+                            lng: coords?.lng ?? form.lng,
+                            verifiedLocation: null,
+                          });
+                        }}
+                      />
+                      <textarea
+                        placeholder="Mô tả vị trí / địa chỉ hiển thị trên bản đồ"
+                        value={form.address}
+                        onChange={(e) => setForm({ ...form, address: e.target.value, verifiedLocation: null })}
+                      />
+                      <iframe title="Google map live preview" className={styles.googleMap} src={mapEmbedUrl} loading="lazy" />
+                    </>
+                  )}
+
+                  {locationMode === "manual" && (
                     <div className={styles.coordRow}>
                       <input
                         type="number"
@@ -295,7 +355,12 @@ export default function SmartFarmExperience() {
                     </div>
                   )}
 
-                  {locationMode === "pin" && <iframe title="Google map" className={styles.googleMap} src={mapEmbedUrl} loading="lazy" />}
+                  {locationMode === "manual" && <iframe title="Google map live preview" className={styles.googleMap} src={mapEmbedUrl} loading="lazy" />}
+                  {locationMode !== "manual" && (
+                    <button className={styles.backBtn} type="button" onClick={validateLocation}>
+                      ✥ Validate
+                    </button>
+                  )}
                   {form.verifiedLocation && <p className={styles.validText}>✓ Location verified</p>}
                   <p>When you are done, click Continue.</p>
                 </div>
