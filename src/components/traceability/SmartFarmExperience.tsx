@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import SmartFarmDashboard from "./SmartFarmDashboard";
 import styles from "./SmartFarmExperience.module.scss";
 
@@ -12,6 +12,13 @@ type FarmLocation = {
 };
 
 type LocationMode = "search" | "link" | "manual";
+
+type LocationSuggestion = {
+  label: string;
+  lat: string;
+  lng: string;
+};
+
 
 type FormState = {
   fullName: string;
@@ -126,13 +133,20 @@ const extractCoordinatesFromGoogleMapsLink = (value: string) => {
   return null;
 };
 
+
+const getLocationLabel = (value: string) => value.split(",").slice(0, 3).join(", ").trim();
+
 export default function SmartFarmExperience() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [step, setStep] = useState(0);
   const [locationMode, setLocationMode] = useState<LocationMode>("search");
   const [form, setForm] = useState<FormState>(initialForm);
-  const [mapHistory, setMapHistory] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [locationHint, setLocationHint] = useState("");
+  const [isResolvingLocation, setIsResolvingLocation] = useState(false);
+  const reverseLookupRef = useRef(0);
 
   const isAccountValid = useMemo(() => {
     const hasValues =
@@ -168,6 +182,9 @@ export default function SmartFarmExperience() {
       if (coords) {
         nextForm.lat = coords.lat;
         nextForm.lng = coords.lng;
+        if (!nextForm.address.trim()) {
+          nextForm.address = locationHint || `${coords.lat}, ${coords.lng}`;
+        }
       }
     }
 
@@ -202,18 +219,124 @@ export default function SmartFarmExperience() {
   }, []);
 
   useEffect(() => {
-    if (step !== 2 || !mapQuery.trim()) return;
+    if (step !== 2 || locationMode !== "search") {
+      setSuggestions([]);
+      setIsLoadingSuggestions(false);
+      return;
+    }
 
-    const timer = setTimeout(() => {
-      setMapHistory((prev) => {
-        if (prev[0] === mapQuery) return prev;
-        const next = [mapQuery, ...prev.filter((item) => item !== mapQuery)].slice(0, 6);
-        return next;
-      });
-    }, 400);
+    const query = form.address.trim();
+    if (query.length < 3) {
+      setSuggestions([]);
+      setIsLoadingSuggestions(false);
+      return;
+    }
 
-    return () => clearTimeout(timer);
-  }, [mapQuery, step]);
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        setIsLoadingSuggestions(true);
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&q=${encodeURIComponent(query)}`,
+          {
+            signal: controller.signal,
+            headers: {
+              Accept: "application/json",
+            },
+          }
+        );
+        if (!response.ok) {
+          throw new Error("Failed to load location suggestions");
+        }
+
+        const results = (await response.json()) as Array<{ display_name: string; lat: string; lon: string }>;
+        setSuggestions(
+          results.map((item) => ({
+            label: getLocationLabel(item.display_name),
+            lat: item.lat,
+            lng: item.lon,
+          }))
+        );
+      } catch {
+        if (!controller.signal.aborted) {
+          setSuggestions([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoadingSuggestions(false);
+        }
+      }
+    }, 350);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [form.address, locationMode, step]);
+
+  useEffect(() => {
+    if (step !== 2) return;
+
+    const shouldReverseLookup =
+      (locationMode === "manual" && form.lat.trim() && form.lng.trim()) ||
+      (locationMode === "link" && form.mapLink.trim() && form.lat.trim() && form.lng.trim());
+
+    if (!shouldReverseLookup) {
+      setLocationHint("");
+      setIsResolvingLocation(false);
+      return;
+    }
+
+    const lookupId = reverseLookupRef.current + 1;
+    reverseLookupRef.current = lookupId;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        setIsResolvingLocation(true);
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(form.lat)}&lon=${encodeURIComponent(form.lng)}`,
+          {
+            signal: controller.signal,
+            headers: {
+              Accept: "application/json",
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to reverse geocode location");
+        }
+
+        const result = (await response.json()) as { display_name?: string };
+        if (controller.signal.aborted || reverseLookupRef.current !== lookupId) return;
+
+        const nextAddress = result.display_name ? getLocationLabel(result.display_name) : `${form.lat}, ${form.lng}`;
+        setLocationHint(nextAddress);
+        setForm((prev) => {
+          if (prev.address === nextAddress) return prev;
+          return { ...prev, address: nextAddress, verifiedLocation: null };
+        });
+      } catch {
+        if (!controller.signal.aborted && reverseLookupRef.current === lookupId) {
+          const fallback = `${form.lat}, ${form.lng}`;
+          setLocationHint(fallback);
+          setForm((prev) => {
+            if (prev.address === fallback) return prev;
+            return { ...prev, address: fallback, verifiedLocation: null };
+          });
+        }
+      } finally {
+        if (!controller.signal.aborted && reverseLookupRef.current === lookupId) {
+          setIsResolvingLocation(false);
+        }
+      }
+    }, 450);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [form.lat, form.lng, form.mapLink, locationMode, step]);
 
   if (completed) {
     return (
@@ -263,7 +386,7 @@ export default function SmartFarmExperience() {
                     Thiết lập này chỉ mất chưa đến một phút. Chúng tôi sẽ thu thập thông tin cơ bản để cá nhân hoá hệ
                     thống theo mô hình nông trại của bạn.
                   </p>
-                  <p>Khi sẵn sàng, bấm "Tiếp tục".</p>
+                  <p>Khi sẵn sàng, bấm &quot;Tiếp tục&quot;.</p>
                 </div>
               )}
 
@@ -327,11 +450,42 @@ export default function SmartFarmExperience() {
 
                   {locationMode === "search" && (
                     <>
-                      <textarea
-                        placeholder="Nhập địa chỉ, tên khu vực hoặc Plus Code"
-                        value={form.address}
-                        onChange={(e) => setForm({ ...form, address: e.target.value, verifiedLocation: null })}
-                      />
+                      <div className={styles.searchBox}>
+                        <textarea
+                          placeholder="Nhập địa chỉ, tên khu vực hoặc Plus Code"
+                          value={form.address}
+                          onChange={(e) => {
+                            setForm({ ...form, address: e.target.value, lat: "", lng: "", verifiedLocation: null });
+                          }}
+                        />
+                        {isLoadingSuggestions && <p className={styles.tip}>Đang tìm vị trí phù hợp...</p>}
+                        {suggestions.length > 0 && (
+                          <div className={styles.suggestionList}>
+                            {suggestions.map((item) => (
+                              <button
+                                key={`${item.label}-${item.lat}-${item.lng}`}
+                                type="button"
+                                className={styles.suggestionItem}
+                                onClick={() => {
+                                  setForm({
+                                    ...form,
+                                    address: item.label,
+                                    lat: item.lat,
+                                    lng: item.lng,
+                                    verifiedLocation: null,
+                                  });
+                                  setSuggestions([]);
+                                }}
+                              >
+                                <strong>{item.label}</strong>
+                                <span>
+                                  {Number(item.lat).toFixed(5)}, {Number(item.lng).toFixed(5)}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       <iframe title="Google map live preview" className={styles.googleMap} src={mapEmbedUrl} loading="lazy" />
                     </>
                   )}
@@ -347,41 +501,63 @@ export default function SmartFarmExperience() {
                           setForm({
                             ...form,
                             mapLink: e.target.value,
-                            lat: coords?.lat ?? form.lat,
-                            lng: coords?.lng ?? form.lng,
+                            lat: coords?.lat ?? "",
+                            lng: coords?.lng ?? "",
+                            address: coords ? form.address : "",
                             verifiedLocation: null,
                           });
                         }}
                       />
                       <textarea
-                        placeholder="Mô tả vị trí / địa chỉ hiển thị trên bản đồ"
+                        placeholder="Tên vị trí sẽ tự đọc từ link tracking"
                         value={form.address}
-                        onChange={(e) => setForm({ ...form, address: e.target.value, verifiedLocation: null })}
+                        readOnly
                       />
+                      <p className={styles.tip}>
+                        {form.mapLink.trim()
+                          ? isResolvingLocation
+                            ? "Đang đọc link map và lấy tên vị trí..."
+                            : "Ô địa chỉ đã được khóa khi dùng link map. Hệ thống tự động hiển thị tên vị trí từ link."
+                          : "Dán link Google Maps để hệ thống tự lấy tọa độ và tên vị trí."}
+                      </p>
                       <iframe title="Google map live preview" className={styles.googleMap} src={mapEmbedUrl} loading="lazy" />
                     </>
                   )}
 
                   {locationMode === "manual" && (
-                    <div className={styles.coordRow}>
-                      <input
-                        type="number"
-                        step="0.0001"
-                        placeholder="Vĩ độ"
-                        value={form.lat}
-                        onChange={(e) => setForm({ ...form, lat: e.target.value, verifiedLocation: null })}
+                    <>
+                      <div className={styles.coordRow}>
+                        <input
+                          type="number"
+                          step="0.0001"
+                          placeholder="Vĩ độ"
+                          value={form.lat}
+                          onChange={(e) => setForm({ ...form, lat: e.target.value, mapLink: "", verifiedLocation: null })}
+                        />
+                        <input
+                          type="number"
+                          step="0.0001"
+                          placeholder="Kinh độ"
+                          value={form.lng}
+                          onChange={(e) => setForm({ ...form, lng: e.target.value, mapLink: "", verifiedLocation: null })}
+                        />
+                        <button className={styles.backBtn} type="button" onClick={validateLocation}>
+                          Xác thực vị trí
+                        </button>
+                      </div>
+                      <textarea
+                        placeholder="Tên vị trí theo tọa độ sẽ hiển thị ở đây"
+                        value={form.address}
+                        readOnly
                       />
-                      <input
-                        type="number"
-                        step="0.0001"
-                        placeholder="Kinh độ"
-                        value={form.lng}
-                        onChange={(e) => setForm({ ...form, lng: e.target.value, verifiedLocation: null })}
-                      />
-                      <button className={styles.backBtn} type="button" onClick={validateLocation}>
-                        Xác thực vị trí
-                      </button>
-                    </div>
+                      <p className={styles.tip}>
+                        {form.lat && form.lng
+                          ? isResolvingLocation
+                            ? "Đang tìm tên vị trí theo tọa độ..."
+                            : `Tên vị trí theo tọa độ: ${locationHint || form.address || `${form.lat}, ${form.lng}`}`
+                          : "Nhập tọa độ để hệ thống tự hiển thị tên vị trí tương ứng."}
+                      </p>
+                    </>
                   )}
 
                   {locationMode === "manual" && <iframe title="Google map live preview" className={styles.googleMap} src={mapEmbedUrl} loading="lazy" />}
@@ -580,7 +756,7 @@ export default function SmartFarmExperience() {
               {step === 6 && (
                 <div className={styles.stepBody}>
                   <p>Bạn đã hoàn tất đăng ký.</p>
-                  <p>Nhấn "Hoàn tất" để vào bảng điều khiển và bắt đầu quản lý truy xuất nông sản.</p>
+                  <p>Nhấn &quot;Hoàn tất&quot; để vào bảng điều khiển và bắt đầu quản lý truy xuất nông sản.</p>
                 </div>
               )}
 
