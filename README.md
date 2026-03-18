@@ -99,6 +99,13 @@ Connection info for Adminer at `http://localhost:8080`:
 
 > In Adminer, do **not** use `localhost` as the server name. Adminer runs in a separate container, so `localhost` points to the Adminer container itself, not PostgreSQL.
 
+Once you log in to Adminer, you can inspect the database like this:
+
+- Use **Databases** to see the list of available databases on the server.
+- Open the `farmhub` database, then use **Schema** / **Tables and views** to browse tables.
+- Click a table name to see its columns, indexes, foreign keys, and data rows.
+- Use **SQL command** to run queries such as `SELECT * FROM farm.some_table LIMIT 20;` or joins to inspect relationships.
+
 ### Windows note
 
 If you see an error like `open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified` or `unable to get image 'cnm-farm-product-traceability-db'`, Docker Desktop is not running yet. Start Docker Desktop first, wait for the engine to become available, then run the command again. See `docs/database/docker-deployment.md` for troubleshooting steps.
