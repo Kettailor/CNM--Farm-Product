@@ -48,6 +48,7 @@ type ZoneMetadata = {
   priority: "low" | "medium" | "high";
   notes: string;
   farmType: FarmType;
+  shapeRatio: number;
 };
 
 type Zone = {
@@ -75,6 +76,7 @@ const TILE_SIZE = 256;
 const DEFAULT_VIEWPORT: ViewportSize = { width: 960, height: 720 };
 const MIN_ZOOM = 14;
 const MAX_ZOOM = 19;
+const METERS_PER_DEGREE_LAT = 111_320;
 
 const sidebarMenus = [
   "Dashboard",
@@ -137,6 +139,7 @@ const initialZones: Zone[] = [
       priority: "medium",
       notes: "Theo dõi khẩu phần sáng và độ ẩm nền chuồng.",
       farmType: "sheep",
+      shapeRatio: 1.35,
     },
     resources: [
       { id: "z1-r1", type: "water", name: "Tank 01", status: "healthy", lastSeen: "2 phút trước", quantity: 3 },
@@ -162,6 +165,7 @@ const initialZones: Zone[] = [
       priority: "high",
       notes: "Cần kiểm tra nước uống và bóng mát khu vực phía đông.",
       farmType: "cattle",
+      shapeRatio: 1.6,
     },
     resources: [
       { id: "z2-r1", type: "water", name: "Water line 02", status: "warning", lastSeen: "12 phút trước", quantity: 2 },
@@ -187,6 +191,7 @@ const initialZones: Zone[] = [
       priority: "medium",
       notes: "Tăng tần suất kiểm tra nhiệt độ chuồng buổi chiều.",
       farmType: "pig",
+      shapeRatio: 1.2,
     },
     resources: [
       { id: "z3-r1", type: "water", name: "Reservoir B1", status: "healthy", lastSeen: "4 phút trước", quantity: 4 },
@@ -212,6 +217,7 @@ const initialZones: Zone[] = [
       priority: "high",
       notes: "Đang xử lý cảnh báo nhiệt độ cao và thông gió.",
       farmType: "poultry",
+      shapeRatio: 1.5,
     },
     resources: [
       { id: "z4-r1", type: "water", name: "Pump line B2", status: "critical", lastSeen: "28 phút trước", quantity: 1 },
@@ -237,6 +243,7 @@ const initialZones: Zone[] = [
       priority: "medium",
       notes: "Giữ ẩm ổn định 7 ngày đầu.",
       farmType: "crop",
+      shapeRatio: 2.1,
     },
     resources: [
       { id: "z5-r1", type: "water", name: "Drip line C1", status: "healthy", lastSeen: "6 phút trước", quantity: 2 },
@@ -262,6 +269,7 @@ const initialZones: Zone[] = [
       priority: "low",
       notes: "Sẵn sàng cho đợt mở rộng A7/N7.",
       farmType: "cattle",
+      shapeRatio: 1.75,
     },
     resources: [
       { id: "z6-r1", type: "water", name: "Lake C2", status: "healthy", lastSeen: "3 phút trước", quantity: 3 },
@@ -336,6 +344,25 @@ const worldPixelToLatLng = (x: number, y: number, zoom: number) => {
 
 const clampLat = (lat: number) => Math.max(-85, Math.min(85, lat));
 const tileCount = (zoom: number) => 2 ** zoom;
+const metersPerDegreeLng = (lat: number) => Math.max(1, METERS_PER_DEGREE_LAT * Math.cos((lat * Math.PI) / 180));
+
+const geoToAreaHecta = (geo: ZoneGeo) => {
+  const heightMeters = Math.max(1, geo.latSpan * METERS_PER_DEGREE_LAT);
+  const widthMeters = Math.max(1, geo.lngSpan * metersPerDegreeLng(geo.lat));
+  return (heightMeters * widthMeters) / 10_000;
+};
+
+const syncGeoSizeToArea = (lat: number, areaHecta: number, shapeRatio: number) => {
+  const safeArea = Math.max(0.05, areaHecta) * 10_000;
+  const safeRatio = Math.max(0.35, shapeRatio);
+  const heightMeters = Math.sqrt(safeArea / safeRatio);
+  const widthMeters = safeArea / heightMeters;
+
+  return {
+    latSpan: heightMeters / METERS_PER_DEGREE_LAT,
+    lngSpan: widthMeters / metersPerDegreeLng(lat),
+  };
+};
 
 export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps) {
   const farmName = profile?.farmName || "Ket Farm";
@@ -408,6 +435,10 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
   }, [resourceFilter, searchTerm, statusFilter, zones]);
 
   const selected = useMemo(() => zones.find((zone) => zone.id === selectedZone) ?? zones[0], [selectedZone, zones]);
+  const selectedDimensions = useMemo(() => ({
+    widthMeters: selected.geo.lngSpan * metersPerDegreeLng(selected.geo.lat),
+    heightMeters: selected.geo.latSpan * METERS_PER_DEGREE_LAT,
+  }), [selected]);
 
   useEffect(() => {
     if (!filteredZones.some((zone) => zone.id === selectedZone) && filteredZones[0]) {
@@ -426,7 +457,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
       {
         title: "Area mặc định",
         value: `${defaultGridArea.toFixed(1)} ${areaUnit}`,
-        detail: "Mỗi area chỉ hiển thị icon trên map, thông tin mở khi click.",
+        detail: "Diện tích ha nhập vào sẽ tự ánh xạ sang kích thước overlay thực tế trên map.",
       },
       {
         title: "Area cần xử lý",
@@ -443,7 +474,25 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
   );
 
   const updateZoneGeo = (zoneId: string, field: keyof ZoneGeo, value: number) => {
-    setZones((prev) => prev.map((zone) => (zone.id === zoneId ? { ...zone, geo: { ...zone.geo, [field]: value } } : zone)));
+    setZones((prev) =>
+      prev.map((zone) => {
+        if (zone.id !== zoneId) return zone;
+        const nextGeo = { ...zone.geo, [field]: value };
+        const nextArea = geoToAreaHecta(nextGeo);
+        const nextRatio = Math.max(0.35, (nextGeo.lngSpan * metersPerDegreeLng(nextGeo.lat)) / Math.max(1, nextGeo.latSpan * METERS_PER_DEGREE_LAT));
+
+        return {
+          ...zone,
+          geo: nextGeo,
+          coverage: `${nextArea.toFixed(1)} ha`,
+          metadata: {
+            ...zone.metadata,
+            areaHecta: Number(nextArea.toFixed(2)),
+            shapeRatio: Number(nextRatio.toFixed(2)),
+          },
+        };
+      })
+    );
   };
 
   const updateZoneMetadata = (zoneId: string, field: keyof ZoneMetadata, value: string | number) => {
@@ -451,6 +500,17 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
       prev.map((zone) => {
         if (zone.id !== zoneId) return zone;
         const nextMetadata = { ...zone.metadata, [field]: value } as ZoneMetadata;
+
+        if (field === "areaHecta" || field === "shapeRatio") {
+          const nextGeoSize = syncGeoSizeToArea(zone.geo.lat, Number(nextMetadata.areaHecta), Number(nextMetadata.shapeRatio));
+          return {
+            ...zone,
+            metadata: nextMetadata,
+            geo: { ...zone.geo, ...nextGeoSize },
+            coverage: `${Number(nextMetadata.areaHecta).toFixed(1)} ha`,
+          };
+        }
+
         return { ...zone, metadata: nextMetadata, coverage: `${Number(nextMetadata.areaHecta).toFixed(1)} ha` };
       })
     );
@@ -482,6 +542,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
         priority: "medium",
         notes: "Cần cập nhật đầy đủ thông số trước khi vận hành.",
         farmType: "cattle",
+        shapeRatio: 1.5,
       },
       resources: [],
     };
@@ -535,7 +596,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
     };
   };
 
-  const changeZoom = (nextZoom: number, anchor?: { clientX: number; clientY: number }) => {
+  const changeZoom = useCallback((nextZoom: number, anchor?: { clientX: number; clientY: number }) => {
     const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nextZoom));
     if (clamped === zoom) return;
 
@@ -557,7 +618,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
 
     setZoom(clamped);
     setMapCenter({ lat: clampLat(nextCenter.lat), lng: nextCenter.lng });
-  };
+  }, [centerPixel.x, centerPixel.y, viewport.height, viewport.width, zoom]);
 
   useEffect(() => {
     const element = mapRef.current;
@@ -836,6 +897,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                       <article><span>Loại area</span><strong>{farmTypeLabels[selected.metadata.farmType]}</strong></article>
                       <article><span>Trạng thái</span><strong>{statusLabels[selected.status]}</strong></article>
                       <article><span>Diện tích</span><strong>{selected.metadata.areaHecta.toFixed(1)} ha</strong></article>
+                      <article><span>Kích thước thực</span><strong>{selectedDimensions.widthMeters.toFixed(0)}m × {selectedDimensions.heightMeters.toFixed(0)}m</strong></article>
                       <article><span>Phụ trách</span><strong>{selected.metadata.manager}</strong></article>
                       <article><span>Ưu tiên</span><strong>{priorityLabels[selected.metadata.priority]}</strong></article>
                     </div>
@@ -884,7 +946,11 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                         </label>
                         <label>
                           Diện tích (ha)
-                          <input type="number" value={selected.metadata.areaHecta} onChange={(e) => updateZoneMetadata(selected.id, "areaHecta", Number(e.target.value) || 0)} />
+                          <input type="number" min={0.05} step={0.1} value={selected.metadata.areaHecta} onChange={(e) => updateZoneMetadata(selected.id, "areaHecta", Number(e.target.value) || 0.05)} />
+                        </label>
+                        <label>
+                          Tỷ lệ ngang/dọc
+                          <input type="number" min={0.35} step={0.05} value={selected.metadata.shapeRatio} onChange={(e) => updateZoneMetadata(selected.id, "shapeRatio", Number(e.target.value) || 1)} />
                         </label>
                         <label>
                           Công năng
@@ -952,6 +1018,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                       <th>Toạ độ tâm</th>
                       <th>Bounds span</th>
                       <th>Diện tích</th>
+                      <th>Kích thước thực</th>
                       <th>Công năng</th>
                       <th>Phụ trách</th>
                     </tr>
@@ -964,6 +1031,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                         <td>{zone.geo.lat.toFixed(5)}, {zone.geo.lng.toFixed(5)}</td>
                         <td>{zone.geo.latSpan.toFixed(4)} × {zone.geo.lngSpan.toFixed(4)}</td>
                         <td>{zone.metadata.areaHecta.toFixed(1)} ha</td>
+                        <td>{(zone.geo.lngSpan * metersPerDegreeLng(zone.geo.lat)).toFixed(0)}m × {(zone.geo.latSpan * METERS_PER_DEGREE_LAT).toFixed(0)}m</td>
                         <td>{zone.metadata.usage}</td>
                         <td>{zone.metadata.manager}</td>
                       </tr>

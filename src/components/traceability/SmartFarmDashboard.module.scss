@@ -254,7 +254,13 @@
     padding: 10px 12px;
     font-size: 14px;
     background: #fff;
+    color: #111827;
     width: 100%;
+  }
+
+  input::placeholder {
+    color: #6b7280;
+    opacity: 1;
   }
 
   input[type="range"] {
@@ -385,6 +391,7 @@
 .resourcePanel { display: grid; gap: 12px; }
 
 .emptyState {
+  color: #1f2937;
   border: 1px dashed #d1d5db;
   border-radius: 12px;
   padding: 16px;
@@ -425,6 +432,10 @@
   p,
   small,
   span { color: #6b7280; }
+
+  button {
+    color: #ffffff;
+  }
 }
 
 .zoneMeta {
@@ -449,6 +460,7 @@
   strong {
     color: #183153;
     font-size: 18px;
+    line-height: 1.35;
   }
 }
 
@@ -582,4 +594,10 @@
   .searchField { grid-column: span 1; }
   .mapFrame { height: 780px; }
   .mapPreview { height: 420px; }
+}
+
+.measureHint {
+  color: #4b5563;
+  font-size: 12px;
+  line-height: 1.45;
 }
