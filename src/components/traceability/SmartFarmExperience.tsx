@@ -54,6 +54,7 @@ type FormState = {
 };
 
 const ONBOARDING_STORAGE_KEY = "farmdeck.smart.onboarding";
+const ONBOARDING_UI_STORAGE_KEY = "farmdeck.smart.onboarding-ui";
 
 const initialForm: FormState = {
   fullName: "",
@@ -137,6 +138,7 @@ const extractCoordinatesFromGoogleMapsLink = (value: string) => {
 const getLocationLabel = (value: string) => value.split(",").slice(0, 3).join(", ").trim();
 
 export default function SmartFarmExperience() {
+  const [isHydrated, setIsHydrated] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [step, setStep] = useState(0);
@@ -171,7 +173,9 @@ export default function SmartFarmExperience() {
 
   const saveForm = (nextForm: FormState) => {
     setForm(nextForm);
-    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(nextForm));
+    if (typeof window !== "undefined") {
+      localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(nextForm));
+    }
   };
 
   const validateLocation = () => {
@@ -207,16 +211,56 @@ export default function SmartFarmExperience() {
   };
 
   useEffect(() => {
-    const stored = localStorage.getItem(ONBOARDING_STORAGE_KEY);
-    if (stored) {
+    const storedForm = localStorage.getItem(ONBOARDING_STORAGE_KEY);
+    if (storedForm) {
       try {
-        const parsed = JSON.parse(stored) as FormState;
+        const parsed = JSON.parse(storedForm) as FormState;
         setForm({ ...initialForm, ...parsed });
       } catch {
         localStorage.removeItem(ONBOARDING_STORAGE_KEY);
       }
     }
+
+    const storedUi = localStorage.getItem(ONBOARDING_UI_STORAGE_KEY);
+    if (storedUi) {
+      try {
+        const parsed = JSON.parse(storedUi) as {
+          showOnboarding?: boolean;
+          completed?: boolean;
+          step?: number;
+          locationMode?: LocationMode;
+        };
+
+        setShowOnboarding(Boolean(parsed.showOnboarding));
+        setCompleted(Boolean(parsed.completed));
+        setStep(typeof parsed.step === "number" ? parsed.step : 0);
+        setLocationMode(parsed.locationMode ?? "search");
+      } catch {
+        localStorage.removeItem(ONBOARDING_UI_STORAGE_KEY);
+      }
+    }
+
+    setIsHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    localStorage.setItem(
+      ONBOARDING_UI_STORAGE_KEY,
+      JSON.stringify({
+        showOnboarding,
+        completed,
+        step,
+        locationMode,
+      })
+    );
+  }, [completed, isHydrated, locationMode, showOnboarding, step]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(form));
+  }, [form, isHydrated]);
 
   useEffect(() => {
     if (step !== 2 || locationMode !== "search") {
@@ -337,6 +381,10 @@ export default function SmartFarmExperience() {
       clearTimeout(timer);
     };
   }, [form.lat, form.lng, form.mapLink, locationMode, step]);
+
+  if (!isHydrated) {
+    return null;
+  }
 
   if (completed) {
     return (
@@ -790,7 +838,7 @@ export default function SmartFarmExperience() {
                     Tiếp tục →
                   </button>
                 ) : (
-                  <button className={styles.nextBtn} onClick={() => setCompleted(true)}>
+                  <button className={styles.nextBtn} onClick={() => { setCompleted(true); setShowOnboarding(false); }}>
                     Hoàn tất
                   </button>
                 )}

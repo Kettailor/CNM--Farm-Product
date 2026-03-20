@@ -1,6 +1,6 @@
 "use client";
 
-import React, { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import React, { CSSProperties , useEffect, useMemo, useRef, useState } from "react";
 import styles from "./SmartFarmDashboard.module.scss";
 
 type DashboardProfile = {
@@ -559,12 +559,22 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
     setMapCenter({ lat: clampLat(nextCenter.lat), lng: nextCenter.lng });
   };
 
-  const handleMapWheel = (event: React.WheelEvent<HTMLDivElement>) => {
-    if (!event.ctrlKey) return;
-    event.preventDefault();
-    const delta = event.deltaY < 0 ? 1 : -1;
-    changeZoom(zoom + delta, { clientX: event.clientX, clientY: event.clientY });
-  };
+  useEffect(() => {
+    const element = mapRef.current;
+    if (!element) return;
+
+    const handleNativeWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const delta = event.deltaY < 0 ? 1 : -1;
+      changeZoom(zoom + delta, { clientX: event.clientX, clientY: event.clientY });
+    };
+
+    element.addEventListener("wheel", handleNativeWheel, { passive: false });
+    return () => element.removeEventListener("wheel", handleNativeWheel);
+  }, [changeZoom, zoom]);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
@@ -765,7 +775,6 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
               <div
                 className={`${styles.mapFrame} ${isDragging ? styles.isDragging : ""}`}
                 ref={mapRef}
-                onWheel={handleMapWheel}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={(event) => endDrag(event.pointerId)}
