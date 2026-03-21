@@ -108,55 +108,55 @@ const MAX_ZOOM = 19;
 const METERS_PER_DEGREE_LAT = 111_320;
 
 const sidebarMenus = [
-  "Dashboard",
-  "Farm Map",
-  "Livestock",
-  "Animal Counting",
-  "Livestock Tracking",
-  "Paddocks & Fields",
-  "Water Resources",
-  "Vehicle Tracking",
-  "Fencing",
-  "Energy Consumption",
-  "Alerts & Notifications",
-  "Food Traceability",
-  "Air Quality Monitoring",
-  "Weather",
-  "Settings",
+  "Tổng quan",
+  "Bản đồ nông trại",
+  "Vật nuôi",
+  "Đếm đàn",
+  "Theo dõi vật nuôi",
+  "Ô đất & khu vực",
+  "Nguồn nước",
+  "Theo dõi phương tiện",
+  "Hàng rào",
+  "Tiêu thụ năng lượng",
+  "Cảnh báo & thông báo",
+  "Truy xuất nguồn gốc",
+  "Theo dõi chất lượng không khí",
+  "Thời tiết",
+  "Cài đặt",
 ];
 
 const metricPills = [
-  { label: "Farm", value: "1" },
-  { label: "Users", value: "1 / 3" },
-  { label: "Assets", value: "57" },
-  { label: "Paddocks", value: "12" },
-  { label: "Sensors", value: "36" },
-  { label: "Dams", value: "1" },
-  { label: "Fences", value: "9" },
-  { label: "Pumps", value: "1" },
-  { label: "Rain Gauges", value: "4" },
-  { label: "Tanks", value: "3" },
+  { label: "Nông trại", value: "1" },
+  { label: "Người dùng", value: "1 / 3" },
+  { label: "Tài sản", value: "57" },
+  { label: "Ô đất", value: "12" },
+  { label: "Cảm biến", value: "36" },
+  { label: "Hồ chứa", value: "1" },
+  { label: "Hàng rào", value: "9" },
+  { label: "Máy bơm", value: "1" },
+  { label: "Trạm mưa", value: "4" },
+  { label: "Bồn chứa", value: "3" },
 ];
 
 const widgets = [
-  { title: "Livestock", rows: ["Cattle: 109", "Sheep: 97", "Goats: 0", "Pigs: 0"] },
-  { title: "Animal Counting", rows: ["Camera: 3", "Today: 133", "Yesterday: 142", "Last 7 days: 1203"] },
-  { title: "Livestock Tracking", rows: ["Tags: 109", "In paddock: 1", "Groups: 6", "Exp paddock: 5"] },
-  { title: "Paddocks & Fields", rows: ["Paddocks: 12", "Grazing: 5", "Hay: 5", "Resting: 2"] },
-  { title: "Water Resources", rows: ["Sensors: 6", "Tanks: 3", "Dams: 1", "Pumps: 1"] },
-  { title: "Rainfall", rows: ["Day: 2mm", "Week: 89mm", "Month: 112mm", "Rolling Yr: 1198mm"] },
-  { title: "Cold Storage", rows: ["Sensors: 4", "Fridges: 4", "Freezers: 2", "Status: Warning"] },
-  { title: "Soil Health", rows: ["Moisture: 68%", "Temp: 27°C", "Salinity: 8.5", "Sensors: 2"] },
+  { title: "Vật nuôi", rows: ["Bò: 109", "Cừu: 97", "Dê: 0", "Heo: 0"] },
+  { title: "Đếm đàn", rows: ["Camera: 3", "Hôm nay: 133", "Hôm qua: 142", "7 ngày gần nhất: 1203"] },
+  { title: "Theo dõi vật nuôi", rows: ["Thẻ gắn: 109", "Đang ở ô đất: 1", "Nhóm đàn: 6", "Ô dự kiến: 5"] },
+  { title: "Ô đất & khu vực", rows: ["Ô đất: 12", "Đang chăn thả: 5", "Cỏ khô: 5", "Đang nghỉ: 2"] },
+  { title: "Nguồn nước", rows: ["Cảm biến: 6", "Bồn chứa: 3", "Hồ chứa: 1", "Máy bơm: 1"] },
+  { title: "Lượng mưa", rows: ["Trong ngày: 2mm", "Trong tuần: 89mm", "Trong tháng: 112mm", "Lũy kế năm: 1198mm"] },
+  { title: "Kho lạnh", rows: ["Cảm biến: 4", "Tủ mát: 4", "Tủ đông: 2", "Trạng thái: Cảnh báo"] },
+  { title: "Sức khỏe đất", rows: ["Độ ẩm: 68%", "Nhiệt độ: 27°C", "Độ mặn: 8.5", "Cảm biến: 2"] },
 ];
 
 const initialZones: Zone[] = [];
 
 const layerOptions: { key: LayerKey; label: string }[] = [
-  { key: "paddocks", label: "Paddocks (12)" },
-  { key: "water", label: "Water (10)" },
-  { key: "vehicles", label: "Vehicles (7)" },
-  { key: "fences", label: "Fences (9)" },
-  { key: "sensors", label: "Sensors (36)" },
+  { key: "paddocks", label: "Ô đất (12)" },
+  { key: "water", label: "Nguồn nước (10)" },
+  { key: "vehicles", label: "Phương tiện (7)" },
+  { key: "fences", label: "Hàng rào (9)" },
+  { key: "sensors", label: "Cảm biến (36)" },
 ];
 
 const resourceTypeLabels: Record<ResourceType, string> = {
@@ -196,6 +196,7 @@ const farmTypeIcons: Record<FarmType, string> = {
 
 const statusOptions: Array<ZoneStatus | "all"> = ["all", "healthy", "warning", "critical"];
 const resourceTypeOptions: Array<ResourceType | "all"> = ["all", "water", "livestock", "sensors", "vehicle"];
+const farmTypeOptions: Array<FarmType | "all"> = ["all", "cattle", "sheep", "pig", "poultry", "crop"];
 
 const latLngToWorldPixel = (lat: number, lng: number, zoom: number) => {
   const scale = TILE_SIZE * 2 ** zoom;
@@ -254,7 +255,7 @@ const createEmptyZone = (
 
   return {
     id: `z-${Date.now()}-${nextIndex}`,
-    name: `Area ${code}`,
+    name: `Ô ${code}`,
     code,
     status: "healthy",
     occupancy: 0,
@@ -288,7 +289,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
   const originLat = profile?.lat ?? 10.8216;
   const originLng = profile?.lng ?? 106.6295;
   const storageKey = useMemo(() => createStorageKey(profile), [profile]);
-  const [activeMenu, setActiveMenu] = useState("Farm Map");
+  const [activeMenu, setActiveMenu] = useState("Bản đồ nông trại");
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({ paddocks: true, water: true, vehicles: true, fences: true, sensors: true });
   const [zones, setZones] = useState<Zone[]>(initialZones);
   const [selectedZone, setSelectedZone] = useState<string | null>(initialZones[0]?.id ?? null);
@@ -296,6 +297,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
   const [timeScale, setTimeScale] = useState("Hiện tại");
   const [statusFilter, setStatusFilter] = useState<ZoneStatus | "all">("all");
   const [resourceFilter, setResourceFilter] = useState<ResourceType | "all">("all");
+  const [farmTypeFilter, setFarmTypeFilter] = useState<FarmType | "all">("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [zoom, setZoom] = useState(16);
   const [viewport, setViewport] = useState<ViewportSize>(DEFAULT_VIEWPORT);
@@ -379,6 +381,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
 
     return zones.filter((zone) => {
       const matchesStatus = statusFilter === "all" || zone.status === statusFilter;
+      const matchesFarmType = farmTypeFilter === "all" || zone.metadata.farmType === farmTypeFilter;
       const matchesSearch =
         keyword.length === 0 ||
         zone.name.toLowerCase().includes(keyword) ||
@@ -389,9 +392,9 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
         zone.resources.some((resource) => resource.name.toLowerCase().includes(keyword));
       const matchesResource = resourceFilter === "all" || zone.resources.some((resource) => resource.type === resourceFilter);
 
-      return matchesStatus && matchesSearch && matchesResource;
+      return matchesStatus && matchesFarmType && matchesSearch && matchesResource;
     });
-  }, [resourceFilter, searchTerm, statusFilter, zones]);
+  }, [farmTypeFilter, resourceFilter, searchTerm, statusFilter, zones]);
 
   const selected = useMemo(() => zones.find((zone) => zone.id === selectedZone) ?? zones[0] ?? null, [selectedZone, zones]);
   const selectedDimensions = useMemo(() => {
@@ -427,12 +430,12 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
         detail: "Area được vẽ theo bounds địa lý nên giữ vị trí đúng khi zoom và pan.",
       },
       {
-        title: "Area mặc định",
+        title: "Diện tích mặc định",
         value: `${defaultGridArea.toFixed(1)} ${areaUnit}`,
         detail: "Diện tích ha nhập vào sẽ tự ánh xạ sang kích thước overlay thực tế trên map.",
       },
       {
-        title: "Area cần xử lý",
+        title: "Ô cần xử lý",
         value: `${zones.filter((zone) => zone.status !== "healthy").length}`,
         detail: "Bao gồm warning + critical.",
       },
@@ -798,12 +801,12 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
       </aside>
 
       <main className={styles.main}>
-        {activeMenu === "Farm Map" ? (
+        {activeMenu === "Bản đồ nông trại" ? (
           <section>
             <header className={styles.topbar}>
               <div>
-                <h1>Farm Map</h1>
-                <p>Map vệ tinh có pan/zoom nội bộ. Area chỉ hiển thị icon nhận biết; click để mở thông tin chi tiết của ô farm.</p>
+                <h1>Bản đồ nông trại</h1>
+                <p>Bản đồ vệ tinh có pan/zoom nội bộ. Mỗi ô area hiển thị theo loại và chỉ hiện icon nhận biết; bấm vào để xem chi tiết.</p>
               </div>
               <span>
                 {profile?.address || "Long Thành, Đồng Nai"}
@@ -829,10 +832,10 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
             </section>
 
             <section className={styles.kpiGrid}>
-              <article><b>{totals.totalAssets}</b><small>Assets</small></article>
-              <article><b>{totals.sensors}</b><small>Sensors</small></article>
-              <article><b>{totals.livestock}</b><small>Livestock</small></article>
-              <article><b>{zones.length}</b><small>Areas</small></article>
+              <article><b>{totals.totalAssets}</b><small>Tài sản</small></article>
+              <article><b>{totals.sensors}</b><small>Cảm biến</small></article>
+              <article><b>{totals.livestock}</b><small>Vật nuôi</small></article>
+              <article><b>{zones.length}</b><small>Ô area</small></article>
             </section>
 
             <section className={styles.mapControls}>
@@ -853,7 +856,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                   <button onClick={() => changeZoom(zoom - 1)}>-</button>
                   <b>{zoom}</b>
                   <button onClick={() => changeZoom(zoom + 1)}>+</button>
-                  <button className={styles.createBtn} onClick={addZone}>+ Area</button>
+                  <button className={styles.createBtn} onClick={addZone}>+ Thêm area</button>
                 </div>
               </div>
 
@@ -887,6 +890,16 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                   </select>
                 </label>
                 <label>
+                  Lọc theo loại area
+                  <select value={farmTypeFilter} onChange={(e) => setFarmTypeFilter(e.target.value as FarmType | "all")}>
+                    {farmTypeOptions.map((type) => (
+                      <option key={type} value={type}>
+                        {type === "all" ? "Tất cả loại area" : farmTypeLabels[type]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
                   Lọc loại tài nguyên
                   <select value={resourceFilter} onChange={(e) => setResourceFilter(e.target.value as ResourceType | "all")}>
                     {resourceTypeOptions.map((type) => (
@@ -898,7 +911,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                 </label>
                 <label className={styles.searchField}>
                   Tìm area / loại ô / công năng / tài nguyên
-                  <input type="text" value={searchTerm} placeholder="Ví dụ: cừu, bò, A7, tank..." onChange={(e) => setSearchTerm(e.target.value)} />
+                  <input type="text" value={searchTerm} placeholder="Ví dụ: cừu, bò, A7, nguồn nước..." onChange={(e) => setSearchTerm(e.target.value)} />
                 </label>
               </div>
             </section>
@@ -925,7 +938,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                 <div className={styles.areaLayer}>
                   {filteredZones.length === 0 ? (
                     <div className={styles.mapEmptyState}>
-                      Chưa có area nào trên map. Bấm <strong>+ Area</strong> để thêm vùng mới.
+                      Chưa có area nào phù hợp trên bản đồ. Bấm <strong>+ Thêm area</strong> để tạo mới hoặc đổi bộ lọc.
                     </div>
                   ) : null}
                   {filteredZones.map((zone) => (
@@ -1102,7 +1115,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                         <article className={styles.resourceCard}>
                           <div>
                             <small>Chưa có tài nguyên</small>
-                            <strong>Area này chưa được gán nước tưới, vật nuôi, cảm biến hoặc phương tiện.</strong>
+                            <strong>Ô area này chưa được gán nước tưới, vật nuôi, cảm biến hoặc phương tiện.</strong>
                           </div>
                           <ul>
                             <li>Bạn có thể bấm nút “Gán tài nguyên” phía trên để thêm dữ liệu sau.</li>
@@ -1118,7 +1131,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                             <span className={`${styles.statusPill} ${styles[resource.status]}`}>{statusLabels[resource.status]}</span>
                             <ul>
                               <li>Số lượng: {resource.quantity}</li>
-                              <li>Vị trí: Area {selected.code}</li>
+                              <li>Vị trí: Ô {selected.code}</li>
                               <li>Cập nhật: {resource.lastSeen}</li>
                             </ul>
                           </article>
@@ -1152,7 +1165,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                   <tbody>
                     {filteredZones.length === 0 ? (
                       <tr>
-                        <td colSpan={8}>Chưa có area nào phù hợp. Hãy thêm area mới hoặc thay đổi bộ lọc tìm kiếm.</td>
+                        <td colSpan={8}>Chưa có area nào phù hợp. Hãy thêm area mới hoặc thay đổi bộ lọc loại/trạng thái/tài nguyên.</td>
                       </tr>
                     ) : (
                       filteredZones.map((zone) => (
@@ -1178,7 +1191,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
             <header className={styles.topbar}>
               <div>
                 <h1>{farmName}</h1>
-                <p>Digital operations overview for your farm. Chọn “Farm Map” ở menu trái để xem area map.</p>
+                <p>Tổng quan vận hành số cho nông trại. Chọn “Bản đồ nông trại” ở menu trái để xem area trên bản đồ.</p>
               </div>
               <span>{profile?.fullName || "Farm owner"}</span>
             </header>
