@@ -126,37 +126,37 @@ const sidebarMenus = [
 ];
 
 const metricPills = [
-  { label: "Nông trại", value: "1" },
-  { label: "Người dùng", value: "1 / 3" },
-  { label: "Tài sản", value: "57" },
-  { label: "Ô đất", value: "12" },
-  { label: "Cảm biến", value: "36" },
-  { label: "Hồ chứa", value: "1" },
-  { label: "Hàng rào", value: "9" },
-  { label: "Máy bơm", value: "1" },
-  { label: "Trạm mưa", value: "4" },
-  { label: "Bồn chứa", value: "3" },
+  { label: "Nông trại", value: "" },
+  { label: "Người dùng", value: "" },
+  { label: "Tài sản", value: "" },
+  { label: "Ô đất", value: "" },
+  { label: "Cảm biến", value: "" },
+  { label: "Hồ chứa", value: "" },
+  { label: "Hàng rào", value: "" },
+  { label: "Máy bơm", value: "" },
+  { label: "Trạm mưa", value: "" },
+  { label: "Bồn chứa", value: "" },
 ];
 
 const widgets = [
-  { title: "Vật nuôi", rows: ["Bò: 109", "Cừu: 97", "Dê: 0", "Heo: 0"] },
-  { title: "Đếm đàn", rows: ["Camera: 3", "Hôm nay: 133", "Hôm qua: 142", "7 ngày gần nhất: 1203"] },
-  { title: "Theo dõi vật nuôi", rows: ["Thẻ gắn: 109", "Đang ở ô đất: 1", "Nhóm đàn: 6", "Ô dự kiến: 5"] },
-  { title: "Ô đất & khu vực", rows: ["Ô đất: 12", "Đang chăn thả: 5", "Cỏ khô: 5", "Đang nghỉ: 2"] },
-  { title: "Nguồn nước", rows: ["Cảm biến: 6", "Bồn chứa: 3", "Hồ chứa: 1", "Máy bơm: 1"] },
-  { title: "Lượng mưa", rows: ["Trong ngày: 2mm", "Trong tuần: 89mm", "Trong tháng: 112mm", "Lũy kế năm: 1198mm"] },
-  { title: "Kho lạnh", rows: ["Cảm biến: 4", "Tủ mát: 4", "Tủ đông: 2", "Trạng thái: Cảnh báo"] },
-  { title: "Sức khỏe đất", rows: ["Độ ẩm: 68%", "Nhiệt độ: 27°C", "Độ mặn: 8.5", "Cảm biến: 2"] },
+  { title: "Vật nuôi", rows: ["", "", "", ""] },
+  { title: "Đếm đàn", rows: ["", "", "", ""] },
+  { title: "Theo dõi vật nuôi", rows: ["", "", "", ""] },
+  { title: "Ô đất & khu vực", rows: ["", "", "", ""] },
+  { title: "Nguồn nước", rows: ["", "", "", ""] },
+  { title: "Lượng mưa", rows: ["", "", "", ""] },
+  { title: "Kho lạnh", rows: ["", "", "", ""] },
+  { title: "Sức khỏe đất", rows: ["", "", "", ""] },
 ];
 
 const initialZones: Zone[] = [];
 
 const layerOptions: { key: LayerKey; label: string }[] = [
-  { key: "paddocks", label: "Ô đất (12)" },
-  { key: "water", label: "Nguồn nước (10)" },
-  { key: "vehicles", label: "Phương tiện (7)" },
-  { key: "fences", label: "Hàng rào (9)" },
-  { key: "sensors", label: "Cảm biến (36)" },
+  { key: "paddocks", label: "Ô đất" },
+  { key: "water", label: "Nguồn nước" },
+  { key: "vehicles", label: "Phương tiện" },
+  { key: "fences", label: "Hàng rào" },
+  { key: "sensors", label: "Cảm biến" },
 ];
 
 const resourceTypeLabels: Record<ResourceType, string> = {
@@ -283,9 +283,9 @@ const createEmptyZone = (
 };
 
 export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps) {
-  const farmName = profile?.farmName || "Ket Farm";
-  const areaUnit = profile?.areaUnit || "Hecta";
-  const defaultGridArea = profile?.defaultGridArea || 1;
+  const farmName = profile?.farmName || "";
+  const areaUnit = profile?.areaUnit || "";
+  const defaultGridArea = profile?.defaultGridArea ?? 0;
   const originLat = profile?.lat ?? 10.8216;
   const originLng = profile?.lng ?? 106.6295;
   const storageKey = useMemo(() => createStorageKey(profile), [profile]);
@@ -809,15 +809,15 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                 <p>Bản đồ vệ tinh có pan/zoom nội bộ. Mỗi ô area hiển thị theo loại và chỉ hiện icon nhận biết; bấm vào để xem chi tiết.</p>
               </div>
               <span>
-                {profile?.address || "Long Thành, Đồng Nai"}
-                {` · ${mapCenter.lat.toFixed(4)}, ${mapCenter.lng.toFixed(4)}`}
+                {profile?.address ? `${profile.address} · ` : ""}
+                {`${mapCenter.lat.toFixed(4)}, ${mapCenter.lng.toFixed(4)}`}
               </span>
             </header>
 
             <article className={styles.noticeCard}>
               <h3>Map tương tác đúng theo vị trí thật</h3>
               <p>
-                Area được lưu bằng toạ độ tâm + bounds địa lý + loại farm. Khi zoom bằng <strong>Ctrl + lăn chuột</strong> hoặc kéo map, overlay sẽ được chiếu lại cùng hệ Web Mercator nên không bị lệch vùng đã set.
+                Dữ liệu area được lưu bằng toạ độ tâm + bounds địa lý + loại farm. Khi zoom bằng <strong>Ctrl + lăn chuột</strong> hoặc kéo map, overlay sẽ được chiếu lại cùng hệ Web Mercator nên không bị lệch vùng đã set.
               </p>
             </article>
 
@@ -1193,7 +1193,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                 <h1>{farmName}</h1>
                 <p>Tổng quan vận hành số cho nông trại. Chọn “Bản đồ nông trại” ở menu trái để xem area trên bản đồ.</p>
               </div>
-              <span>{profile?.fullName || "Farm owner"}</span>
+              <span>{profile?.fullName || ""}</span>
             </header>
 
             <section className={styles.pillRow}>
@@ -1215,9 +1215,13 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                   <article key={widget.title} className={styles.widgetCard}>
                     <h3>{widget.title}</h3>
                     <ul>
-                      {widget.rows.map((row) => (
-                        <li key={row}>{row}</li>
-                      ))}
+                      {widget.rows.every((row) => row === "") ? (
+                        <li>Chưa có dữ liệu</li>
+                      ) : (
+                        widget.rows.map((row, index) => (
+                          <li key={`${widget.title}-${index}`}>{row}</li>
+                        ))
+                      )}
                     </ul>
                   </article>
                 ))}
