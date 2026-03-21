@@ -54,6 +54,7 @@ type FormState = {
 };
 
 const ONBOARDING_STORAGE_KEY = "farmdeck.smart.onboarding";
+const ONBOARDING_UI_STORAGE_KEY = "farmdeck.smart.onboarding-ui";
 
 const initialForm: FormState = {
   fullName: "",
@@ -71,16 +72,16 @@ const initialForm: FormState = {
   cropTypes: [],
   livestockTypes: [],
   resources: [],
-  annualRainfall: "1000",
-  animalLoadUnit: "DSE",
-  landArea: "Hecta",
-  carryingCapacity: "1",
-  carryingUnit: "SDH/100mm",
-  unitLength: "Mét (m, km)",
-  unitMass: "Mét (kg, tấn)",
-  springStart: "01 Tháng 09",
-  unitTemperature: "Độ C (°C)",
-  unitVolume: "Mét (lít, megalit)",
+  annualRainfall: "",
+  animalLoadUnit: "",
+  landArea: "",
+  carryingCapacity: "",
+  carryingUnit: "",
+  unitLength: "",
+  unitMass: "",
+  springStart: "",
+  unitTemperature: "",
+  unitVolume: "",
   hearFrom: [],
   hearFromEventDetails: [],
   hearFromNewsDetails: [],
@@ -137,6 +138,7 @@ const extractCoordinatesFromGoogleMapsLink = (value: string) => {
 const getLocationLabel = (value: string) => value.split(",").slice(0, 3).join(", ").trim();
 
 export default function SmartFarmExperience() {
+  const [isHydrated, setIsHydrated] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [step, setStep] = useState(0);
@@ -166,12 +168,14 @@ export default function SmartFarmExperience() {
     return true;
   }, [form, isAccountValid, step]);
 
-  const mapQuery = form.lat && form.lng ? `${form.lat},${form.lng}` : form.address || "Việt Nam";
+  const mapQuery = form.lat && form.lng ? `${form.lat},${form.lng}` : form.address || "";
   const mapEmbedUrl = `https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&z=14&output=embed`;
 
   const saveForm = (nextForm: FormState) => {
     setForm(nextForm);
-    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(nextForm));
+    if (typeof window !== "undefined") {
+      localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(nextForm));
+    }
   };
 
   const validateLocation = () => {
@@ -207,16 +211,56 @@ export default function SmartFarmExperience() {
   };
 
   useEffect(() => {
-    const stored = localStorage.getItem(ONBOARDING_STORAGE_KEY);
-    if (stored) {
+    const storedForm = localStorage.getItem(ONBOARDING_STORAGE_KEY);
+    if (storedForm) {
       try {
-        const parsed = JSON.parse(stored) as FormState;
+        const parsed = JSON.parse(storedForm) as FormState;
         setForm({ ...initialForm, ...parsed });
       } catch {
         localStorage.removeItem(ONBOARDING_STORAGE_KEY);
       }
     }
+
+    const storedUi = localStorage.getItem(ONBOARDING_UI_STORAGE_KEY);
+    if (storedUi) {
+      try {
+        const parsed = JSON.parse(storedUi) as {
+          showOnboarding?: boolean;
+          completed?: boolean;
+          step?: number;
+          locationMode?: LocationMode;
+        };
+
+        setShowOnboarding(Boolean(parsed.showOnboarding));
+        setCompleted(Boolean(parsed.completed));
+        setStep(typeof parsed.step === "number" ? parsed.step : 0);
+        setLocationMode(parsed.locationMode ?? "search");
+      } catch {
+        localStorage.removeItem(ONBOARDING_UI_STORAGE_KEY);
+      }
+    }
+
+    setIsHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    localStorage.setItem(
+      ONBOARDING_UI_STORAGE_KEY,
+      JSON.stringify({
+        showOnboarding,
+        completed,
+        step,
+        locationMode,
+      })
+    );
+  }, [completed, isHydrated, locationMode, showOnboarding, step]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(form));
+  }, [form, isHydrated]);
 
   useEffect(() => {
     if (step !== 2 || locationMode !== "search") {
@@ -338,17 +382,21 @@ export default function SmartFarmExperience() {
     };
   }, [form.lat, form.lng, form.mapLink, locationMode, step]);
 
+  if (!isHydrated) {
+    return null;
+  }
+
   if (completed) {
     return (
-      <SmartFarmDashboard
+        <SmartFarmDashboard
         profile={{
-          fullName: form.fullName || "Nguyễn Văn A",
-          farmName: form.farmName || "Nông trại mẫu",
+          fullName: form.fullName || "",
+          farmName: form.farmName || "",
           address: form.address,
           lat: form.verifiedLocation?.lat,
           lng: form.verifiedLocation?.lng,
-          defaultGridArea: Number(form.carryingCapacity) || 1,
-          areaUnit: form.landArea || "Hecta",
+          defaultGridArea: Number.isFinite(Number(form.carryingCapacity)) ? Number(form.carryingCapacity) : 0,
+          areaUnit: form.landArea || "",
         }}
       />
     );
@@ -648,30 +696,36 @@ export default function SmartFarmExperience() {
                   <div className={styles.unitsGrid}>
                     <label>Đơn vị tải vật nuôi:</label>
                     <select value={form.animalLoadUnit} onChange={(e) => setForm({ ...form, animalLoadUnit: e.target.value })}>
+                      <option value="">Chưa chọn</option>
                       <option>DSE</option>
                     </select>
                     <label>Lượng mưa năm (mm):</label>
                     <input value={form.annualRainfall} onChange={(e) => setForm({ ...form, annualRainfall: e.target.value })} />
                     <label>Đơn vị diện tích đất:</label>
                     <select value={form.landArea} onChange={(e) => setForm({ ...form, landArea: e.target.value })}>
+                      <option value="">Chưa chọn</option>
                       <option>Hecta</option>
                     </select>
                     <label>Sức tải:</label>
                     <input value={form.carryingCapacity} onChange={(e) => setForm({ ...form, carryingCapacity: e.target.value })} />
                     <label>Đơn vị sức tải:</label>
                     <select value={form.carryingUnit} onChange={(e) => setForm({ ...form, carryingUnit: e.target.value })}>
+                      <option value="">Chưa chọn</option>
                       <option>SDH/100mm</option>
                     </select>
                     <label>Đơn vị chiều dài:</label>
                     <select value={form.unitLength} onChange={(e) => setForm({ ...form, unitLength: e.target.value })}>
+                      <option value="">Chưa chọn</option>
                       <option>Mét (m, km)</option>
                     </select>
                     <label>Đơn vị khối lượng:</label>
                     <select value={form.unitMass} onChange={(e) => setForm({ ...form, unitMass: e.target.value })}>
+                      <option value="">Chưa chọn</option>
                       <option>Kg, tấn</option>
                     </select>
                     <label>Mốc bắt đầu mùa xuân:</label>
                     <select value={form.springStart} onChange={(e) => setForm({ ...form, springStart: e.target.value })}>
+                      <option value="">Chưa chọn</option>
                       <option>01 Tháng 09</option>
                     </select>
                     <label>Đơn vị nhiệt độ:</label>
@@ -679,10 +733,12 @@ export default function SmartFarmExperience() {
                       value={form.unitTemperature}
                       onChange={(e) => setForm({ ...form, unitTemperature: e.target.value })}
                     >
+                      <option value="">Chưa chọn</option>
                       <option>Độ C (°C)</option>
                     </select>
                     <label>Đơn vị thể tích:</label>
                     <select value={form.unitVolume} onChange={(e) => setForm({ ...form, unitVolume: e.target.value })}>
+                      <option value="">Chưa chọn</option>
                       <option>Lít, megalit</option>
                     </select>
                   </div>
@@ -790,7 +846,7 @@ export default function SmartFarmExperience() {
                     Tiếp tục →
                   </button>
                 ) : (
-                  <button className={styles.nextBtn} onClick={() => setCompleted(true)}>
+                  <button className={styles.nextBtn} onClick={() => { setCompleted(true); setShowOnboarding(false); }}>
                     Hoàn tất
                   </button>
                 )}
