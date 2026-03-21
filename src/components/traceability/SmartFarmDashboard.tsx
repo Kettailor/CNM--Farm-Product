@@ -1,6 +1,6 @@
 "use client";
 
-import React, { CSSProperties , useEffect, useMemo, useRef, useState } from "react";
+import React, { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./SmartFarmDashboard.module.scss";
 
 type DashboardProfile = {
