@@ -194,6 +194,41 @@ const farmTypeIcons: Record<FarmType, string> = {
   crop: "🌿",
 };
 
+const iconAssets = {
+  dashboard: "/assets/img/08dbb3ce-1822-40ad-8549-b6180ff05bc2.svg",
+  traceability: "/assets/img/08dbb3ce-181d-4aa1-8c6b-fc19d42c08e3.svg",
+  data: "/assets/img/08dbb3ce-181e-4882-8370-5de4d5fc601b.svg",
+  map: "/assets/img/08dbb3ce-1821-4dfc-8234-2243edad2577.svg",
+  livestock: "/assets/img/08dbb3ce-1822-4840-8a96-4933641eaaee.svg",
+  irrigation: "/assets/img/08dbb3ce-181d-4d5e-8a49-76b8a0c18122.svg",
+  analytics: "/assets/img/08dbb3ce-1823-4389-801c-c707e29462a0.svg",
+};
+
+const menuIcons: Record<string, string> = {
+  "Tổng quan": iconAssets.dashboard,
+  "Bản đồ nông trại": iconAssets.map,
+  "Vật nuôi": iconAssets.livestock,
+  "Đếm đàn": iconAssets.analytics,
+  "Theo dõi vật nuôi": iconAssets.traceability,
+  "Ô đất & khu vực": iconAssets.map,
+  "Nguồn nước": iconAssets.irrigation,
+  "Theo dõi phương tiện": iconAssets.dashboard,
+  "Hàng rào": iconAssets.traceability,
+  "Tiêu thụ năng lượng": iconAssets.data,
+  "Cảnh báo & thông báo": iconAssets.analytics,
+  "Truy xuất nguồn gốc": iconAssets.traceability,
+  "Theo dõi chất lượng không khí": iconAssets.data,
+  "Thời tiết": iconAssets.analytics,
+  "Cài đặt": iconAssets.dashboard,
+};
+
+const resourceTypeIcons: Record<ResourceType, string> = {
+  water: iconAssets.irrigation,
+  livestock: iconAssets.livestock,
+  sensors: iconAssets.data,
+  vehicle: iconAssets.dashboard,
+};
+
 const statusOptions: Array<ZoneStatus | "all"> = ["all", "healthy", "warning", "critical"];
 const resourceTypeOptions: Array<ResourceType | "all"> = ["all", "water", "livestock", "sensors", "vehicle"];
 const farmTypeOptions: Array<FarmType | "all"> = ["all", "cattle", "sheep", "pig", "poultry", "crop"];
@@ -428,21 +463,25 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
         title: "Map vệ tinh thật",
         value: `Zoom ${zoom}`,
         detail: "Area được vẽ theo bounds địa lý nên giữ vị trí đúng khi zoom và pan.",
+        icon: iconAssets.map,
       },
       {
         title: "Diện tích mặc định",
         value: `${defaultGridArea.toFixed(1)} ${areaUnit}`,
         detail: "Diện tích ha nhập vào sẽ tự ánh xạ sang kích thước overlay thực tế trên map.",
+        icon: iconAssets.analytics,
       },
       {
         title: "Ô cần xử lý",
         value: `${zones.filter((zone) => zone.status !== "healthy").length}`,
         detail: "Bao gồm warning + critical.",
+        icon: iconAssets.traceability,
       },
       {
         title: "Điều khiển map",
         value: "Ctrl + wheel / kéo",
         detail: "Giữ Ctrl + lăn chuột để zoom map, kéo chuột để pan khu vực xem.",
+        icon: iconAssets.dashboard,
       },
     ],
     [areaUnit, defaultGridArea, zoom, zones]
@@ -794,7 +833,8 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
         <ul>
           {sidebarMenus.map((item) => (
             <li key={item} className={activeMenu === item ? styles.activeMenu : ""} onClick={() => setActiveMenu(item)}>
-              {item}
+              <img src={menuIcons[item]} alt="" aria-hidden="true" className={styles.menuIcon} />
+              <span>{item}</span>
             </li>
           ))}
         </ul>
@@ -824,6 +864,9 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
             <section className={styles.summaryColumns}>
               {summaryColumns.map((item) => (
                 <article key={item.title}>
+                  <div className={styles.cardIcon}>
+                    <img src={item.icon} alt="" aria-hidden="true" />
+                  </div>
                   <small>{item.title}</small>
                   <strong>{item.value}</strong>
                   <span>{item.detail}</span>
@@ -832,16 +875,17 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
             </section>
 
             <section className={styles.kpiGrid}>
-              <article><b>{totals.totalAssets}</b><small>Tài sản</small></article>
-              <article><b>{totals.sensors}</b><small>Cảm biến</small></article>
-              <article><b>{totals.livestock}</b><small>Vật nuôi</small></article>
-              <article><b>{zones.length}</b><small>Ô area</small></article>
+              <article><div className={styles.cardIcon}><img src={iconAssets.data} alt="" aria-hidden="true" /></div><b>{totals.totalAssets}</b><small>Tài sản</small></article>
+              <article><div className={styles.cardIcon}><img src={resourceTypeIcons.sensors} alt="" aria-hidden="true" /></div><b>{totals.sensors}</b><small>Cảm biến</small></article>
+              <article><div className={styles.cardIcon}><img src={resourceTypeIcons.livestock} alt="" aria-hidden="true" /></div><b>{totals.livestock}</b><small>Vật nuôi</small></article>
+              <article><div className={styles.cardIcon}><img src={iconAssets.map} alt="" aria-hidden="true" /></div><b>{zones.length}</b><small>Ô area</small></article>
             </section>
 
             <section className={styles.mapControls}>
               <div className={styles.toggleRow}>
                 {layerOptions.map((layer) => (
                   <button key={layer.key} className={layers[layer.key] ? styles.toggleActive : styles.toggleBtn} onClick={() => setLayers((prev) => ({ ...prev, [layer.key]: !prev[layer.key] }))}>
+                    <img src={layer.key === "water" ? iconAssets.irrigation : layer.key === "sensors" ? iconAssets.data : layer.key === "vehicles" ? iconAssets.dashboard : iconAssets.map} alt="" aria-hidden="true" />
                     {layer.label}
                   </button>
                 ))}
@@ -952,6 +996,9 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                       onClick={() => handleSelectZone(zone.id)}
                     >
                       <span className={styles.areaIcon}>{farmTypeIcons[zone.metadata.farmType]}</span>
+                      <span className={styles.areaAsset}>
+                        <img src={zone.metadata.farmType === "crop" ? iconAssets.analytics : iconAssets.livestock} alt="" aria-hidden="true" />
+                      </span>
                       {zone.id === selectedZone && detailOpen ? (
                         <>
                           <span className={`${styles.cornerHandle} ${styles.cornerNw}`} onPointerDown={(event) => beginResize(event, zone, "nw")} />
@@ -1008,12 +1055,12 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                       <span>Điền thông số ở khung bên phải hoặc kéo trực tiếp góc/điểm xoay trên map để chỉnh vùng đất.</span>
                     </div>
                     <div className={styles.zoneMeta}>
-                      <article><span>Loại area</span><strong>{farmTypeLabels[selected.metadata.farmType]}</strong></article>
-                      <article><span>Trạng thái</span><strong>{statusLabels[selected.status]}</strong></article>
-                      <article><span>Diện tích</span><strong>{selected.metadata.areaHecta.toFixed(1)} ha</strong></article>
-                      <article><span>Kích thước thực</span><strong>{selectedDimensions.widthMeters.toFixed(0)}m × {selectedDimensions.heightMeters.toFixed(0)}m</strong></article>
-                      <article><span>Phụ trách</span><strong>{selected.metadata.manager}</strong></article>
-                      <article><span>Ưu tiên</span><strong>{priorityLabels[selected.metadata.priority]}</strong></article>
+                      <article><div className={styles.cardIcon}><img src={selected.metadata.farmType === "crop" ? iconAssets.analytics : iconAssets.livestock} alt="" aria-hidden="true" /></div><span>Loại area</span><strong>{farmTypeLabels[selected.metadata.farmType]}</strong></article>
+                      <article><div className={styles.cardIcon}><img src={iconAssets.traceability} alt="" aria-hidden="true" /></div><span>Trạng thái</span><strong>{statusLabels[selected.status]}</strong></article>
+                      <article><div className={styles.cardIcon}><img src={iconAssets.analytics} alt="" aria-hidden="true" /></div><span>Diện tích</span><strong>{selected.metadata.areaHecta.toFixed(1)} ha</strong></article>
+                      <article><div className={styles.cardIcon}><img src={iconAssets.map} alt="" aria-hidden="true" /></div><span>Kích thước thực</span><strong>{selectedDimensions.widthMeters.toFixed(0)}m × {selectedDimensions.heightMeters.toFixed(0)}m</strong></article>
+                      <article><div className={styles.cardIcon}><img src={iconAssets.dashboard} alt="" aria-hidden="true" /></div><span>Phụ trách</span><strong>{selected.metadata.manager || "Chưa nhập"}</strong></article>
+                      <article><div className={styles.cardIcon}><img src={iconAssets.data} alt="" aria-hidden="true" /></div><span>Ưu tiên</span><strong>{priorityLabels[selected.metadata.priority]}</strong></article>
                     </div>
 
                     <div className={styles.editorPanel}>
@@ -1125,6 +1172,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                         selected.resources.map((resource) => (
                           <article key={resource.id} className={styles.resourceCard}>
                             <div>
+                              <img src={resourceTypeIcons[resource.type]} alt="" aria-hidden="true" className={styles.resourceIcon} />
                               <small>{resourceTypeLabels[resource.type]}</small>
                               <strong>{resource.name}</strong>
                             </div>
@@ -1198,7 +1246,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
 
             <section className={styles.pillRow}>
               {metricPills.map((pill) => (
-                <article key={pill.label}><b>{pill.value}</b><small>{pill.label}</small></article>
+                <article key={pill.label}><div className={styles.cardIcon}><img src={iconAssets.data} alt="" aria-hidden="true" /></div><b>{pill.value}</b><small>{pill.label}</small></article>
               ))}
             </section>
 
@@ -1213,6 +1261,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
               <div className={styles.widgetGrid}>
                 {widgets.map((widget) => (
                   <article key={widget.title} className={styles.widgetCard}>
+                    <div className={styles.cardIcon}><img src={widget.title.includes("Vật nuôi") ? iconAssets.livestock : widget.title.includes("nước") || widget.title.includes("mưa") ? iconAssets.irrigation : iconAssets.data} alt="" aria-hidden="true" /></div>
                     <h3>{widget.title}</h3>
                     <ul>
                       {widget.rows.every((row) => row === "") ? (

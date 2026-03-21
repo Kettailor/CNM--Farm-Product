@@ -29,6 +29,9 @@
   }
 
   li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     padding: 9px 11px;
     border-radius: 10px;
     color: #4b5563;
@@ -42,6 +45,13 @@
       color: #2f6b10;
     }
   }
+}
+
+.menuIcon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  opacity: 0.8;
 }
 
 .activeMenu {
@@ -127,6 +137,22 @@
   }
 }
 
+.cardIcon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #f3f8ee;
+  display: grid;
+  place-items: center;
+  margin-bottom: 10px;
+
+  img {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+  }
+}
+
 .summaryColumns {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 
@@ -200,6 +226,24 @@
 }
 
 .createBtn { width: auto !important; }
+
+.toggleBtn,
+.toggleActive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  img {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    filter: brightness(0) saturate(100%) invert(26%) sepia(14%) saturate(626%) hue-rotate(176deg) brightness(98%) contrast(89%);
+  }
+}
+
+.toggleActive img {
+  filter: brightness(0) invert(1);
+}
 
 .zoomBar {
   margin-top: 10px;
@@ -446,6 +490,24 @@
   box-shadow: 0 8px 16px rgba(15, 23, 42, 0.18);
 }
 
+.areaAsset {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  display: grid;
+  place-items: center;
+
+  img {
+    width: 12px;
+    height: 12px;
+    object-fit: contain;
+  }
+}
+
 .areaSelected {
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9), 0 22px 38px rgba(17, 24, 39, 0.22);
 }
@@ -599,6 +661,13 @@
     display: grid;
     gap: 4px;
   }
+}
+
+.resourceIcon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  margin-bottom: 2px;
 }
 
 .statusPill {

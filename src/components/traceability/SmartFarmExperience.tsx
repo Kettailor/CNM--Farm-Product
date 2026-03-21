@@ -115,6 +115,15 @@ const sourceOptions = [
 const eventOptions = ["AgQuip", "AgSmart Expo", "AgTech Field Day", "Beef Week", "Khác"];
 const newspaperOptions = ["The Farmer", "The Land", "Stock Journal", "Farm Weekly", "Khác"];
 
+const experienceIcons = {
+  hero: "/assets/img/08dbb3ce-1822-40ad-8549-b6180ff05bc2.svg",
+  function: "/assets/img/08dbb3ce-1821-4dfc-8234-2243edad2577.svg",
+  category: "/assets/img/08dbb3ce-1822-4840-8a96-4933641eaaee.svg",
+  data: "/assets/img/08dbb3ce-181e-4882-8370-5de4d5fc601b.svg",
+  traceability: "/assets/img/08dbb3ce-181d-4aa1-8c6b-fc19d42c08e3.svg",
+  location: "/assets/img/08dbb3ce-181d-4d5e-8a49-76b8a0c18122.svg",
+};
+
 const toggleValue = (list: string[], value: string, checked: boolean) =>
   checked ? [...list, value] : list.filter((item) => item !== value);
 
@@ -405,8 +414,34 @@ export default function SmartFarmExperience() {
   return (
     <div className={styles.wrapper}>
       <section className={styles.hero}>
+        <div className={styles.heroIcon}>
+          <img src={experienceIcons.hero} alt="" aria-hidden="true" />
+        </div>
         <h1>Nền tảng quản lý nông sản thông minh</h1>
         <p>Theo dõi lô nông sản, giám sát IoT và truy xuất nguồn gốc minh bạch từ nông trại đến người dùng.</p>
+        <div className={styles.heroHighlights}>
+          <article>
+            <img src={experienceIcons.function} alt="" aria-hidden="true" />
+            <div>
+              <strong>Chức năng</strong>
+              <span>Giám sát bản đồ, thiết bị và cảnh báo vận hành.</span>
+            </div>
+          </article>
+          <article>
+            <img src={experienceIcons.category} alt="" aria-hidden="true" />
+            <div>
+              <strong>Danh mục</strong>
+              <span>Phân loại nông trại, cây trồng, vật nuôi và tài nguyên.</span>
+            </div>
+          </article>
+          <article>
+            <img src={experienceIcons.data} alt="" aria-hidden="true" />
+            <div>
+              <strong>Dữ liệu</strong>
+              <span>Chuẩn hóa vị trí, đơn vị đo và truy xuất nguồn gốc.</span>
+            </div>
+          </article>
+        </div>
         <button onClick={() => setShowOnboarding(true)}>Đăng ký & bắt đầu quản lý</button>
       </section>
 
@@ -428,6 +463,10 @@ export default function SmartFarmExperience() {
 
               {step === 0 && (
                 <div className={styles.stepBody}>
+                  <div className={styles.sectionBadge}>
+                    <img src={experienceIcons.traceability} alt="" aria-hidden="true" />
+                    <span>Thiết lập chức năng truy xuất và dữ liệu nền tảng</span>
+                  </div>
                   <p>
                     Chào mừng bạn đến với <b>Farmdeck</b> - nền tảng tất cả trong một để quản lý nông trại hiệu quả,
                     theo dõi vận hành hằng ngày và truy xuất nguồn gốc sản phẩm.
@@ -442,6 +481,10 @@ export default function SmartFarmExperience() {
 
               {step === 1 && (
                 <div className={styles.stepBody}>
+                  <div className={styles.sectionBadge}>
+                    <img src={experienceIcons.data} alt="" aria-hidden="true" />
+                    <span>Dữ liệu tài khoản quản trị</span>
+                  </div>
                   <p>Vui lòng nhập thông tin tài khoản để phục vụ đăng nhập và quản lý nông trại.</p>
                   <input
                     placeholder="Họ và tên"
@@ -476,6 +519,10 @@ export default function SmartFarmExperience() {
 
               {step === 2 && (
                 <div className={styles.stepBody}>
+                  <div className={styles.sectionBadge}>
+                    <img src={experienceIcons.location} alt="" aria-hidden="true" />
+                    <span>Dữ liệu vị trí và bản đồ nông trại</span>
+                  </div>
                   <p>
                     Help us tailor Farmdeck to your needs by letting us know where your farm is located. A full
                     address is best as it centres your homestead on the map.
@@ -623,6 +670,10 @@ export default function SmartFarmExperience() {
 
               {step === 3 && (
                 <div className={styles.stepBody}>
+                  <div className={styles.sectionBadge}>
+                    <img src={experienceIcons.category} alt="" aria-hidden="true" />
+                    <span>Danh mục loại hình, cây trồng và vật nuôi</span>
+                  </div>
                   <p>Vui lòng chọn loại hình đang có trên nông trại (chọn ít nhất 1 mục).</p>
 
                   <div className={styles.checkGroup}>
@@ -692,6 +743,10 @@ export default function SmartFarmExperience() {
 
               {step === 4 && (
                 <div className={styles.stepBody}>
+                  <div className={styles.sectionBadge}>
+                    <img src={experienceIcons.function} alt="" aria-hidden="true" />
+                    <span>Cấu hình chức năng đo lường và vận hành</span>
+                  </div>
                   <p>Thiết lập đơn vị đo để bảng điều khiển phù hợp với nhu cầu vận hành của bạn.</p>
                   <div className={styles.unitsGrid}>
                     <label>Đơn vị tải vật nuôi:</label>
@@ -747,6 +802,10 @@ export default function SmartFarmExperience() {
 
               {step === 5 && (
                 <div className={styles.stepBody}>
+                  <div className={styles.sectionBadge}>
+                    <img src={experienceIcons.traceability} alt="" aria-hidden="true" />
+                    <span>Nguồn dữ liệu marketing và kênh tiếp cận</span>
+                  </div>
                   <p>Bạn biết Farmdeck từ kênh nào? (chọn tất cả mục phù hợp)</p>
 
                   <div className={styles.checkGroup}>
@@ -813,6 +872,10 @@ export default function SmartFarmExperience() {
 
               {step === 6 && (
                 <div className={styles.stepBody}>
+                  <div className={styles.sectionBadge}>
+                    <img src={experienceIcons.hero} alt="" aria-hidden="true" />
+                    <span>Hoàn tất khởi tạo giao diện quản lý</span>
+                  </div>
                   <p>Bạn đã hoàn tất đăng ký.</p>
                   <p>Nhấn &quot;Hoàn tất&quot; để vào bảng điều khiển và bắt đầu quản lý truy xuất nông sản.</p>
                 </div>
