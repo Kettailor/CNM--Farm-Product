@@ -345,6 +345,7 @@
 
 .areaBox {
   position: absolute;
+  overflow: visible;
   border: 2px solid rgba(255, 255, 255, 0.9);
   border-radius: 16px;
   display: grid;
@@ -360,6 +361,54 @@
     transform: translateY(-2px) scale(1.02);
     box-shadow: 0 20px 36px rgba(17, 24, 39, 0.22);
   }
+}
+
+.cornerHandle,
+.rotateHandle {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid #ffffff;
+  background: #183153;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.28);
+  z-index: 4;
+}
+
+.cornerHandle {
+  cursor: nwse-resize;
+}
+
+.cornerNw {
+  left: -10px;
+  top: -10px;
+}
+
+.cornerNe {
+  right: -10px;
+  top: -10px;
+}
+
+.cornerSw {
+  left: -10px;
+  bottom: -10px;
+}
+
+.cornerSe {
+  right: -10px;
+  bottom: -10px;
+}
+
+.rotateHandle {
+  top: -36px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: grab;
 }
 
 .areaIcon {

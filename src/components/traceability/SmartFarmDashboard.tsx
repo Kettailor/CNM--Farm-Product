@@ -49,6 +49,7 @@ type ZoneMetadata = {
   notes: string;
   farmType: FarmType;
   shapeRatio: number;
+  rotationDeg: number;
 };
 
 type Zone = {
@@ -70,6 +71,26 @@ type DragState = {
   startCenterX: number;
   startCenterY: number;
   moved: boolean;
+};
+
+type ResizeCorner = "nw" | "ne" | "sw" | "se";
+
+type ResizeState = {
+  zoneId: string;
+  corner: ResizeCorner;
+  startX: number;
+  startY: number;
+  startWidthPx: number;
+  startHeightPx: number;
+  startWidthMeters: number;
+  startHeightMeters: number;
+  rotationDeg: number;
+};
+
+type RotateState = {
+  zoneId: string;
+  centerX: number;
+  centerY: number;
 };
 
 const TILE_SIZE = 256;
@@ -140,6 +161,7 @@ const initialZones: Zone[] = [
       notes: "Theo dõi khẩu phần sáng và độ ẩm nền chuồng.",
       farmType: "sheep",
       shapeRatio: 1.35,
+      rotationDeg: -8,
     },
     resources: [
       { id: "z1-r1", type: "water", name: "Tank 01", status: "healthy", lastSeen: "2 phút trước", quantity: 3 },
@@ -166,6 +188,7 @@ const initialZones: Zone[] = [
       notes: "Cần kiểm tra nước uống và bóng mát khu vực phía đông.",
       farmType: "cattle",
       shapeRatio: 1.6,
+      rotationDeg: 12,
     },
     resources: [
       { id: "z2-r1", type: "water", name: "Water line 02", status: "warning", lastSeen: "12 phút trước", quantity: 2 },
@@ -192,6 +215,7 @@ const initialZones: Zone[] = [
       notes: "Tăng tần suất kiểm tra nhiệt độ chuồng buổi chiều.",
       farmType: "pig",
       shapeRatio: 1.2,
+      rotationDeg: -18,
     },
     resources: [
       { id: "z3-r1", type: "water", name: "Reservoir B1", status: "healthy", lastSeen: "4 phút trước", quantity: 4 },
@@ -218,6 +242,7 @@ const initialZones: Zone[] = [
       notes: "Đang xử lý cảnh báo nhiệt độ cao và thông gió.",
       farmType: "poultry",
       shapeRatio: 1.5,
+      rotationDeg: 10,
     },
     resources: [
       { id: "z4-r1", type: "water", name: "Pump line B2", status: "critical", lastSeen: "28 phút trước", quantity: 1 },
@@ -244,6 +269,7 @@ const initialZones: Zone[] = [
       notes: "Giữ ẩm ổn định 7 ngày đầu.",
       farmType: "crop",
       shapeRatio: 2.1,
+      rotationDeg: -6,
     },
     resources: [
       { id: "z5-r1", type: "water", name: "Drip line C1", status: "healthy", lastSeen: "6 phút trước", quantity: 2 },
@@ -270,6 +296,7 @@ const initialZones: Zone[] = [
       notes: "Sẵn sàng cho đợt mở rộng A7/N7.",
       farmType: "cattle",
       shapeRatio: 1.75,
+      rotationDeg: 16,
     },
     resources: [
       { id: "z6-r1", type: "water", name: "Lake C2", status: "healthy", lastSeen: "3 phút trước", quantity: 3 },
@@ -364,6 +391,9 @@ const syncGeoSizeToArea = (lat: number, areaHecta: number, shapeRatio: number) =
   };
 };
 
+const angleToCursor = (centerX: number, centerY: number, clientX: number, clientY: number) =>
+  (Math.atan2(clientY - centerY, clientX - centerX) * 180) / Math.PI + 90;
+
 export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps) {
   const farmName = profile?.farmName || "Ket Farm";
   const areaUnit = profile?.areaUnit || "Hecta";
@@ -386,6 +416,8 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
   const [isDragging, setIsDragging] = useState(false);
   const mapRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<DragState | null>(null);
+  const resizeRef = useRef<ResizeState | null>(null);
+  const rotateRef = useRef<RotateState | null>(null);
 
   useEffect(() => {
     const element = mapRef.current;
@@ -489,6 +521,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
             ...zone.metadata,
             areaHecta: Number(nextArea.toFixed(2)),
             shapeRatio: Number(nextRatio.toFixed(2)),
+            rotationDeg: zone.metadata.rotationDeg,
           },
         };
       })
@@ -543,6 +576,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
         notes: "Cần cập nhật đầy đủ thông số trước khi vận hành.",
         farmType: "cattle",
         shapeRatio: 1.5,
+        rotationDeg: 0,
       },
       resources: [],
     };
@@ -582,17 +616,35 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
     return tiles;
   }, [centerPixel.x, centerPixel.y, viewport.height, viewport.width, zoom]);
 
-  const projectZone = (zone: Zone): CSSProperties => {
+  const getZoneRenderBox = (zone: Zone) => {
     const northWest = latLngToWorldPixel(clampLat(zone.geo.lat + zone.geo.latSpan / 2), zone.geo.lng - zone.geo.lngSpan / 2, zoom);
     const southEast = latLngToWorldPixel(clampLat(zone.geo.lat - zone.geo.latSpan / 2), zone.geo.lng + zone.geo.lngSpan / 2, zoom);
     const originX = centerPixel.x - viewport.width / 2;
     const originY = centerPixel.y - viewport.height / 2;
 
+    const width = Math.max(28, southEast.x - northWest.x);
+    const height = Math.max(28, southEast.y - northWest.y);
+    const left = northWest.x - originX;
+    const top = northWest.y - originY;
+
     return {
-      left: `${northWest.x - originX}px`,
-      top: `${northWest.y - originY}px`,
-      width: `${Math.max(28, southEast.x - northWest.x)}px`,
-      height: `${Math.max(28, southEast.y - northWest.y)}px`,
+      left,
+      top,
+      width,
+      height,
+      centerX: left + width / 2,
+      centerY: top + height / 2,
+    };
+  };
+
+  const projectZone = (zone: Zone): CSSProperties => {
+    const box = getZoneRenderBox(zone);
+    return {
+      left: `${box.left}px`,
+      top: `${box.top}px`,
+      width: `${box.width}px`,
+      height: `${box.height}px`,
+      transform: `rotate(${zone.metadata.rotationDeg}deg)`,
     };
   };
 
@@ -637,6 +689,40 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
     return () => element.removeEventListener("wheel", handleNativeWheel);
   }, [changeZoom, zoom]);
 
+  const beginResize = (
+    event: React.PointerEvent<HTMLSpanElement>,
+    zone: Zone,
+    corner: ResizeCorner
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const box = getZoneRenderBox(zone);
+    resizeRef.current = {
+      zoneId: zone.id,
+      corner,
+      startX: event.clientX,
+      startY: event.clientY,
+      startWidthPx: box.width,
+      startHeightPx: box.height,
+      startWidthMeters: zone.geo.lngSpan * metersPerDegreeLng(zone.geo.lat),
+      startHeightMeters: zone.geo.latSpan * METERS_PER_DEGREE_LAT,
+      rotationDeg: zone.metadata.rotationDeg,
+    };
+    mapRef.current?.setPointerCapture(event.pointerId);
+  };
+
+  const beginRotate = (event: React.PointerEvent<HTMLSpanElement>, zone: Zone) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const box = getZoneRenderBox(zone);
+    rotateRef.current = {
+      zoneId: zone.id,
+      centerX: box.centerX + mapRef.current!.getBoundingClientRect().left,
+      centerY: box.centerY + mapRef.current!.getBoundingClientRect().top,
+    };
+    mapRef.current?.setPointerCapture(event.pointerId);
+  };
+
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     const pointerTarget = event.target as HTMLElement;
@@ -654,6 +740,67 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (resizeRef.current) {
+      const resizeState = resizeRef.current;
+      const dx = event.clientX - resizeState.startX;
+      const dy = event.clientY - resizeState.startY;
+      const angle = (resizeState.rotationDeg * Math.PI) / 180;
+      const localDx = dx * Math.cos(angle) + dy * Math.sin(angle);
+      const localDy = -dx * Math.sin(angle) + dy * Math.cos(angle);
+      const signX = resizeState.corner.includes("e") ? 1 : -1;
+      const signY = resizeState.corner.includes("s") ? 1 : -1;
+      const nextWidthPx = Math.max(28, resizeState.startWidthPx + signX * localDx);
+      const nextHeightPx = Math.max(28, resizeState.startHeightPx + signY * localDy);
+      const metersPerPxX = resizeState.startWidthMeters / Math.max(1, resizeState.startWidthPx);
+      const metersPerPxY = resizeState.startHeightMeters / Math.max(1, resizeState.startHeightPx);
+      const nextWidthMeters = Math.max(12, nextWidthPx * metersPerPxX);
+      const nextHeightMeters = Math.max(12, nextHeightPx * metersPerPxY);
+      const nextAreaHecta = (nextWidthMeters * nextHeightMeters) / 10_000;
+      const nextShapeRatio = nextWidthMeters / Math.max(1, nextHeightMeters);
+
+      setZones((prev) =>
+        prev.map((zone) => {
+          if (zone.id !== resizeState.zoneId) return zone;
+          const nextGeo = {
+            ...zone.geo,
+            latSpan: nextHeightMeters / METERS_PER_DEGREE_LAT,
+            lngSpan: nextWidthMeters / metersPerDegreeLng(zone.geo.lat),
+          };
+
+          return {
+            ...zone,
+            geo: nextGeo,
+            coverage: `${nextAreaHecta.toFixed(1)} ha`,
+            metadata: {
+              ...zone.metadata,
+              areaHecta: Number(nextAreaHecta.toFixed(2)),
+              shapeRatio: Number(nextShapeRatio.toFixed(2)),
+            },
+          };
+        })
+      );
+      return;
+    }
+
+    if (rotateRef.current) {
+      const rotateState = rotateRef.current;
+      const nextRotation = angleToCursor(rotateState.centerX, rotateState.centerY, event.clientX, event.clientY);
+      setZones((prev) =>
+        prev.map((zone) =>
+          zone.id === rotateState.zoneId
+            ? {
+                ...zone,
+                metadata: {
+                  ...zone.metadata,
+                  rotationDeg: Number(nextRotation.toFixed(1)),
+                },
+              }
+            : zone
+        )
+      );
+      return;
+    }
+
     const drag = dragRef.current;
     if (!drag) return;
 
@@ -666,6 +813,8 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
 
   const endDrag = (pointerId?: number) => {
     dragRef.current = null;
+    resizeRef.current = null;
+    rotateRef.current = null;
     setIsDragging(false);
     if (pointerId !== undefined && mapRef.current?.hasPointerCapture(pointerId)) {
       mapRef.current.releasePointerCapture(pointerId);
@@ -863,6 +1012,17 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                       onClick={() => handleSelectZone(zone.id)}
                     >
                       <span className={styles.areaIcon}>{farmTypeIcons[zone.metadata.farmType]}</span>
+                      {zone.id === selectedZone && detailOpen ? (
+                        <>
+                          <span className={`${styles.cornerHandle} ${styles.cornerNw}`} onPointerDown={(event) => beginResize(event, zone, "nw")} />
+                          <span className={`${styles.cornerHandle} ${styles.cornerNe}`} onPointerDown={(event) => beginResize(event, zone, "ne")} />
+                          <span className={`${styles.cornerHandle} ${styles.cornerSw}`} onPointerDown={(event) => beginResize(event, zone, "sw")} />
+                          <span className={`${styles.cornerHandle} ${styles.cornerSe}`} onPointerDown={(event) => beginResize(event, zone, "se")} />
+                          <span className={styles.rotateHandle} onPointerDown={(event) => beginRotate(event, zone)}>
+                            ↻
+                          </span>
+                        </>
+                      ) : null}
                     </button>
                   ))}
                 </div>
@@ -953,6 +1113,10 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                           <input type="number" min={0.35} step={0.05} value={selected.metadata.shapeRatio} onChange={(e) => updateZoneMetadata(selected.id, "shapeRatio", Number(e.target.value) || 1)} />
                         </label>
                         <label>
+                          Góc xoay (độ)
+                          <input type="number" step={1} value={selected.metadata.rotationDeg} onChange={(e) => updateZoneMetadata(selected.id, "rotationDeg", Number(e.target.value) || 0)} />
+                        </label>
+                        <label>
                           Công năng
                           <input type="text" value={selected.metadata.usage} onChange={(e) => updateZoneMetadata(selected.id, "usage", e.target.value)} />
                         </label>
@@ -976,6 +1140,11 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                           Ghi chú vận hành
                           <input type="text" value={selected.metadata.notes} onChange={(e) => updateZoneMetadata(selected.id, "notes", e.target.value)} />
                         </label>
+                        <div className={styles.searchField}>
+                          <span className={styles.measureHint}>
+                            Chọn area trên map rồi kéo các góc để chỉnh khung phủ, hoặc kéo nút xoay phía trên để xoay ô theo đúng hướng thực tế ngoài hiện trường.
+                          </span>
+                        </div>
                       </div>
                     </div>
 
