@@ -33,7 +33,7 @@ export default function NavMenu() {
                         </div>
                         <div className="homemenu-content text-center">
                           <h4 className="homemenu-title">
-                            Home Version 0{index + 1}
+                            Giao diện số 0{index + 1}
                           </h4>
                         </div>
                       </div>

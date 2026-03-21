@@ -16,7 +16,7 @@ export default function SearchBar({serchOpen, setSearchOpen}: SearchBarProps ) {
           <div className="search-cell">
             <form onSubmit={(e) => e.preventDefault()}>
               <div className="search-field-holder">
-                <input type="search" className="main-search-input" placeholder="Search..." />
+                <input type="search" className="main-search-input" placeholder="Tìm kiếm..." />
               </div>
             </form>
           </div>

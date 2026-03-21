@@ -20,14 +20,14 @@ export default function BlogDetailsArea() {
               <div className="blog-post-details">
                 <div className="explore-details-content">
                   <h2 className="wow fadeInUp" data-wow-delay=".2s">
-                    Explore the beauty of nature
+                    Khám phá vẻ đẹp của nông nghiệp bền vững
                   </h2>
                   <ul className="comment-inner wow fadeInUp" data-wow-delay=".3s">
                     <li>
-                      <a href="#"><i className="fa-regular fa-user"></i> By admin</a>
+                      <a href="#"><i className="fa-regular fa-user"></i> Bởi quản trị viên</a>
                     </li>
                     <li>
-                      <a href="#"><i className="fa-solid fa-folder-open"></i> Category</a>
+                      <a href="#"><i className="fa-solid fa-folder-open"></i> Danh mục</a>
                     </li>
                     <li>
                       <a href="#"><i className="fa-solid fa-calendar-days"></i> October 19, 2024</a>
@@ -107,7 +107,7 @@ export default function BlogDetailsArea() {
                 <div className="social-tag-wrapper wow fadeInUp" data-wow-delay=".4s">
                   <div className="left-tag">
                     <h5>
-                      Tags:
+                      Thẻ:
                     </h5>
                     <ul className="tag-list">
                       <li>
@@ -173,7 +173,7 @@ export default function BlogDetailsArea() {
                         </span>
                       </div>
                       <button className="replys" type="button">
-                        Reply
+                        Trả lời
                       </button>
                     </div>
                     <p>
@@ -185,40 +185,40 @@ export default function BlogDetailsArea() {
                 </div>
                 <div className="who-contact-wrap mt-60 mb-60 wow fadeInUp" data-wow-delay=".7s">
                   <h3 className="mb-40 text-capitalize">
-                    Leave A Reply
+                    Để lại phản hồi
                   </h3>
                   <form onSubmit={e => e.preventDefault()} className="row g-xl-4 g-3">
                     <div className="col-lg-6">
-                      <input type="text" placeholder="Name" />
+                      <input type="text" placeholder="Họ và tên" />
                     </div>
                     <div className="col-lg-6">
                       <input type="email" placeholder="E-mail" />
                     </div>
                     <div className="col-lg-6">
-                      <input type="number" placeholder="Your Number" />
+                      <input type="number" placeholder="Số điện thoại" />
                     </div>
                     <div className="col-lg-6">
 
                       <NiceSelect
                         options={[
-                          { value: "00", text: "Your Area" },
+                          { value: "00", text: "Khu vực của bạn" },
                           { value: "01", text: "Us" },
                           { value: "02", text: "Uk" },
                           { value: "04", text: "Turky" },
                         ]}
                         defaultCurrent={0}
                         onChange={selectHandler}
-                        placeholder="Select an option"
+                        placeholder="Chọn một tùy chọn"
                         name="myNiceSelect"
                       />
 
                     </div>
                     <div className="col-lg-12">
-                      <textarea name="message" rows={4} placeholder="Message"></textarea>
+                      <textarea name="message" rows={4} placeholder="Nội dung"></textarea>
                     </div>
                     <div className="col-lg-12">
                       <button type="submit" className="cmn-btn">
-                        Sent Now
+                        Gửi ngay
                         <i className="fa-solid fa-arrow-right"></i>
                       </button>
                     </div>
@@ -226,7 +226,7 @@ export default function BlogDetailsArea() {
                 </div>
                 <div className="maybe-liking wow fadeInUp" data-wow-delay=".8s">
                   <h3 className="mb-40">
-                    You May Also Like
+                    Có thể bạn cũng quan tâm
                   </h3>
                   <div className="thumb mb-30">
                     <img src="assets/img/blog/bd2.jpg" alt="img" />
@@ -246,18 +246,18 @@ export default function BlogDetailsArea() {
               <div className="blog-right-bar mt-lg-0 mt-4">
                 <div className="box common-style-box wow fadeInUp" data-wow-delay=".2s">
                   <div className="wid-title wow fadeInLeft" data-wow-delay=".3s">
-                    <h3>Search</h3>
+                    <h3>Tìm kiếm</h3>
                   </div>
                   <div className="search-widget" data-aos="zoom-in" data-aos-duration="1400">
                     <form onSubmit={e => e.preventDefault()}>
-                      <input type="text" placeholder="Search here..." />
+                      <input type="text" placeholder="Tìm kiếm tại đây..." />
                       <button type="submit"><i className="fas fa-search"></i></button>
                     </form>
                   </div>
                 </div>
                 <div className="box common-style-box wow fadeInUp" data-wow-delay=".3s">
                   <div className="wid-title wow fadeInLeft" data-wow-delay=".3s">
-                    <h3>Search</h3>
+                    <h3>Danh mục</h3>
                   </div>
                   <div className="category" data-aos="fade-down" data-aos-duration="1600">
                     <ul className="d-grid gap-xxl-3 gap-3">
@@ -291,7 +291,7 @@ export default function BlogDetailsArea() {
                 </div>
                 <div className="box common-style-box wow fadeInUp" data-wow-delay=".4s">
                   <div className="wid-title wow fadeInLeft" data-wow-delay=".3s">
-                    <h3>Latest Blogs</h3>
+                    <h3>Tin mới nhất</h3>
                   </div>
                   <div className="recent-postwrap">
                     <div className="recent-items">
@@ -337,7 +337,7 @@ export default function BlogDetailsArea() {
                 </div>
                 <div className="box common-style-box wow fadeInUp" data-wow-delay=".5s">
                   <div className="wid-title wow fadeInLeft" data-wow-delay=".3s">
-                    <h3>Tags</h3>
+                    <h3>Thẻ</h3>
                   </div>
                   <div className="tagwrap">
                     <Link href="/blog-details">CropCare Pro</Link>

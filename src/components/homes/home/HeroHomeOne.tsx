@@ -10,27 +10,27 @@ export default function HeroHomeOne() {
             <div className="col-lg-7 col-md-7 col-sm-9">
               <div className="hero-contentv01">
                 <h1 className="wow fadeInUp" data-wow-delay="0.4s">
-                  Plowing the earth
+                  Cày sâu vun gốc
                   <span className="harves">
-                    harvesting hope
+                    gieo mầm hy vọng
                   </span>
                 </h1>
                 <p className="wow fadeInUp" data-wow-delay="0.6s">
-                  Education is the key to studeny Unlock your potential through learning. <br /> Expand your
-                  horizons with the most
+                  FarmHub giúp số hóa canh tác, theo dõi lô sản xuất và minh bạch hành trình nông sản. <br />
+                  Nâng tầm nông nghiệp bền vững với dữ liệu theo thời gian thực.
                 </p>
                 <ul className="hero-list wow fadeInUp" data-wow-delay="0.8s">
                   <li>
                     <i className="fa-solid fa-angles-right"></i>
-                    Crops of opportunity fields of dreams
+                    Quản lý nhật ký canh tác rõ ràng theo từng giai đoạn
                   </li>
                   <li>
                     <i className="fa-solid fa-angles-right"></i>
-                    Where innovation meets cultivation
+                    Truy xuất nguồn gốc minh bạch từ nông trại đến bàn ăn
                   </li>
                 </ul>
                 <Link href="/about" className="cmn-btn round100 wow fadeInUp" data-wow-delay="0.9s">
-                  View More
+                  Xem thêm
                   <i className="fa-solid fa-arrow-right"></i>
                 </Link>
               </div>

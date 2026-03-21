@@ -634,6 +634,14 @@
     &:hover { background: #f9fbfa; }
   }
 
+  .selectedRow {
+    background: #eef8e5 !important;
+
+    td {
+      border-bottom-color: #d9e9cb;
+    }
+  }
+
   td:first-child {
     strong,
     span { display: block; }
@@ -669,24 +677,160 @@
   }
 }
 
+.overviewBoard {
+  display: grid;
+  gap: 14px;
+}
+
+.overviewHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid #dbe7d5;
+  background: linear-gradient(120deg, #f7fbf4 0%, #ffffff 70%);
+
+  h1 { margin: 4px 0; font-size: 30px; }
+  p { margin: 0; color: #4b5563; }
+
+  span {
+    border: 1px solid #d8e7cc;
+    background: #eef8e8;
+    color: #335e17;
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+}
+
+.overviewEyebrow { color: #4c8e1f !important; font-weight: 700; font-size: 12px; text-transform: uppercase; }
+.overviewMetricGrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.overviewMetricCard {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #fff;
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+
+  strong { font-size: 24px; color: #1f2937; }
+  small { color: #6b7280; font-size: 12px; }
+  span { color: #4b5563; font-size: 12px; }
+}
+.metricIconWrap {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #edf7e7;
+  display: grid;
+  place-items: center;
+
+  img { width: 18px; height: 18px; object-fit: contain; }
+}
+
+.overviewContentGrid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.55fr); gap: 12px; }
+.overviewMapCard,
+.overviewStatusCard,
+.overviewModuleCard {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px;
+}
+.sectionHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+  h3 { margin: 0; font-size: 16px; }
+  small { color: #6b7280; font-size: 12px; }
+}
+.overviewMapPreview {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  height: 280px;
+  background: #e5e7eb;
+}
+.overviewStatusCard ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+
+  li {
+    border: 1px solid #eef0f2;
+    border-radius: 10px;
+    padding: 10px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 10px;
+
+    div { display: grid; gap: 2px; }
+    strong { font-size: 13px; color: #1f2937; }
+    span, small { font-size: 12px; color: #6b7280; }
+    p { margin: 0; color: #2f6b10; font-weight: 700; font-size: 12px; }
+  }
+}
+
+.overviewModuleGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.overviewModuleCard {
+  p { margin: 6px 0; color: #6b7280; font-size: 12px; }
+  strong { font-size: 20px; color: #1f2937; }
+  small { color: #4b5563; font-size: 12px; }
+}
+.moduleTitle { display: flex; align-items: center; gap: 8px;
+  img { width: 18px; height: 18px; object-fit: contain; }
+  h4 { margin: 0; font-size: 15px; }
+}
+
+.overviewAlertCard {
+  ul {
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 8px;
+  }
+
+  li {
+    border: 1px solid #eef0f2;
+    border-radius: 10px;
+    padding: 8px;
+    display: grid;
+    gap: 2px;
+
+    strong { font-size: 12px; color: #1f2937; }
+    span { font-size: 12px; color: #4b5563; }
+    small { font-size: 11px; color: #6b7280; }
+  }
+}
+
+
+
 @media (max-width: 1280px) {
   .summaryColumns,
   .kpiGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .configRow,
   .editorGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .searchField { grid-column: span 2; }
-  .mapWidget { grid-template-columns: 1fr; }
+  .mapWidget,
+  .overviewContentGrid { grid-template-columns: 1fr; }
+  .overviewMetricGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .overviewModuleGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 992px) {
   .layout { grid-template-columns: 1fr; }
   .sidebar { display: none; }
-  .pillRow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pillRow,
+  .overviewMetricGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 640px) {
   .main { padding: 12px; }
-  .topbar {
+  .topbar,
+  .overviewHeader {
     flex-direction: column;
     span { white-space: normal; }
   }
@@ -697,7 +841,9 @@
   .editorGrid,
   .zoneMeta,
   .widgetGrid,
-  .pillRow { grid-template-columns: 1fr; }
+  .pillRow,
+  .overviewMetricGrid,
+  .overviewModuleGrid { grid-template-columns: 1fr; }
 
   .searchField { grid-column: span 1; }
   .mapFrame { height: 780px; }

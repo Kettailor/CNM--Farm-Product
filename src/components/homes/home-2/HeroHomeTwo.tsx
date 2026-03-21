@@ -13,18 +13,18 @@ export default function HeroHomeTwo() {
               <div className="col-lg-7 col-md-9">
                 <div className="banner-contentv02">
                   <h5 className="wow fadeInUp" data-wow-delay="0.2s">
-                    Farming for tomorrow
+                    Nông nghiệp cho tương lai
                   </h5>
                   <h1 className="wow fadeInUp" data-wow-delay="0.5s">
-                    Farming is ours heritage <span>future <br /> our harvest</span>
+                    Nông nghiệp là di sản <span>tương lai <br /> mùa vàng bền vững</span>
                   </h1>
                   <p className="wow fadeInUp" data-wow-delay="0.7s">
-                    We have been operating for over a decade, providing top-notch services to our clients
-                    and building a strong track record in the industry.
+                    Với hơn 10 năm kinh nghiệm, chúng tôi đồng hành cùng nông hộ và doanh nghiệp
+                    để chuẩn hóa quy trình, nâng cao chất lượng và tối ưu truy xuất nguồn gốc.
                   </p>
                   <div className="banner-buttonv2 wow fadeInUp" data-wow-delay="1s">
                     <Link href="/about" className="cmn-btn round100 primary-border">
-                      Read More
+                      Tìm hiểu thêm
                       <i className="fa-solid fa-angle-right"></i>
                     </Link>
                     <a href="#" className="header-help">
@@ -33,7 +33,7 @@ export default function HeroHomeTwo() {
                       </span>
                       <span className="d-grid">
                         <span className="need">
-                          Need help?
+                          Cần hỗ trợ?
                         </span>
                         <span className="call">
                           (808) 555-0111

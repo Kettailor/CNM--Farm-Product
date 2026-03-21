@@ -6,8 +6,8 @@ import Wrapper from '@/layouts/Wrapper';
 
 
 export const metadata: Metadata = {
-  title: 'FarmHub Home Two - Agriculture Farming Next js Template',
-  description: 'Introducing Farmhub - the ultimate Next template for showcasing your agricultural or organic business. Designed with a sleek and modern aesthetic, Farmhub effortlessly captures the essence of sustainable farming and food production.',
+  title: 'Trang chủ 2 | FarmHub - Nông sản thông minh',
+  description: 'Giao diện trang chủ 2 dành cho hệ sinh thái FarmHub với định hướng quản trị nông trại và truy xuất nguồn gốc.',
 };
 
 

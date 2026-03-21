@@ -1,25 +1,19 @@
 "use client"
 import React from 'react'
-import Image from 'next/image';
 import Count from '@/components/common/Count';
-import counter_img_1 from "@/assets/img/icon/count1.svg";
-import counter_img_2 from "@/assets/img/icon/count2.svg";
-import counter_img_3 from "@/assets/img/icon/count3.svg";
-import counter_img_4 from "@/assets/img/icon/count4.svg";
 
 interface CountDataType {
   id: number;
   number: number;
-  icon: string;
   text: string;
   title: string;
 }
 
 const coundet_data: CountDataType[] = [
-  { id: 1, number: 200, icon: counter_img_1, text: "+", title: "Team member" },
-  { id: 2, number: 300, icon: counter_img_2, text: "k+", title: "Winning award" },
-  { id: 2, number: 100, icon: counter_img_3, text: "+", title: "Complete project" },
-  { id: 2, number: 900, icon: counter_img_4, text: "+", title: "Client review" },
+  { id: 1, number: 200, text: "+", title: "Thành viên đội ngũ" },
+  { id: 2, number: 300, text: "k+", title: "Giải thưởng" },
+  { id: 3, number: 100, text: "+", title: "Dự án hoàn thành" },
+  { id: 4, number: 900, text: "+", title: "Đánh giá khách hàng" },
 ]
 
 
@@ -38,7 +32,7 @@ export default function CounterHomeOne({ style_2 }: PropsType) {
                 {style_2 ?
                   <>
                     <div className="cont-bottom">
-                      <Image src={item.icon} alt="img" />
+                      <img src="/assets/img/08dbb3ce-181c-4e80-833e-6c43bd5dd105.svg" alt="Biểu tượng thống kê" />
                     </div>
                     <div className="con-box">
                       <h2 className="d-flex align-items-center">
@@ -53,7 +47,7 @@ export default function CounterHomeOne({ style_2 }: PropsType) {
                       <span className="count"> <Count number={item.number} /> </span> {item.text}
                     </h2>
                     <div className="cont-bottom">
-                      <Image src={item.icon} alt="img" />
+                      <img src="/assets/img/08dbb3ce-181c-4e80-833e-6c43bd5dd105.svg" alt="Biểu tượng thống kê" />
                       <p>{item.title}</p>
                     </div>
                   </>

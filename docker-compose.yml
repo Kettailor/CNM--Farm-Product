@@ -34,6 +34,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docs/database/farm_traceability_schema.sql:/docker-entrypoint-initdb.d/01_farm_traceability_schema.sql:ro
+      - ./docs/database/02_seed_map_data.sql:/docker-entrypoint-initdb.d/02_seed_map_data.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U farmhub -d farmhub"]
       interval: 10s
@@ -44,7 +45,6 @@ services:
   adminer:
     image: adminer:4
     container_name: farmhub-adminer
-    profiles: ["tools"]
     depends_on:
       db:
         condition: service_healthy

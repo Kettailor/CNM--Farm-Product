@@ -53,8 +53,8 @@ type FormState = {
   verifiedLocation: FarmLocation | null;
 };
 
-const ONBOARDING_STORAGE_KEY = "farmdeck.smart.onboarding";
-const ONBOARDING_UI_STORAGE_KEY = "farmdeck.smart.onboarding-ui";
+const ONBOARDING_STORAGE_KEY = "ketkat.ecofarm.onboarding";
+const ONBOARDING_UI_STORAGE_KEY = "ketkat.ecofarm.onboarding-ui";
 
 const initialForm: FormState = {
   fullName: "",
@@ -95,7 +95,7 @@ const stepTitles = [
   "Định vị nông trại",
   "Loại hình & quy mô nông trại",
   "Đơn vị đo & cài đặt",
-  "Bạn biết Farmdeck từ đâu?",
+  "Bạn biết KetKat-EcoFarm từ đâu?",
   "Hoàn tất đăng ký 🎉",
 ];
 
@@ -158,6 +158,16 @@ export default function SmartFarmExperience() {
       form.confirmPassword.trim() &&
       form.farmName.trim();
     return Boolean(hasValues && form.password === form.confirmPassword);
+  }, [form]);
+
+  const accountErrors = useMemo(() => {
+    const fullName = form.fullName.trim().length === 0 ? "Vui lòng nhập họ và tên." : "";
+    const username = form.username.trim().length < 4 ? "Tên đăng nhập phải có ít nhất 4 ký tự." : "";
+    const password = form.password.trim().length < 6 ? "Mật khẩu phải có ít nhất 6 ký tự." : "";
+    const confirmPassword = form.confirmPassword !== form.password ? "Mật khẩu xác nhận chưa khớp." : "";
+    const farmName = form.farmName.trim().length === 0 ? "Vui lòng nhập tên nông trại." : "";
+
+    return { fullName, username, password, confirmPassword, farmName };
   }, [form]);
 
   const canContinue = useMemo(() => {
@@ -405,88 +415,131 @@ export default function SmartFarmExperience() {
   return (
     <div className={styles.wrapper}>
       <section className={styles.hero}>
-        <h1>Nền tảng quản lý nông sản thông minh</h1>
-        <p>Theo dõi lô nông sản, giám sát IoT và truy xuất nguồn gốc minh bạch từ nông trại đến người dùng.</p>
-        <button onClick={() => setShowOnboarding(true)}>Đăng ký & bắt đầu quản lý</button>
+        <p className={styles.heroBadge}>KetKat-EcoFarm</p>
+        <h1>Đăng ký hệ thống quản trị nông trại thông minh</h1>
+        <p>
+          Chuẩn hóa dữ liệu nông trại, thiết lập bản đồ vận hành và kích hoạt quy trình truy xuất nguồn gốc ngay từ bước
+          khởi tạo.
+        </p>
+        <button onClick={() => setShowOnboarding(true)}>Đăng ký thông tin</button>
       </section>
 
       {showOnboarding && (
         <section className={styles.modalOverlay}>
           <div className={styles.modal}>
             <div className={styles.content}>
-              {step > 0 && (
-                <div className={styles.stepPreviewMuted}>
-                  <span>{step}</span>
-                  <p>{stepTitles[step - 1]}</p>
+              <aside className={styles.stepRail}>
+                <p className={styles.stepLabel}>Lộ trình thiết lập</p>
+                {step > 0 && (
+                  <div className={styles.stepPreviewMuted}>
+                    <span>{step}</span>
+                    <p>{stepTitles[step - 1]}</p>
+                  </div>
+                )}
+                <div className={styles.stepPreviewActive}>
+                  <span>{step + 1}</span>
+                  <p>{stepTitles[step]}</p>
                 </div>
-              )}
+                {step < 6 && (
+                  <div className={styles.stepPreviewMuted}>
+                    <span>{step + 2}</span>
+                    <p>{stepTitles[step + 1]}</p>
+                  </div>
+                )}
+              </aside>
 
-              <div className={styles.stepPreviewActive}>
-                <span>{step + 1}</span>
-                <p>{stepTitles[step]}</p>
-              </div>
+              <div className={styles.formPanel}>
 
               {step === 0 && (
                 <div className={styles.stepBody}>
+                  <h2>Khởi tạo hồ sơ KetKat-EcoFarm</h2>
                   <p>
-                    Chào mừng bạn đến với <b>Farmdeck</b> - nền tảng tất cả trong một để quản lý nông trại hiệu quả,
-                    theo dõi vận hành hằng ngày và truy xuất nguồn gốc sản phẩm.
+                    Chào mừng bạn đến với <b>KetKat-EcoFarm</b>. Bộ thiết lập này giúp chuẩn hóa thông tin tài khoản,
+                    nông trại, vị trí và đơn vị vận hành để bạn bắt đầu quản trị nhanh chóng.
                   </p>
-                  <p>
-                    Thiết lập này chỉ mất chưa đến một phút. Chúng tôi sẽ thu thập thông tin cơ bản để cá nhân hoá hệ
-                    thống theo mô hình nông trại của bạn.
-                  </p>
-                  <p>Khi sẵn sàng, bấm &quot;Tiếp tục&quot;.</p>
+                  <div className={styles.infoCard}>
+                    <p>✅ Thời gian thao tác: khoảng 1–2 phút.</p>
+                    <p>✅ Bạn có thể cập nhật lại thông tin sau khi hoàn tất đăng ký.</p>
+                  </div>
+                  <p>Khi sẵn sàng, nhấn <b>Tiếp tục</b> để bắt đầu.</p>
                 </div>
               )}
 
               {step === 1 && (
                 <div className={styles.stepBody}>
-                  <p>Vui lòng nhập thông tin tài khoản để phục vụ đăng nhập và quản lý nông trại.</p>
-                  <input
-                    placeholder="Họ và tên"
-                    value={form.fullName}
-                    onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-                  />
-                  <input
-                    placeholder="Tên tài khoản đăng nhập"
-                    value={form.username}
-                    onChange={(e) => setForm({ ...form, username: e.target.value })}
-                  />
-                  <input
-                    type="password"
-                    placeholder="Mật khẩu"
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  />
-                  <input
-                    type="password"
-                    placeholder="Nhập lại mật khẩu"
-                    value={form.confirmPassword}
-                    onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-                  />
-                  <input
-                    placeholder="Tên nông trại"
-                    value={form.farmName}
-                    onChange={(e) => setForm({ ...form, farmName: e.target.value })}
-                  />
-                  {!isAccountValid && <p className={styles.tip}>Tên tài khoản/mật khẩu chưa hợp lệ hoặc chưa khớp.</p>}
+                  <h2>Thông tin tài khoản & nông trại</h2>
+                  <p>Vui lòng nhập đầy đủ các trường bắt buộc để kích hoạt không gian quản trị của bạn.</p>
+
+                  <div className={styles.formGroup}>
+                    <label>Họ và tên *</label>
+                    <input
+                      placeholder="Ví dụ: Nguyễn Văn A"
+                      value={form.fullName}
+                      onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                    />
+                    {accountErrors.fullName && <p className={styles.errorText}>{accountErrors.fullName}</p>}
+                  </div>
+
+                  <div className={styles.formGroup}>
+                    <label>Tên đăng nhập *</label>
+                    <input
+                      placeholder="Tối thiểu 4 ký tự"
+                      value={form.username}
+                      onChange={(e) => setForm({ ...form, username: e.target.value })}
+                    />
+                    {accountErrors.username && <p className={styles.errorText}>{accountErrors.username}</p>}
+                  </div>
+
+                  <div className={styles.formRow}>
+                    <div className={styles.formGroup}>
+                      <label>Mật khẩu *</label>
+                      <input
+                        type="password"
+                        placeholder="Tối thiểu 6 ký tự"
+                        value={form.password}
+                        onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      />
+                      {accountErrors.password && <p className={styles.errorText}>{accountErrors.password}</p>}
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label>Xác nhận mật khẩu *</label>
+                      <input
+                        type="password"
+                        placeholder="Nhập lại mật khẩu"
+                        value={form.confirmPassword}
+                        onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                      />
+                      {accountErrors.confirmPassword && <p className={styles.errorText}>{accountErrors.confirmPassword}</p>}
+                    </div>
+                  </div>
+
+                  <div className={styles.formGroup}>
+                    <label>Tên nông trại *</label>
+                    <input
+                      placeholder="Ví dụ: Nông trại Hữu Cơ Miền Tây"
+                      value={form.farmName}
+                      onChange={(e) => setForm({ ...form, farmName: e.target.value })}
+                    />
+                    {accountErrors.farmName && <p className={styles.errorText}>{accountErrors.farmName}</p>}
+                  </div>
+
+                  {!isAccountValid && <p className={styles.tip}>Vui lòng hoàn tất đúng các trường bắt buộc để tiếp tục.</p>}
                 </div>
               )}
 
               {step === 2 && (
                 <div className={styles.stepBody}>
                   <p>
-                    Help us tailor Farmdeck to your needs by letting us know where your farm is located. A full
-                    address is best as it centres your homestead on the map.
+                    Hãy cho chúng tôi biết vị trí nông trại của bạn để KetKat-EcoFarm cấu hình bản đồ và dữ liệu
+                    phù hợp. Nên nhập địa chỉ đầy đủ để hệ thống định tâm chính xác trên bản đồ.
                   </p>
-                  <p className={styles.tip}>💡 TIP: Chọn 1 trong 3 cách: nhập địa chỉ để xem live map, dán link Google Maps, hoặc nhập tọa độ.</p>
-                  <p>How would you like to share your location? (Select one option)</p>
+                  <p className={styles.tip}>💡 Mẹo: Chọn 1 trong 3 cách: nhập địa chỉ để xem bản đồ trực tiếp, dán link Google Maps hoặc nhập tọa độ.</p>
+                  <p>Bạn muốn chia sẻ vị trí theo cách nào? (chọn 1 phương án)</p>
 
                   <div className={styles.radioGroup}>
                     <label>
                       <input type="radio" checked={locationMode === "search"} onChange={() => setLocationMode("search")} />
-                      Nhập địa chỉ / vị trí và xem live preview
+                      Nhập địa chỉ / vị trí và xem bản đồ trực tiếp
                     </label>
                     <label>
                       <input type="radio" checked={locationMode === "link"} onChange={() => setLocationMode("link")} />
@@ -536,7 +589,7 @@ export default function SmartFarmExperience() {
                           </div>
                         )}
                       </div>
-                      <iframe title="Google map live preview" className={styles.googleMap} src={mapEmbedUrl} loading="lazy" />
+                      <iframe title="Bản đồ Google xem trực tiếp" className={styles.googleMap} src={mapEmbedUrl} loading="lazy" />
                     </>
                   )}
 
@@ -570,7 +623,7 @@ export default function SmartFarmExperience() {
                             : "Ô địa chỉ đã được khóa khi dùng link map. Hệ thống tự động hiển thị tên vị trí từ link."
                           : "Dán link Google Maps để hệ thống tự lấy tọa độ và tên vị trí."}
                       </p>
-                      <iframe title="Google map live preview" className={styles.googleMap} src={mapEmbedUrl} loading="lazy" />
+                      <iframe title="Bản đồ Google xem trực tiếp" className={styles.googleMap} src={mapEmbedUrl} loading="lazy" />
                     </>
                   )}
 
@@ -610,14 +663,14 @@ export default function SmartFarmExperience() {
                     </>
                   )}
 
-                  {locationMode === "manual" && <iframe title="Google map live preview" className={styles.googleMap} src={mapEmbedUrl} loading="lazy" />}
+                  {locationMode === "manual" && <iframe title="Bản đồ Google xem trực tiếp" className={styles.googleMap} src={mapEmbedUrl} loading="lazy" />}
                   {locationMode !== "manual" && (
                     <button className={styles.backBtn} type="button" onClick={validateLocation}>
-                      ✥ Validate
+                      ✥ Xác thực
                     </button>
                   )}
-                  {form.verifiedLocation && <p className={styles.validText}>✓ Location verified</p>}
-                  <p>When you are done, click Continue.</p>
+                  {form.verifiedLocation && <p className={styles.validText}>✓ Đã xác thực vị trí</p>}
+                  <p>Khi hoàn tất, bấm "Tiếp tục".</p>
                 </div>
               )}
 
@@ -747,7 +800,7 @@ export default function SmartFarmExperience() {
 
               {step === 5 && (
                 <div className={styles.stepBody}>
-                  <p>Bạn biết Farmdeck từ kênh nào? (chọn tất cả mục phù hợp)</p>
+                  <p>Bạn biết KetKat-EcoFarm từ kênh nào? (chọn tất cả mục phù hợp)</p>
 
                   <div className={styles.checkGroup}>
                     {sourceOptions.map((item) => (
@@ -829,7 +882,7 @@ export default function SmartFarmExperience() {
                     setStep((prev) => prev - 1);
                   }}
                 >
-                  ← Quay lại
+                  {step === 0 ? "Đóng" : "← Quay lại"}
                 </button>
 
                 {step < 6 ? (
@@ -846,18 +899,18 @@ export default function SmartFarmExperience() {
                     Tiếp tục →
                   </button>
                 ) : (
-                  <button className={styles.nextBtn} onClick={() => { setCompleted(true); setShowOnboarding(false); }}>
-                    Hoàn tất
+                  <button
+                    className={styles.nextBtn}
+                    onClick={() => {
+                      setCompleted(true);
+                      setShowOnboarding(false);
+                    }}
+                  >
+                    Hoàn tất đăng ký
                   </button>
                 )}
               </div>
-
-              {step < 6 && (
-                <div className={styles.stepPreviewMuted}>
-                  <span>{step + 2}</span>
-                  <p>{stepTitles[step + 1]}</p>
-                </div>
-              )}
+              </div>
             </div>
           </div>
         </section>

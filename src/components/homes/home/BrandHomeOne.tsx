@@ -1,26 +1,20 @@
 
 "use client"
 import React from 'react'
-import Image from 'next/image';
+
 import { Autoplay } from 'swiper/modules';
 import { Swiper, SwiperSlide } from 'swiper/react';
-import brand_img_1 from "@/assets/img/sponsor/sp1.png";
-import brand_img_2 from "@/assets/img/sponsor/sp2.png";
-import brand_img_3 from "@/assets/img/sponsor/sp3.png";
-import brand_img_4 from "@/assets/img/sponsor/sp4.png";
-import brand_img_5 from "@/assets/img/sponsor/sp5.png";
-
 const brand_data = [
-  brand_img_1,
-  brand_img_2,
-  brand_img_3,
-  brand_img_4,
-  brand_img_5,
-  brand_img_1,
-  brand_img_2,
-  brand_img_3,
-  brand_img_4,
-  brand_img_5,
+  "/assets/img/08dbb3ce-181c-4f36-8ab8-8c8f94cf174b.svg",
+  "/assets/img/08dbb3ce-181c-5092-8f78-f40213d3d315.svg",
+  "/assets/img/08dbb3ce-181c-4fde-8668-b2bb31d25893.svg",
+  "/assets/img/08dbb3ce-181c-5024-823f-d878c31298eb.svg",
+  "/assets/img/08dbb3ce-181c-5131-8a69-f43eeaf5298d.svg",
+  "/assets/img/08dbb3ce-181c-4f36-8ab8-8c8f94cf174b.svg",
+  "/assets/img/08dbb3ce-181c-5092-8f78-f40213d3d315.svg",
+  "/assets/img/08dbb3ce-181c-4fde-8668-b2bb31d25893.svg",
+  "/assets/img/08dbb3ce-181c-5024-823f-d878c31298eb.svg",
+  "/assets/img/08dbb3ce-181c-5131-8a69-f43eeaf5298d.svg",
 ]
 
 interface PropsType {
@@ -66,7 +60,7 @@ export default function BrandHomeOne({ style_2, style_3 }: PropsType) {
             {brand_data.map((item, i) => (
               <SwiperSlide key={i} className="swiper-slide">
                 <div className="brand-image">
-                  <Image src={item} alt="img" />
+                  <img src={item} alt="Đối tác" />
                 </div>
               </SwiperSlide>
             ))}

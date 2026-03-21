@@ -1,26 +1,20 @@
 
 "use client"
 import React from 'react'
-
-import counter_img_1 from "@/assets/img/icon/count1.svg";
-import counter_img_2 from "@/assets/img/icon/count2.svg";
-import counter_img_3 from "@/assets/img/icon/count3.svg";
-import counter_img_4 from "@/assets/img/icon/count4.svg";
 import Count from '@/components/common/Count';
 
 interface CountDataType {
   id: number;
   number: number;
-  icon: string;
   text: string;
   title: string;
 }
 
 const coundet_data: CountDataType[] = [
-  { id: 1, number: 200, icon: counter_img_1, text: "+", title: "Team member" },
-  { id: 2, number: 20, icon: counter_img_2, text: "+", title: "Winning award" },
-  { id: 2, number: 10, icon: counter_img_3, text: "k+", title: "Complete project" },
-  { id: 2, number: 900, icon: counter_img_4, text: "+", title: "Client review" },
+  { id: 1, number: 200, text: "+", title: "Thành viên đội ngũ" },
+  { id: 2, number: 20, text: "+", title: "Giải thưởng" },
+  { id: 3, number: 10, text: "k+", title: "Dự án hoàn thành" },
+  { id: 4, number: 900, text: "+", title: "Đánh giá khách hàng" },
 ]
 
 type Props = {

@@ -21,14 +21,14 @@ export default function BlogArea() {
                   <div className="content">
                     <ul className="comment-inner">
                       <li>
-                        <a href="#"><i className="fa-regular fa-comments"></i> Comments (05)</a>
+                        <a href="#"><i className="fa-regular fa-comments"></i> Bình luận (05)</a>
                       </li>
                       <li>
-                        <a href="#"><i className="fa-regular fa-user"></i> By admin</a>
+                        <a href="#"><i className="fa-regular fa-user"></i> Bởi quản trị viên</a>
                       </li>
                     </ul>
                     <Link href="/blog-details" className="titles">
-                      Farming for a Better Future
+                      Nông nghiệp cho tương lai bền vững
                     </Link>
                     <p>
                       Lorem ipsum dolor sit amet consectetur. Amet lectus mi ultricies dictum facilisis
@@ -38,7 +38,7 @@ export default function BlogArea() {
                       the world
                     </p>
                     <Link href="/blog-details" className="cmn-btn primary-border">
-                      Read More
+                      Xem thêm
                       <i className="fa-solid fa-arrow-right p1-clr"></i>
                     </Link>
                   </div>
@@ -53,14 +53,14 @@ export default function BlogArea() {
                   <div className="content">
                     <ul className="comment-inner">
                       <li>
-                        <a href="#"><i className="fa-regular fa-comments"></i> Comments (05)</a>
+                        <a href="#"><i className="fa-regular fa-comments"></i> Bình luận (05)</a>
                       </li>
                       <li>
-                        <a href="#"><i className="fa-regular fa-user"></i> By admin</a>
+                        <a href="#"><i className="fa-regular fa-user"></i> Bởi quản trị viên</a>
                       </li>
                     </ul>
                     <Link href="/blog-details" className="titles">
-                      Cultivate Success with Agriculture
+                      Canh tác thông minh, nâng tầm hiệu quả
                     </Link>
                     <p>
                       Lorem ipsum dolor sit amet consectetur. Amet lectus mi ultricies dictum facilisis
@@ -70,7 +70,7 @@ export default function BlogArea() {
                       the world
                     </p>
                     <Link href="/blog-details" className="cmn-btn primary-border">
-                      Read More
+                      Xem thêm
                       <i className="fa-solid fa-arrow-right p1-clr"></i>
                     </Link>
                   </div>
@@ -85,14 +85,14 @@ export default function BlogArea() {
                   <div className="content">
                     <ul className="comment-inner">
                       <li>
-                        <a href="#"><i className="fa-regular fa-comments"></i> Comments (05)</a>
+                        <a href="#"><i className="fa-regular fa-comments"></i> Bình luận (05)</a>
                       </li>
                       <li>
-                        <a href="#"><i className="fa-regular fa-user"></i> By admin</a>
+                        <a href="#"><i className="fa-regular fa-user"></i> Bởi quản trị viên</a>
                       </li>
                     </ul>
                     <Link href="/blog-details" className="titles">
-                      Sow the Seeds of Prosperity
+                      Gieo mầm thịnh vượng từ nông trại
                     </Link>
                     <p>
                       Lorem ipsum dolor sit amet consectetur. Amet lectus mi ultricies dictum facilisis
@@ -102,7 +102,7 @@ export default function BlogArea() {
                       the world
                     </p>
                     <Link href="/blog-details" className="cmn-btn primary-border">
-                      Read More
+                      Xem thêm
                       <i className="fa-solid fa-arrow-right p1-clr"></i>
                     </Link>
                   </div>
@@ -117,14 +117,14 @@ export default function BlogArea() {
                   <div className="content">
                     <ul className="comment-inner">
                       <li>
-                        <a href="#"><i className="fa-regular fa-comments"></i> Comments (05)</a>
+                        <a href="#"><i className="fa-regular fa-comments"></i> Bình luận (05)</a>
                       </li>
                       <li>
-                        <a href="#"><i className="fa-regular fa-user"></i> By admin</a>
+                        <a href="#"><i className="fa-regular fa-user"></i> Bởi quản trị viên</a>
                       </li>
                     </ul>
                     <Link href="/blog-details" className="titles">
-                      From Farm to Table, Agriculture Matters
+                      Từ nông trại đến bàn ăn: minh bạch từng bước
                     </Link>
                     <p>
                       Lorem ipsum dolor sit amet consectetur. Amet lectus mi ultricies dictum facilisis
@@ -134,7 +134,7 @@ export default function BlogArea() {
                       the world
                     </p>
                     <Link href="/blog-details" className="cmn-btn primary-border">
-                      Read More
+                      Xem thêm
                       <i className="fa-solid fa-arrow-right p1-clr"></i>
                     </Link>
                   </div>
@@ -149,14 +149,14 @@ export default function BlogArea() {
                   <div className="content">
                     <ul className="comment-inner">
                       <li>
-                        <a href="#"><i className="fa-regular fa-comments"></i> Comments (05)</a>
+                        <a href="#"><i className="fa-regular fa-comments"></i> Bình luận (05)</a>
                       </li>
                       <li>
-                        <a href="#"><i className="fa-regular fa-user"></i> By admin</a>
+                        <a href="#"><i className="fa-regular fa-user"></i> Bởi quản trị viên</a>
                       </li>
                     </ul>
                     <Link href="/blog-details" className="titles">
-                      Planting the Seeds of Innovation
+                      Gieo hạt đổi mới trong canh tác
                     </Link>
                     <p>
                       Lorem ipsum dolor sit amet consectetur. Amet lectus mi ultricies dictum facilisis
@@ -166,7 +166,7 @@ export default function BlogArea() {
                       the world
                     </p>
                     <Link href="/blog-details" className="cmn-btn primary-border">
-                      Read More
+                      Xem thêm
                       <i className="fa-solid fa-arrow-right p1-clr"></i>
                     </Link>
                   </div>
@@ -177,44 +177,44 @@ export default function BlogArea() {
               <div className="blog-right-bar mt-lg-0 mt-4">
                 <div className="box common-style-box wow fadeInUp" data-wow-delay=".2s">
                   <div className="wid-title wow fadeInLeft" data-wow-delay=".3s">
-                    <h3>Search</h3>
+                    <h3>Tìm kiếm</h3>
                   </div>
                   <div className="search-widget" data-aos="zoom-in" data-aos-duration="1400">
                     <form onSubmit={(e) => e.preventDefault()}>
-                      <input type="text" placeholder="Search here..." />
+                      <input type="text" placeholder="Tìm kiếm tại đây..." />
                       <button type="submit"><i className="fas fa-search"></i></button>
                     </form>
                   </div>
                 </div>
                 <div className="box common-style-box wow fadeInUp" data-wow-delay=".3s">
                   <div className="wid-title wow fadeInLeft" data-wow-delay=".3s">
-                    <h3>Search</h3>
+                    <h3>Danh mục</h3>
                   </div>
                   <div className="category" data-aos="fade-down" data-aos-duration="1600">
                     <ul className="d-grid gap-xxl-3 gap-3">
                       <li>
                         <Link href="/blog-details">
-                          <i className="fa-solid fa-minus"></i>Evergreen Lawn Care
+                          <i className="fa-solid fa-minus"></i>Chăm sóc cây trồng bền vững
                         </Link>
                       </li>
                       <li>
                         <Link href="/blog-details">
-                          <i className="fa-solid fa-minus"></i>Petal Perfect Farming
+                          <i className="fa-solid fa-minus"></i>Kỹ thuật canh tác chuẩn hóa
                         </Link>
                       </li>
                       <li>
                         <Link href="/blog-details">
-                          <i className="fa-solid fa-minus"></i>Blissful Botanicals
+                          <i className="fa-solid fa-minus"></i>Canh tác hữu cơ
                         </Link>
                       </li>
                       <li>
                         <Link href="/blog-details">
-                          <i className="fa-solid fa-minus"></i>The Farm Guru
+                          <i className="fa-solid fa-minus"></i>Quản trị nông trại
                         </Link>
                       </li>
                       <li>
                         <Link href="/blog-details">
-                          <i className="fa-solid fa-minus"></i>Serene Scape Design
+                          <i className="fa-solid fa-minus"></i>Thiết kế vùng canh tác
                         </Link>
                       </li>
                     </ul>
@@ -222,7 +222,7 @@ export default function BlogArea() {
                 </div>
                 <div className="box common-style-box wow fadeInUp" data-wow-delay=".4s">
                   <div className="wid-title wow fadeInLeft" data-wow-delay=".3s">
-                    <h3>Latest Blogs</h3>
+                    <h3>Tin mới nhất</h3>
                   </div>
                   <div className="recent-postwrap">
                     <div className="recent-items">
@@ -234,7 +234,7 @@ export default function BlogArea() {
                           <i className="fa-solid fa-calendar-days"></i> Jan 10,2024
                         </span>
                         <Link href="/blog-details">
-                          Planting the Seeds of Innovation
+                          Gieo hạt đổi mới trong canh tác
                         </Link>
                       </div>
                     </div>
@@ -247,7 +247,7 @@ export default function BlogArea() {
                           <i className="fa-solid fa-calendar-days"></i> Jan 10,2024
                         </span>
                         <Link href="/blog-details">
-                          Discover the Potential of Agriculture
+                          Khám phá tiềm năng của nông nghiệp
                         </Link>
                       </div>
                     </div>
@@ -260,7 +260,7 @@ export default function BlogArea() {
                           <i className="fa-solid fa-calendar-days"></i> Jan 10,2024
                         </span>
                         <Link href="/blog-details">
-                          Nourish Your Life with Agriculture
+                          Nuôi dưỡng cuộc sống từ nông nghiệp sạch
                         </Link>
                       </div>
                     </div>
@@ -268,7 +268,7 @@ export default function BlogArea() {
                 </div>
                 <div className="box common-style-box wow fadeInUp" data-wow-delay=".5s">
                   <div className="wid-title wow fadeInLeft" data-wow-delay=".3s">
-                    <h3>Tags</h3>
+                    <h3>Thẻ</h3>
                   </div>
                   <div className="tagwrap">
                     <Link href="/blog-details">CropCare Pro</Link>

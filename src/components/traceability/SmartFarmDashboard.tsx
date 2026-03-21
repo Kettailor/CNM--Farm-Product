@@ -101,6 +101,13 @@ type PersistedMapState = {
   detailOpen: boolean;
 };
 
+type MapApiState = {
+  loading: boolean;
+  saving: boolean;
+  error: string | null;
+  fromDb: boolean;
+};
+
 const TILE_SIZE = 256;
 const DEFAULT_VIEWPORT: ViewportSize = { width: 960, height: 720 };
 const MIN_ZOOM = 14;
@@ -109,11 +116,11 @@ const METERS_PER_DEGREE_LAT = 111_320;
 
 const sidebarMenus = [
   "Tổng quan",
-  "Bản đồ nông trại",
+  "Bản đồ trực quan",
   "Vật nuôi",
   "Đếm đàn",
   "Theo dõi vật nuôi",
-  "Ô đất & khu vực",
+  "Quản lý khu",
   "Nguồn nước",
   "Theo dõi phương tiện",
   "Hàng rào",
@@ -125,28 +132,26 @@ const sidebarMenus = [
   "Cài đặt",
 ];
 
-const metricPills = [
-  { label: "Nông trại", value: "" },
-  { label: "Người dùng", value: "" },
-  { label: "Tài sản", value: "" },
-  { label: "Ô đất", value: "" },
-  { label: "Cảm biến", value: "" },
-  { label: "Hồ chứa", value: "" },
-  { label: "Hàng rào", value: "" },
-  { label: "Máy bơm", value: "" },
-  { label: "Trạm mưa", value: "" },
-  { label: "Bồn chứa", value: "" },
-];
+const OVERVIEW_ICON_FALLBACK = "/assets/img/08dbb3ce-181c-49e9-8306-22abec26b4fa.svg";
 
-const widgets = [
-  { title: "Vật nuôi", rows: ["", "", "", ""] },
-  { title: "Đếm đàn", rows: ["", "", "", ""] },
-  { title: "Theo dõi vật nuôi", rows: ["", "", "", ""] },
-  { title: "Ô đất & khu vực", rows: ["", "", "", ""] },
-  { title: "Nguồn nước", rows: ["", "", "", ""] },
-  { title: "Lượng mưa", rows: ["", "", "", ""] },
-  { title: "Kho lạnh", rows: ["", "", "", ""] },
-  { title: "Sức khỏe đất", rows: ["", "", "", ""] },
+const overviewIconMap: Record<string, string> = {
+  farm: "/assets/img/08dbb3ce-181c-4a06-8eec-9d43bca8ed8e.svg",
+  user: "/assets/img/08dbb3ce-181c-4a17-87ae-cd831646cfae.svg",
+  area: "/assets/img/08dbb3ce-181c-4a25-8e37-317bfbaef7ce.svg",
+  sensor: "/assets/img/08dbb3ce-181c-4a33-8410-90cf62243bf5.svg",
+  alert: "/assets/img/08dbb3ce-181c-4a42-8800-2ee233c68de2.svg",
+  water: "/assets/img/08dbb3ce-181c-4a50-8c4e-ecebe4b01c5b.svg",
+  livestock: "/assets/img/08dbb3ce-181c-4a5f-804b-29cfcea22dd7.svg",
+  weather: "/assets/img/08dbb3ce-181c-4a6d-8dd8-73bc4f978eff.svg",
+  schedule: "/assets/img/08dbb3ce-181c-4a7b-80a5-a8d51cf438a8.svg",
+  map: "/assets/img/08dbb3ce-181c-4a89-8a26-5d1010ddf30e.svg",
+};
+
+const overviewModuleTemplates = [
+  { title: "Vật nuôi", icon: "livestock", description: "Số liệu đàn và chuồng trại", metric: "1.248 con", note: "Tăng 3,2% so với tuần trước" },
+  { title: "Nguồn nước", icon: "water", description: "Mực nước và lịch tưới", metric: "82% dung tích", note: "2 hồ cần bổ sung" },
+  { title: "Thời tiết", icon: "weather", description: "Mưa, độ ẩm, nhiệt độ", metric: "29°C · 76% RH", note: "Khả năng mưa: 63%" },
+  { title: "Lịch vận hành", icon: "schedule", description: "Công việc trong ngày", metric: "12 tác vụ", note: "4 tác vụ ưu tiên cao" },
 ];
 
 const initialZones: Zone[] = [];
@@ -195,7 +200,6 @@ const farmTypeIcons: Record<FarmType, string> = {
 };
 
 const statusOptions: Array<ZoneStatus | "all"> = ["all", "healthy", "warning", "critical"];
-const resourceTypeOptions: Array<ResourceType | "all"> = ["all", "water", "livestock", "sensors", "vehicle"];
 const farmTypeOptions: Array<FarmType | "all"> = ["all", "cattle", "sheep", "pig", "poultry", "crop"];
 
 const latLngToWorldPixel = (lat: number, lng: number, zoom: number) => {
@@ -242,8 +246,9 @@ const angleToCursor = (centerX: number, centerY: number, clientX: number, client
 
 const createStorageKey = (profile?: DashboardProfile) => {
   const rawKey = `${profile?.farmName || "farm"}-${profile?.address || "default"}`.toLowerCase();
-  return `farmdeck.smart.map.${rawKey.replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "default"}`;
+  return `ketkat.ecofarm.map.${rawKey.replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "default"}`;
 };
+
 
 const createEmptyZone = (
   nextIndex: number,
@@ -289,21 +294,28 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
   const originLat = profile?.lat ?? 10.8216;
   const originLng = profile?.lng ?? 106.6295;
   const storageKey = useMemo(() => createStorageKey(profile), [profile]);
-  const [activeMenu, setActiveMenu] = useState("Bản đồ nông trại");
+  const [activeMenu, setActiveMenu] = useState("Bản đồ trực quan");
+  const isManagementMode = activeMenu === "Quản lý khu";
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({ paddocks: true, water: true, vehicles: true, fences: true, sensors: true });
   const [zones, setZones] = useState<Zone[]>(initialZones);
   const [selectedZone, setSelectedZone] = useState<string | null>(initialZones[0]?.id ?? null);
-  const [resourceMode, setResourceMode] = useState<ResourceType>("water");
+  const [resourceMode] = useState<ResourceType>("water");
   const [timeScale, setTimeScale] = useState("Hiện tại");
   const [statusFilter, setStatusFilter] = useState<ZoneStatus | "all">("all");
-  const [resourceFilter, setResourceFilter] = useState<ResourceType | "all">("all");
+  const [resourceFilter] = useState<ResourceType | "all">("all");
   const [farmTypeFilter, setFarmTypeFilter] = useState<FarmType | "all">("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [sortField] = useState<"code" | "name" | "area">("code");
+  const [sortDir] = useState<"asc" | "desc">("asc");
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState<string | null>(null);
+  const [baselineZones, setBaselineZones] = useState<Zone[]>(initialZones);
   const [zoom, setZoom] = useState(16);
   const [viewport, setViewport] = useState<ViewportSize>(DEFAULT_VIEWPORT);
   const [mapCenter, setMapCenter] = useState(() => ({ lat: originLat, lng: originLng }));
   const [detailOpen, setDetailOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [mapApi, setMapApi] = useState<MapApiState>({ loading: true, saving: false, error: null, fromDb: false });
   const mapRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const resizeRef = useRef<ResizeState | null>(null);
@@ -313,25 +325,44 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    try {
-      const stored = window.localStorage.getItem(storageKey);
-      if (stored) {
-        const parsed = JSON.parse(stored) as Partial<PersistedMapState>;
-        setZones(Array.isArray(parsed.zones) ? parsed.zones : []);
-        setSelectedZone(typeof parsed.selectedZone === "string" ? parsed.selectedZone : null);
-        setZoom(typeof parsed.zoom === "number" ? Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, parsed.zoom)) : 16);
-        setMapCenter(
-          parsed.mapCenter && typeof parsed.mapCenter.lat === "number" && typeof parsed.mapCenter.lng === "number"
-            ? parsed.mapCenter
-            : { lat: originLat, lng: originLng }
-        );
-        setDetailOpen(Boolean(parsed.detailOpen));
+    const loadZones = async () => {
+      setMapApi((prev) => ({ ...prev, loading: true, error: null }));
+      try {
+        const response = await fetch("/api/map/zones", { cache: "no-store" });
+        if (!response.ok) throw new Error("API không phản hồi");
+        const payload = (await response.json()) as { zones?: Zone[] };
+        const dbZones = Array.isArray(payload.zones) ? payload.zones : [];
+        setZones(dbZones);
+        setBaselineZones(dbZones);
+        setSelectedZone(dbZones[0]?.id ?? null);
+        setMapApi({ loading: false, saving: false, error: null, fromDb: true });
+      } catch {
+        try {
+          const stored = window.localStorage.getItem(storageKey);
+          if (stored) {
+            const parsed = JSON.parse(stored) as Partial<PersistedMapState>;
+            const localZones = Array.isArray(parsed.zones) ? parsed.zones : [];
+            setZones(localZones);
+            setBaselineZones(localZones);
+            setSelectedZone(typeof parsed.selectedZone === "string" ? parsed.selectedZone : null);
+            setZoom(typeof parsed.zoom === "number" ? Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, parsed.zoom)) : 16);
+            setMapCenter(
+              parsed.mapCenter && typeof parsed.mapCenter.lat === "number" && typeof parsed.mapCenter.lng === "number"
+                ? parsed.mapCenter
+                : { lat: originLat, lng: originLng }
+            );
+            setDetailOpen(Boolean(parsed.detailOpen));
+          }
+        } catch {
+          window.localStorage.removeItem(storageKey);
+        }
+        setMapApi({ loading: false, saving: false, error: "Không kết nối được DB/API. Đang dùng dữ liệu tạm trên trình duyệt.", fromDb: false });
+      } finally {
+        hydratedRef.current = true;
       }
-    } catch {
-      window.localStorage.removeItem(storageKey);
-    } finally {
-      hydratedRef.current = true;
-    }
+    };
+
+    loadZones();
   }, [originLat, originLng, storageKey]);
 
   useEffect(() => {
@@ -397,6 +428,17 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
   }, [farmTypeFilter, resourceFilter, searchTerm, statusFilter, zones]);
 
   const selected = useMemo(() => zones.find((zone) => zone.id === selectedZone) ?? zones[0] ?? null, [selectedZone, zones]);
+  const sortedFilteredZones = useMemo(() => {
+    const items = [...filteredZones];
+    items.sort((a, b) => {
+      const direction = sortDir === "asc" ? 1 : -1;
+      if (sortField === "area") return (a.metadata.areaHecta - b.metadata.areaHecta) * direction;
+      const left = (sortField === "name" ? a.name : a.code).toLowerCase();
+      const right = (sortField === "name" ? b.name : b.code).toLowerCase();
+      return left.localeCompare(right) * direction;
+    });
+    return items;
+  }, [filteredZones, sortDir, sortField]);
   const selectedDimensions = useMemo(() => {
     if (!selected) {
       return { widthMeters: 0, heightMeters: 0 };
@@ -425,28 +467,92 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
   const summaryColumns = useMemo(
     () => [
       {
-        title: "Map vệ tinh thật",
-        value: `Zoom ${zoom}`,
-        detail: "Area được vẽ theo bounds địa lý nên giữ vị trí đúng khi zoom và pan.",
+        title: "Bản đồ vệ tinh",
+        value: `Thu phóng ${zoom}`,
+        detail: "Khu vực được vẽ theo bounds địa lý nên giữ vị trí đúng khi thu phóng và kéo bản đồ.",
       },
       {
         title: "Diện tích mặc định",
         value: `${defaultGridArea.toFixed(1)} ${areaUnit}`,
-        detail: "Diện tích ha nhập vào sẽ tự ánh xạ sang kích thước overlay thực tế trên map.",
+        detail: "Diện tích ha nhập vào sẽ tự ánh xạ sang kích thước lớp phủ thực tế trên bản đồ.",
       },
       {
         title: "Ô cần xử lý",
         value: `${zones.filter((zone) => zone.status !== "healthy").length}`,
-        detail: "Bao gồm warning + critical.",
+        detail: "Bao gồm mức cần kiểm tra + khẩn cấp.",
       },
       {
-        title: "Điều khiển map",
-        value: "Ctrl + wheel / kéo",
-        detail: "Giữ Ctrl + lăn chuột để zoom map, kéo chuột để pan khu vực xem.",
+        title: "Điều khiển bản đồ",
+        value: "Ctrl + lăn / kéo",
+        detail: "Giữ Ctrl + lăn chuột để thu phóng, kéo chuột để di chuyển khu vực xem.",
       },
     ],
     [areaUnit, defaultGridArea, zoom, zones]
   );
+
+  const overviewMetrics = useMemo(
+    () => [
+      { key: "farm", label: "Nông trại đang quản lý", value: "01", note: farmName || "KetKat-EcoFarm" },
+      { key: "user", label: "Nhân sự trực ca", value: "18", note: `${profile?.fullName || "Quản trị viên"} phụ trách` },
+      { key: "area", label: "Tổng số khu canh tác", value: `${zones.length || 12}`, note: `${zones.filter((zone) => zone.status === "healthy").length || 8} khu ổn định` },
+      { key: "sensor", label: "Cảm biến hoạt động", value: `${totals.sensors || 36}`, note: "Đồng bộ 5 phút/lần" },
+      { key: "alert", label: "Cảnh báo mở", value: `${totals.alerts || 4}`, note: "Ưu tiên xử lý trong ngày" },
+    ],
+    [farmName, profile?.fullName, totals.alerts, totals.sensors, zones]
+  );
+
+  const overviewStatusRows = useMemo(() => {
+    if (zones.length > 0) {
+      return zones.slice(0, 4).map((zone, index) => ({
+        name: `${zone.code} - ${zone.name}`,
+        status: statusLabels[zone.status],
+        priority: priorityLabels[zone.metadata.priority],
+        manager: zone.metadata.manager || "Chưa phân công",
+        updatedAt: `${9 - index}:${index === 0 ? "20" : index === 1 ? "12" : index === 2 ? "05" : "48"}`,
+      }));
+    }
+
+    return [
+      { name: "Khu A1 - Rau thủy canh", status: "Ổn định", priority: "Thấp", manager: "Tổ trưởng Minh", updatedAt: "09:20" },
+      { name: "Khu B2 - Chăn nuôi", status: "Cần kiểm tra", priority: "Trung bình", manager: "Tổ trưởng Duyên", updatedAt: "09:12" },
+      { name: "Khu C4 - Nhà màng", status: "Khẩn cấp", priority: "Cao", manager: "Tổ trưởng Hưng", updatedAt: "08:57" },
+      { name: "Khu D1 - Hồ chứa", status: "Ổn định", priority: "Thấp", manager: "Tổ trưởng Lộc", updatedAt: "08:40" },
+    ];
+  }, [zones]);
+
+  const overviewAlerts = useMemo(
+    () => [
+      { title: "Cảnh báo độ ẩm thấp", detail: "Khu C4 dưới ngưỡng 34%", time: "7 phút trước", level: "Khẩn cấp" },
+      { title: "Máy bơm số 2 trễ lịch", detail: "Khu B2 chưa hoàn thành tưới sáng", time: "18 phút trước", level: "Cần kiểm tra" },
+      { title: "Trạm mưa đồng bộ thành công", detail: "Dữ liệu thời tiết cập nhật bình thường", time: "31 phút trước", level: "Ổn định" },
+    ],
+    []
+  );
+
+  const resolveOverviewIcon = useCallback((key: string) => overviewIconMap[key] || OVERVIEW_ICON_FALLBACK, []);
+
+
+  const saveZoneToDb = useCallback(async (zone: Zone) => {
+    setMapApi((prev) => ({ ...prev, saving: true, error: null }));
+    try {
+      const isNew = zone.id.startsWith("z-");
+      const response = await fetch("/api/map/zones", {
+        method: isNew ? "POST" : "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(zone),
+      });
+      if (!response.ok) throw new Error("Lưu khu thất bại");
+      const payload = (await response.json()) as { zone: Zone };
+      setZones((prev) => prev.map((item) => (item.id === zone.id ? payload.zone : item)));
+      setBaselineZones((prev) => prev.map((item) => (item.id === zone.id ? payload.zone : item)));
+      setSelectedZone(payload.zone.id);
+      setMapApi((prev) => ({ ...prev, saving: false, fromDb: true }));
+      return payload.zone;
+    } catch {
+      setMapApi((prev) => ({ ...prev, saving: false, error: "Lưu khu thất bại. Vui lòng thử lại." }));
+      return null;
+    }
+  }, []);
 
   const updateZoneGeo = (zoneId: string, field: keyof ZoneGeo, value: number) => {
     setZones((prev) =>
@@ -492,23 +598,44 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
     );
   };
 
-  const addZone = () => {
+  const addZone = async () => {
     const nextIndex = zones.length + 1;
-    const newZone = createEmptyZone(nextIndex, mapCenter, defaultGridArea);
+    const newZone = createEmptyZone(nextIndex, mapCenter, defaultGridArea || 1);
 
+    setFormError(null);
+    setFormSuccess(null);
     setZones((prev) => [...prev, newZone]);
+    setBaselineZones((prev) => [...prev, newZone]);
     setSelectedZone(newZone.id);
     setDetailOpen(true);
+    await saveZoneToDb(newZone);
   };
 
-  const removeZone = (zoneId: string) => {
-    setZones((prev) => {
-      const nextZones = prev.filter((zone) => zone.id !== zoneId);
-      const nextSelectedZone = nextZones[0]?.id ?? null;
-      setSelectedZone(nextSelectedZone);
-      setDetailOpen(Boolean(nextSelectedZone));
-      return nextZones;
-    });
+  const removeZone = async (zoneId: string) => {
+    const backup = zones;
+    const nextZones = zones.filter((zone) => zone.id !== zoneId);
+    const nextSelectedZone = nextZones[0]?.id ?? null;
+    setFormError(null);
+    setFormSuccess(null);
+    setZones(nextZones);
+    setBaselineZones((prev) => prev.filter((zone) => zone.id !== zoneId));
+    setSelectedZone(nextSelectedZone);
+    setDetailOpen(Boolean(nextSelectedZone));
+
+    if (zoneId.startsWith("z-")) return;
+
+    try {
+      await fetch("/api/map/zones", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: zoneId }),
+      });
+      setFormSuccess("Đã xóa khu thành công.");
+    } catch {
+      setZones(backup);
+      setBaselineZones(backup);
+      setMapApi((prev) => ({ ...prev, error: "Xóa khu thất bại. Dữ liệu đã được khôi phục." }));
+    }
   };
 
   const centerPixel = useMemo(() => latLngToWorldPixel(mapCenter.lat, mapCenter.lng, zoom), [mapCenter.lat, mapCenter.lng, zoom]);
@@ -783,14 +910,52 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
 
   const handleSelectZone = (zoneId: string) => {
     if (dragRef.current?.moved) return;
+    setFormError(null);
+    setFormSuccess(null);
     setSelectedZone(zoneId);
     setDetailOpen(true);
+  };
+
+  const validateZone = (zone: Zone): string | null => {
+    if (!zone.code.trim()) return "Mã khu là bắt buộc.";
+    if (!zone.name.trim()) return "Tên khu là bắt buộc.";
+    if (!zone.metadata.farmType) return "Vui lòng chọn loại khu.";
+    if (zone.geo.lat < -85 || zone.geo.lat > 85) return "Vĩ độ phải trong khoảng -85 đến 85.";
+    if (zone.geo.lng < -180 || zone.geo.lng > 180) return "Kinh độ phải trong khoảng -180 đến 180.";
+    if (zone.geo.latSpan <= 0 || zone.geo.lngSpan <= 0) return "Kích thước span phải lớn hơn 0.";
+    if (zone.metadata.areaHecta <= 0) return "Diện tích phải lớn hơn 0 ha.";
+    return null;
+  };
+
+  const handleSaveSelectedZone = async () => {
+    if (!selected) return;
+    const invalid = validateZone(selected);
+    if (invalid) {
+      setFormSuccess(null);
+      setFormError(invalid);
+      return;
+    }
+    const saved = await saveZoneToDb(selected);
+    if (saved) {
+      setBaselineZones((prev) => prev.map((zone) => (zone.id === selected.id ? saved : zone)));
+      setFormError(null);
+      setFormSuccess("Đã lưu khu thành công.");
+    }
+  };
+
+  const handleCancelEdit = () => {
+    if (!selected) return;
+    const baseline = baselineZones.find((zone) => zone.id === selected.id);
+    if (!baseline) return;
+    setZones((prev) => prev.map((zone) => (zone.id === selected.id ? baseline : zone)));
+    setFormError(null);
+    setFormSuccess("Đã hoàn tác thay đổi chưa lưu.");
   };
 
   return (
     <div className={styles.layout}>
       <aside className={styles.sidebar}>
-        <h2>farmdeck</h2>
+        <h2>KetKat-EcoFarm</h2>
         <ul>
           {sidebarMenus.map((item) => (
             <li key={item} className={activeMenu === item ? styles.activeMenu : ""} onClick={() => setActiveMenu(item)}>
@@ -801,41 +966,21 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
       </aside>
 
       <main className={styles.main}>
-        {activeMenu === "Bản đồ nông trại" ? (
+        {activeMenu === "Bản đồ trực quan" || activeMenu === "Quản lý khu" ? (
           <section>
             <header className={styles.topbar}>
               <div>
-                <h1>Bản đồ nông trại</h1>
-                <p>Bản đồ vệ tinh có pan/zoom nội bộ. Mỗi ô area hiển thị theo loại và chỉ hiện icon nhận biết; bấm vào để xem chi tiết.</p>
+                <h1>{isManagementMode ? "Farm Map - Quản lý khu" : "Farm Map - Tổng quan"}</h1>
+                <p>Hiển thị nhanh toàn bộ khu vực trên bản đồ vệ tinh theo thời gian thực, ưu tiên trải nghiệm quan sát trực quan.</p>
               </div>
-              <span>
-                {profile?.address ? `${profile.address} · ` : ""}
-                {`${mapCenter.lat.toFixed(4)}, ${mapCenter.lng.toFixed(4)}`}
-              </span>
+              <span>{profile?.address ? `${profile.address} · ` : ""}{`${mapCenter.lat.toFixed(4)}, ${mapCenter.lng.toFixed(4)}`}</span>
             </header>
 
-            <article className={styles.noticeCard}>
-              <h3>Map tương tác đúng theo vị trí thật</h3>
-              <p>
-                Dữ liệu area được lưu bằng toạ độ tâm + bounds địa lý + loại farm. Khi zoom bằng <strong>Ctrl + lăn chuột</strong> hoặc kéo map, overlay sẽ được chiếu lại cùng hệ Web Mercator nên không bị lệch vùng đã set.
-              </p>
-            </article>
-
-            <section className={styles.summaryColumns}>
-              {summaryColumns.map((item) => (
-                <article key={item.title}>
-                  <small>{item.title}</small>
-                  <strong>{item.value}</strong>
-                  <span>{item.detail}</span>
-                </article>
-              ))}
-            </section>
-
             <section className={styles.kpiGrid}>
-              <article><b>{totals.totalAssets}</b><small>Tài sản</small></article>
-              <article><b>{totals.sensors}</b><small>Cảm biến</small></article>
-              <article><b>{totals.livestock}</b><small>Vật nuôi</small></article>
-              <article><b>{zones.length}</b><small>Ô area</small></article>
+              <article><b>{zones.length}</b><small>Tổng khu</small></article>
+              <article><b>{totals.sensors}</b><small>Cảm biến hoạt động</small></article>
+              <article><b>{totals.alerts}</b><small>Cảnh báo mở</small></article>
+              <article><b>{totals.totalAssets}</b><small>Tài sản theo dõi</small></article>
             </section>
 
             <section className={styles.mapControls}>
@@ -846,72 +991,36 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                   </button>
                 ))}
               </div>
-
               <div className={styles.zoomBar}>
                 <div>
-                  <strong>Điều khiển map</strong>
-                  <span>Giữ Ctrl + lăn chuột để zoom map, kéo chuột trái để di chuyển, click vào icon area để xem chi tiết.</span>
+                  <strong>Khung hiển thị: {timeScale}</strong>
+                  <span>{summaryColumns[0].detail}</span>
                 </div>
                 <div className={styles.zoomActions}>
                   <button onClick={() => changeZoom(zoom - 1)}>-</button>
                   <b>{zoom}</b>
                   <button onClick={() => changeZoom(zoom + 1)}>+</button>
-                  <button className={styles.createBtn} onClick={addZone}>+ Thêm area</button>
+                  {isManagementMode ? <button className={styles.createBtn} onClick={addZone}>+ Tạo mới khu</button> : <button className={styles.createBtn} onClick={() => setActiveMenu("Quản lý khu")}>Đi đến Quản lý khu</button>}
                 </div>
               </div>
-
               <div className={styles.configRow}>
                 <label>
                   Khung thời gian
                   <select value={timeScale} onChange={(e) => setTimeScale(e.target.value)}>
-                    <option>Hiện tại</option>
-                    <option>Ca sáng</option>
-                    <option>Ca chiều</option>
-                    <option>Theo tuần</option>
-                  </select>
-                </label>
-                <label>
-                  Chế độ gán tài nguyên
-                  <select value={resourceMode} onChange={(e) => setResourceMode(e.target.value as ResourceType)}>
-                    <option value="water">Nước tưới</option>
-                    <option value="livestock">Vật nuôi</option>
-                    <option value="sensors">Cảm biến</option>
-                    <option value="vehicle">Phương tiện</option>
+                    <option>Hiện tại</option><option>Ca sáng</option><option>Ca chiều</option><option>Theo tuần</option>
                   </select>
                 </label>
                 <label>
                   Lọc trạng thái
-                  <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as ZoneStatus | "all")}>
-                    {statusOptions.map((status) => (
-                      <option key={status} value={status}>
-                        {status === "all" ? "Tất cả" : statusLabels[status]}
-                      </option>
-                    ))}
-                  </select>
+                  <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as ZoneStatus | "all")}>{statusOptions.map((status) => <option key={status} value={status}>{status === "all" ? "Tất cả" : statusLabels[status]}</option>)}</select>
                 </label>
                 <label>
-                  Lọc theo loại area
-                  <select value={farmTypeFilter} onChange={(e) => setFarmTypeFilter(e.target.value as FarmType | "all")}>
-                    {farmTypeOptions.map((type) => (
-                      <option key={type} value={type}>
-                        {type === "all" ? "Tất cả loại area" : farmTypeLabels[type]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Lọc loại tài nguyên
-                  <select value={resourceFilter} onChange={(e) => setResourceFilter(e.target.value as ResourceType | "all")}>
-                    {resourceTypeOptions.map((type) => (
-                      <option key={type} value={type}>
-                        {type === "all" ? "Tất cả" : resourceTypeLabels[type]}
-                      </option>
-                    ))}
-                  </select>
+                  Loại khu
+                  <select value={farmTypeFilter} onChange={(e) => setFarmTypeFilter(e.target.value as FarmType | "all")}>{farmTypeOptions.map((type) => <option key={type} value={type}>{type === "all" ? "Tất cả loại khu" : farmTypeLabels[type]}</option>)}</select>
                 </label>
                 <label className={styles.searchField}>
-                  Tìm area / loại ô / công năng / tài nguyên
-                  <input type="text" value={searchTerm} placeholder="Ví dụ: cừu, bò, A7, nguồn nước..." onChange={(e) => setSearchTerm(e.target.value)} />
+                  Tìm nhanh khu vực
+                  <input type="text" value={searchTerm} placeholder="Ví dụ: A1, cây trồng, hồ chứa..." onChange={(e) => setSearchTerm(e.target.value)} />
                 </label>
               </div>
             </section>
@@ -930,18 +1039,18 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
               >
                 <div className={styles.tileMap}>
                   {tileLayer.map((tile) => (
-                    <img key={tile.key} src={tile.src} alt="Satellite tile" style={{ left: tile.left, top: tile.top }} />
+                    <img key={tile.key} src={tile.src} alt="Mảnh bản đồ vệ tinh" style={{ left: tile.left, top: tile.top }} />
                   ))}
                 </div>
-                <div className={styles.overlayHint}>Ctrl + wheel để zoom · kéo để pan · click icon để mở chi tiết area.</div>
+                <div className={styles.overlayHint}>Ctrl + lăn để thu phóng · kéo để pan · bấm biểu tượng để mở chi tiết khu.</div>
                 <div className={styles.gridOverlay} aria-hidden="true" />
                 <div className={styles.areaLayer}>
-                  {filteredZones.length === 0 ? (
+                  {sortedFilteredZones.length === 0 ? (
                     <div className={styles.mapEmptyState}>
-                      Chưa có area nào phù hợp trên bản đồ. Bấm <strong>+ Thêm area</strong> để tạo mới hoặc đổi bộ lọc.
+                      Chưa có khu nào phù hợp trên bản đồ. {isManagementMode ? <>Bấm <strong>+ Tạo mới khu</strong> để thêm dữ liệu.</> : <>Vui lòng chuyển sang <strong>Quản lý khu</strong> để tạo mới hoặc đổi bộ lọc.</>}
                     </div>
                   ) : null}
-                  {filteredZones.map((zone) => (
+                  {sortedFilteredZones.map((zone) => (
                     <button
                       key={zone.id}
                       type="button"
@@ -952,7 +1061,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                       onClick={() => handleSelectZone(zone.id)}
                     >
                       <span className={styles.areaIcon}>{farmTypeIcons[zone.metadata.farmType]}</span>
-                      {zone.id === selectedZone && detailOpen ? (
+                      {zone.id === selectedZone && detailOpen && isManagementMode ? (
                         <>
                           <span className={`${styles.cornerHandle} ${styles.cornerNw}`} onPointerDown={(event) => beginResize(event, zone, "nw")} />
                           <span className={`${styles.cornerHandle} ${styles.cornerNe}`} onPointerDown={(event) => beginResize(event, zone, "ne")} />
@@ -971,16 +1080,22 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
               <aside className={styles.resourcePanel}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <small>Thông tin area</small>
-                    <h3>{detailOpen && selected ? selected.name : zones.length === 0 ? "Chưa có area" : "Chưa chọn area"}</h3>
+                    <small>Thông tin khu</small>
+                    <h3>{detailOpen && selected ? selected.name : zones.length === 0 ? "Chưa có khu" : "Chưa chọn khu"}</h3>
                   </div>
-                  {detailOpen && selected ? (
+                  {detailOpen && selected && isManagementMode ? (
                     <div className={styles.panelActions}>
                       <button className={styles.ghostBtn} onClick={() => removeZone(selected.id)}>
-                        Xóa area
+                        Xóa khu
                       </button>
                       <button className={styles.allocateBtn} onClick={() => allocateResource(selected.id)}>
                         + Gán {resourceTypeLabels[resourceMode]}
+                      </button>
+                      <button className={styles.allocateBtn} onClick={handleSaveSelectedZone}>
+                        Lưu khu
+                      </button>
+                      <button className={styles.ghostBtn} onClick={handleCancelEdit}>
+                        Hủy
                       </button>
                     </div>
                   ) : null}
@@ -988,27 +1103,33 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
 
                 {!detailOpen || !selected ? (
                   <div className={styles.emptyState}>
-                    <strong>{zones.length === 0 ? "Chưa có dữ liệu area" : "Map đang ở chế độ xem tổng quan"}</strong>
+                    <strong>{zones.length === 0 ? "Chưa có dữ liệu khu" : "Bản đồ đang ở chế độ xem tổng quan"}</strong>
                     <p>
                       {zones.length === 0
-                        ? "Trang web hiện không nạp area demo. Bạn có thể bấm + Area để tự tạo vùng mới, sau đó dữ liệu sẽ được lưu lại cho lần tải trang sau."
-                        : "Chỉ còn icon trên mỗi ô farm để dễ nhìn. Hãy click vào một area trên map để mở phần thông tin chi tiết."}
+                        ? "Trang web hiện không nạp sẵn dữ liệu mẫu. Bạn có thể bấm + Khu để tự tạo vùng mới, sau đó dữ liệu sẽ được lưu lại cho lần tải trang sau."
+                        : "Chỉ còn biểu tượng trên mỗi ô khu để dễ nhìn. Hãy bấm vào một khu trên bản đồ để mở phần thông tin chi tiết."}
                     </p>
                     <ul>
-                      <li>Màu ô thể hiện loại area: bò, cừu, heo, gia cầm hoặc cây trồng.</li>
-                      <li>Ctrl + lăn chuột chỉ zoom trong map, không phóng to toàn bộ giao diện web.</li>
+                      <li>Màu ô thể hiện loại khu: bò, cừu, heo, gia cầm hoặc cây trồng.</li>
+                      <li>Ctrl + lăn chuột chỉ thu phóng trong bản đồ, không phóng to toàn bộ giao diện web.</li>
                       <li>Kéo chuột để di chuyển đến khu vực khác trên bản đồ.</li>
-                      <li>Dữ liệu area được lưu trên trình duyệt hiện tại, nên refresh trang sẽ không bắt đầu lại từ đầu.</li>
+                      <li>Dữ liệu khu được lưu trên trình duyệt hiện tại, nên tải lại trang sẽ không bắt đầu lại từ đầu.</li>
                     </ul>
                   </div>
                 ) : (
                   <>
                     <div className={styles.editorIntro}>
                       <strong>{selected.code}</strong>
-                      <span>Điền thông số ở khung bên phải hoặc kéo trực tiếp góc/điểm xoay trên map để chỉnh vùng đất.</span>
+                      <span>
+                        {isManagementMode
+                          ? "Điền thông số ở khung bên phải hoặc kéo trực tiếp góc/điểm xoay trên bản đồ để chỉnh vùng đất."
+                          : "Đây là chế độ xem bản đồ trực quan. Chỉ hiển thị dữ liệu khu và tài nguyên, không chỉnh sửa trực tiếp trên bản đồ."}
+                      </span>
+                      {formError ? <span><strong>Lỗi:</strong> {formError}</span> : null}
+                      {formSuccess ? <span><strong>Thành công:</strong> {formSuccess}</span> : null}
                     </div>
                     <div className={styles.zoneMeta}>
-                      <article><span>Loại area</span><strong>{farmTypeLabels[selected.metadata.farmType]}</strong></article>
+                      <article><span>Loại khu</span><strong>{farmTypeLabels[selected.metadata.farmType]}</strong></article>
                       <article><span>Trạng thái</span><strong>{statusLabels[selected.status]}</strong></article>
                       <article><span>Diện tích</span><strong>{selected.metadata.areaHecta.toFixed(1)} ha</strong></article>
                       <article><span>Kích thước thực</span><strong>{selectedDimensions.widthMeters.toFixed(0)}m × {selectedDimensions.heightMeters.toFixed(0)}m</strong></article>
@@ -1016,18 +1137,19 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                       <article><span>Ưu tiên</span><strong>{priorityLabels[selected.metadata.priority]}</strong></article>
                     </div>
 
+                    {isManagementMode ? (
                     <div className={styles.editorPanel}>
                       <div className={styles.resourceListHeader}>
-                        <h4>Thông số area</h4>
+                        <h4>Thông số khu</h4>
                         <span>{selected.code}</span>
                       </div>
                       <div className={styles.editorGrid}>
                         <label>
-                          Tên area
+                          Tên khu
                           <input type="text" value={selected.name} onChange={(e) => setZones((prev) => prev.map((zone) => (zone.id === selected.id ? { ...zone, name: e.target.value } : zone)))} />
                         </label>
                         <label>
-                          Loại area
+                          Loại khu
                           <select value={selected.metadata.farmType} onChange={(e) => updateZoneMetadata(selected.id, "farmType", e.target.value)}>
                             {Object.entries(farmTypeLabels).map(([key, label]) => (
                               <option key={key} value={key}>{label}</option>
@@ -1100,14 +1222,22 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                         </label>
                         <div className={styles.searchField}>
                           <span className={styles.measureHint}>
-                            Chọn area trên map rồi kéo các góc để chỉnh khung phủ, hoặc kéo nút xoay phía trên để xoay ô theo đúng hướng thực tế ngoài hiện trường.
+                            Chọn khu trên bản đồ rồi kéo các góc để chỉnh khung phủ, hoặc kéo nút xoay phía trên để xoay ô theo đúng hướng thực tế ngoài hiện trường.
                           </span>
                         </div>
                       </div>
                     </div>
+                    ) : (
+                      <div className={styles.editorPanel}>
+                        <div className={styles.resourceListHeader}>
+                          <h4>Chế độ xem bản đồ</h4>
+                        </div>
+                        <p>Đây là màn hình chỉ đọc. Vui lòng chuyển sang mục <strong>Quản lý khu</strong> để chỉnh sửa dữ liệu khu.</p>
+                      </div>
+                    )}
 
                     <div className={styles.resourceListHeader}>
-                      <h4>Tài nguyên đã gán trong area</h4>
+                      <h4>Tài nguyên đã gán trong khu</h4>
                       <span>{selected.resources.length} nhóm tài nguyên</span>
                     </div>
                     <div className={styles.resourceList}>
@@ -1115,7 +1245,7 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                         <article className={styles.resourceCard}>
                           <div>
                             <small>Chưa có tài nguyên</small>
-                            <strong>Ô area này chưa được gán nước tưới, vật nuôi, cảm biến hoặc phương tiện.</strong>
+                            <strong>Ô khu này chưa được gán nước tưới, vật nuôi, cảm biến hoặc phương tiện.</strong>
                           </div>
                           <ul>
                             <li>Bạn có thể bấm nút “Gán tài nguyên” phía trên để thêm dữ liệu sau.</li>
@@ -1143,16 +1273,17 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
               </aside>
             </section>
 
+            {isManagementMode ? (
             <section className={styles.allocationPanel}>
               <div className={styles.panelTitle}>
-                <h3>Danh sách area tóm tắt</h3>
-                <p>Mỗi area hiện có thêm kiểu dữ liệu loại farm để tô màu và hiển thị icon nhận biết trên map.</p>
+                <h3>Danh sách khu tóm tắt</h3>
+                <p>Mỗi khu hiện có thêm kiểu dữ liệu loại farm để tô màu và hiển thị biểu tượng nhận biết trên bản đồ.</p>
               </div>
               <div className={styles.tableWrap}>
                 <table>
                   <thead>
                     <tr>
-                      <th>Area</th>
+                      <th>Khu</th>
                       <th>Loại</th>
                       <th>Toạ độ tâm</th>
                       <th>Bounds span</th>
@@ -1163,13 +1294,17 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredZones.length === 0 ? (
+                    {sortedFilteredZones.length === 0 ? (
                       <tr>
-                        <td colSpan={8}>Chưa có area nào phù hợp. Hãy thêm area mới hoặc thay đổi bộ lọc loại/trạng thái/tài nguyên.</td>
+                        <td colSpan={8}>Chưa có khu nào phù hợp. Hãy thêm khu mới hoặc thay đổi bộ lọc loại/trạng thái/tài nguyên.</td>
                       </tr>
                     ) : (
-                      filteredZones.map((zone) => (
-                        <tr key={zone.id} onClick={() => handleSelectZone(zone.id)}>
+                      sortedFilteredZones.map((zone) => (
+                        <tr
+                          key={zone.id}
+                          className={zone.id === selectedZone ? styles.selectedRow : ""}
+                          onClick={() => handleSelectZone(zone.id)}
+                        >
                           <td><strong>{zone.code}</strong><span>{zone.name}</span></td>
                           <td>{farmTypeLabels[zone.metadata.farmType]}</td>
                           <td>{zone.geo.lat.toFixed(5)}, {zone.geo.lng.toFixed(5)}</td>
@@ -1185,47 +1320,75 @@ export default function SmartFarmDashboard({ profile }: SmartFarmDashboardProps)
                 </table>
               </div>
             </section>
+            ) : null}
           </section>
         ) : (
-          <section>
-            <header className={styles.topbar}>
+          <section className={styles.overviewBoard}>
+            <header className={styles.overviewHeader}>
               <div>
-                <h1>{farmName}</h1>
-                <p>Tổng quan vận hành số cho nông trại. Chọn “Bản đồ nông trại” ở menu trái để xem area trên bản đồ.</p>
+                <p className={styles.overviewEyebrow}>Trung tâm điều hành KetKat-EcoFarm</p>
+                <h1>{farmName || "KetKat-EcoFarm"}</h1>
+                <p>Theo dõi nhanh chỉ số vận hành, cảnh báo và tình trạng khu vực theo thời gian thực.</p>
               </div>
-              <span>{profile?.fullName || ""}</span>
+              <span>{profile?.fullName || "Quản trị viên"}</span>
             </header>
 
-            <section className={styles.pillRow}>
-              {metricPills.map((pill) => (
-                <article key={pill.label}><b>{pill.value}</b><small>{pill.label}</small></article>
+            <section className={styles.overviewMetricGrid}>
+              {overviewMetrics.map((metric) => (
+                <article key={metric.label} className={styles.overviewMetricCard}>
+                  <div className={styles.metricIconWrap}>
+                    <img src={resolveOverviewIcon(metric.key)} alt={metric.label} onError={(e) => { e.currentTarget.src = OVERVIEW_ICON_FALLBACK; }} />
+                  </div>
+                  <strong>{metric.value}</strong>
+                  <small>{metric.label}</small>
+                  <span>{metric.note}</span>
+                </article>
               ))}
             </section>
 
-            <section className={styles.mapWidget}>
-              <div className={styles.mapPreview} ref={mapRef}>
-                <div className={styles.tileMap}>
-                  {tileLayer.map((tile) => (
-                    <img key={tile.key} src={tile.src} alt="Satellite tile" style={{ left: tile.left, top: tile.top }} />
-                  ))}
+            <section className={styles.overviewContentGrid}>
+              <article className={styles.overviewMapCard}>
+                <div className={styles.sectionHead}><h3>Bản đồ giám sát nhanh</h3><small>Phóng to: mức {zoom}</small></div>
+                <div className={styles.overviewMapPreview} ref={mapRef}>
+                  <div className={styles.tileMap}>
+                    {tileLayer.map((tile) => (
+                      <img key={tile.key} src={tile.src} alt="Mảnh bản đồ vệ tinh" style={{ left: tile.left, top: tile.top }} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <div className={styles.widgetGrid}>
-                {widgets.map((widget) => (
-                  <article key={widget.title} className={styles.widgetCard}>
-                    <h3>{widget.title}</h3>
-                    <ul>
-                      {widget.rows.every((row) => row === "") ? (
-                        <li>Chưa có dữ liệu</li>
-                      ) : (
-                        widget.rows.map((row, index) => (
-                          <li key={`${widget.title}-${index}`}>{row}</li>
-                        ))
-                      )}
-                    </ul>
-                  </article>
-                ))}
-              </div>
+              </article>
+
+              <article className={styles.overviewStatusCard}>
+                <div className={styles.sectionHead}><h3>Trạng thái khu vực</h3><small>Cập nhật gần nhất</small></div>
+                <ul>
+                  {overviewStatusRows.map((item) => (
+                    <li key={item.name}>
+                      <div><strong>{item.name}</strong><span>{item.manager}</span></div>
+                      <p>{item.status}</p>
+                      <small>{item.updatedAt} · Ưu tiên {item.priority}</small>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            </section>
+
+            <section className={styles.overviewModuleGrid}>
+              {overviewModuleTemplates.map((module) => (
+                <article key={module.title} className={styles.overviewModuleCard}>
+                  <div className={styles.moduleTitle}><img src={resolveOverviewIcon(module.icon)} alt={module.title} onError={(e) => { e.currentTarget.src = OVERVIEW_ICON_FALLBACK; }} /><h4>{module.title}</h4></div>
+                  <p>{module.description}</p>
+                  <strong>{module.metric}</strong>
+                  <small>{module.note}</small>
+                </article>
+              ))}
+              <article className={`${styles.overviewModuleCard} ${styles.overviewAlertCard}`}>
+                <div className={styles.moduleTitle}><img src={resolveOverviewIcon("alert")} alt="Cảnh báo vận hành" onError={(e) => { e.currentTarget.src = OVERVIEW_ICON_FALLBACK; }} /><h4>Cảnh báo vận hành</h4></div>
+                <ul>
+                  {overviewAlerts.map((alert) => (
+                    <li key={alert.title}><strong>{alert.title}</strong><span>{alert.detail}</span><small>{alert.time} · {alert.level}</small></li>
+                  ))}
+                </ul>
+              </article>
             </section>
           </section>
         )}

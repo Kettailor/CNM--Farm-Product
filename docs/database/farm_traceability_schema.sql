@@ -795,6 +795,153 @@ create table health_treatments (
   notes text
 );
 
+
+-- =========================
+-- FARM MAP / PLANNER / TASKS / SPRAYING / ORCHARD / SETTINGS
+-- =========================
+create table map_layers (
+  id uuid primary key default gen_random_uuid(),
+  farm_id uuid not null references farms(id) on delete cascade,
+  layer_code varchar(50) not null unique,
+  layer_name varchar(255) not null,
+  layer_type varchar(50) not null, -- paddock, field, water, fence, road, sensor, custom
+  is_enabled boolean not null default true,
+  style_json jsonb not null default '{}'::jsonb,
+  display_order integer not null default 100,
+  created_by uuid references farm_users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create table map_features (
+  id uuid primary key default gen_random_uuid(),
+  farm_id uuid not null references farms(id) on delete cascade,
+  layer_id uuid not null references map_layers(id) on delete cascade,
+  feature_code varchar(50) not null unique,
+  feature_name varchar(255),
+  geometry_geojson jsonb not null,
+  centroid_latitude numeric(9,6),
+  centroid_longitude numeric(9,6),
+  linked_entity_type varchar(50),
+  linked_entity_id uuid,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table spray_condition_logs (
+  id uuid primary key default gen_random_uuid(),
+  farm_id uuid not null references farms(id) on delete cascade,
+  field_id uuid references fields(id) on delete set null,
+  paddock_id uuid references paddocks(id) on delete set null,
+  weather_station_id uuid references weather_stations(id) on delete set null,
+  measured_at timestamptz not null,
+  wind_speed_kmh numeric(8,2),
+  wind_direction_deg numeric(6,2),
+  temperature_c numeric(6,2),
+  humidity_percent numeric(6,2),
+  rain_forecast_mm numeric(10,2),
+  inversion_risk severity_level,
+  spray_window_status varchar(30), -- good, caution, blocked
+  notes text
+);
+
+create table spray_operations (
+  id uuid primary key default gen_random_uuid(),
+  farm_id uuid not null references farms(id) on delete cascade,
+  operation_code varchar(50) not null unique,
+  field_id uuid references fields(id) on delete set null,
+  paddock_id uuid references paddocks(id) on delete set null,
+  vehicle_id uuid references vehicles(id) on delete set null,
+  operator_id uuid references farm_users(id) on delete set null,
+  chemical_usage_log_id uuid references chemical_usage_logs(id) on delete set null,
+  condition_log_id uuid references spray_condition_logs(id) on delete set null,
+  started_at timestamptz not null,
+  ended_at timestamptz,
+  area_ha numeric(10,2),
+  water_volume_liters numeric(14,2),
+  status plan_status not null default 'planned',
+  notes text
+);
+
+create table orchard_blocks (
+  id uuid primary key default gen_random_uuid(),
+  farm_id uuid not null references farms(id) on delete cascade,
+  block_code varchar(50) not null unique,
+  block_name varchar(255) not null,
+  field_id uuid references fields(id) on delete set null,
+  crop_variety varchar(120),
+  planting_year integer,
+  row_spacing_m numeric(8,2),
+  tree_spacing_m numeric(8,2),
+  total_rows integer,
+  estimated_tree_count integer,
+  irrigation_type varchar(80),
+  status asset_status not null default 'active',
+  notes text
+);
+
+create table orchard_observations (
+  id uuid primary key default gen_random_uuid(),
+  orchard_block_id uuid not null references orchard_blocks(id) on delete cascade,
+  observed_at timestamptz not null,
+  observer_id uuid references farm_users(id) on delete set null,
+  phenology_stage varchar(80),
+  pest_pressure_level severity_level,
+  disease_pressure_level severity_level,
+  canopy_health_score numeric(5,2),
+  fruit_set_percent numeric(6,2),
+  estimated_yield_kg numeric(14,2),
+  notes text,
+  payload jsonb not null default '{}'::jsonb
+);
+
+create table work_plans (
+  id uuid primary key default gen_random_uuid(),
+  farm_id uuid not null references farms(id) on delete cascade,
+  plan_code varchar(50) not null unique,
+  plan_name varchar(255) not null,
+  start_date date not null,
+  end_date date,
+  status plan_status not null default 'planned',
+  created_by uuid references farm_users(id) on delete set null,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create table tasks (
+  id uuid primary key default gen_random_uuid(),
+  farm_id uuid not null references farms(id) on delete cascade,
+  work_plan_id uuid references work_plans(id) on delete set null,
+  task_code varchar(50) not null unique,
+  task_name varchar(255) not null,
+  task_type varchar(80) not null,
+  related_entity_type varchar(50),
+  related_entity_id uuid,
+  priority integer not null default 2,
+  status plan_status not null default 'planned',
+  due_at timestamptz,
+  completed_at timestamptz,
+  notes text
+);
+
+create table task_assignments (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid not null references tasks(id) on delete cascade,
+  assignee_user_id uuid not null references farm_users(id) on delete cascade,
+  assigned_at timestamptz not null default now(),
+  is_primary boolean not null default false,
+  unique(task_id, assignee_user_id)
+);
+
+create table app_settings (
+  id uuid primary key default gen_random_uuid(),
+  farm_id uuid not null references farms(id) on delete cascade,
+  setting_key varchar(120) not null,
+  setting_value jsonb not null default '{}'::jsonb,
+  is_encrypted boolean not null default false,
+  updated_by uuid references farm_users(id) on delete set null,
+  updated_at timestamptz not null default now(),
+  unique(farm_id, setting_key)
+);
 -- =========================
 -- INDEXES
 -- =========================

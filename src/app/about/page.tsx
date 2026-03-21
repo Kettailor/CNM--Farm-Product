@@ -6,8 +6,8 @@ import { Metadata } from 'next';
 import React from 'react'
 
 export const metadata: Metadata = {
-  title: 'FarmHub About - Agriculture Farming Next js Template',
-  description: 'Introducing Farmhub - the ultimate Next template for showcasing your agricultural or organic business. Designed with a sleek and modern aesthetic, Farmhub effortlessly captures the essence of sustainable farming and food production.',
+  title: 'Giới thiệu | FarmHub - Nông sản thông minh',
+  description: 'Tìm hiểu nền tảng FarmHub cho quản lý nông trại số, truy xuất nguồn gốc và vận hành nông nghiệp hiện đại.',
 };
 
 
