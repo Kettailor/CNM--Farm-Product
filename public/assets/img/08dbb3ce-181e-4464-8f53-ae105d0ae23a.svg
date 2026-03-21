@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The Best Svg Icon site in the world: iconSvg.co, Visit us! https://iconsvg.co -->
+<svg width="800px" height="800px" version="1.1" viewBox="144 144 512 512" xmlns="http://www.w3.org/2000/svg">
+ <defs>
+  <clipPath id="a">
+   <path d="m148.09 153h503.81v475h-503.81z"/>
+  </clipPath>
+ </defs>
+ <path transform="matrix(5.0381 0 0 5.0381 148.09 148.09)" d="m65.4 79.1v-24.999l-6.4005 12.2z" fill="none" stroke="#000000" stroke-miterlimit="10"/>
+ <path transform="matrix(5.0381 0 0 5.0381 148.09 148.09)" d="m57.9 64 5.2995-10.9h-10.6z" fill="none" stroke="#000000" stroke-miterlimit="10"/>
+ <path transform="matrix(5.0381 0 0 5.0381 148.09 148.09)" d="m56.8 66.3-6.3997-12.2v25.299z" fill="none" stroke="#000000" stroke-miterlimit="10"/>
+ <path transform="matrix(5.0381 0 0 5.0381 148.09 148.09)" d="m48.4 79.5v-25.399l-6.3997 12.3z" fill="none" stroke="#000000" stroke-miterlimit="10"/>
+ <path transform="matrix(5.0381 0 0 5.0381 148.09 148.09)" d="m57.9 68.6-6.1004 12.4h12.3z" fill="none" stroke="#000000" stroke-miterlimit="10"/>
+ <g clip-path="url(#a)">
+  <path transform="matrix(5.0381 0 0 5.0381 148.09 148.09)" d="m79.5 31.5-12.8-10.8-17-5.4003-17 5.4003-12.799 10.8-8.2 15.2 2.5997 1.4003 2.6997-5.1002v38h14.4l7.76e-4 -30h35.9v30h14.2l7.75e-4 -39.3 3.3999 6.3997 2.5997-1.4003zm-22.8 10h-13.9v-12.5h13.9zm9.2002-17.6" fill="none" stroke="#000000" stroke-miterlimit="10"/>
+ </g>
+ <path transform="matrix(5.0381 0 0 5.0381 148.09 148.09)" d="m40.8 68.7-6.0004 12.3h12.1z" fill="none" stroke="#000000" stroke-miterlimit="10"/>
+ <path transform="matrix(5.0381 0 0 5.0381 148.09 148.09)" d="m40.8 64.1 5.4003-11h-10.801z" fill="none" stroke="#000000" stroke-miterlimit="10"/>
+ <path transform="matrix(5.0381 0 0 5.0381 148.09 148.09)" d="m33.5 79.2 6.1996-12.799-6.1996-12z" fill="none" stroke="#000000" stroke-miterlimit="10"/>
+ <path transform="matrix(5.0381 0 0 5.0381 148.09 148.09)" d="m45 31.3h9.5003v8.1h-9.5003z" fill="none" stroke="#000000" stroke-miterlimit="10"/>
+</svg>
