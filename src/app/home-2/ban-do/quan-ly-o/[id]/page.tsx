@@ -476,17 +476,6 @@ export default async function ChiTietKhuVucPage({ params }: { params: { id: stri
                   </div>
                 </div>
 
-                <div className="area-detail-thumb-grid compact">
-                  <article className="area-detail-thumb-card">
-                    <span>Vệ tinh</span>
-                    <MapViewSwitcher lat={chiTiet.tam_lat} lng={chiTiet.tam_lng} zoom={17} title={`Vệ tinh ${chiTiet.ten}`} initialMode="satellite" frameClassName="area-detail-thumb-map" polygon={chiTiet.polygon} fitToPolygon={chiTiet.polygon.length >= 3} hideModeTabs hideEcoNote />
-                  </article>
-                  <article className="area-detail-thumb-card">
-                    <span>Lớp thảm thực vật NDVI</span>
-                    <MapViewSwitcher lat={chiTiet.tam_lat} lng={chiTiet.tam_lng} zoom={12} title={`Thảm thực vật ${chiTiet.ten}`} initialMode="eco" frameClassName="area-detail-thumb-map" polygon={chiTiet.polygon} fitToPolygon={chiTiet.polygon.length >= 3} hideModeTabs hideEcoNote />
-                  </article>
-                </div>
-
                 {chiTiet.chi_so.length > 0 ? (
                   <>
                     <div className="area-detail-scale-grid">
@@ -515,7 +504,7 @@ export default async function ChiTietKhuVucPage({ params }: { params: { id: stri
                     <div className="area-detail-chart-card">
                       <div className="area-detail-chart-head">
                         <strong>Biểu đồ chỉ số khu vực</strong>
-                        <span>Biểu diễn nhiều đường theo phong cách dashboard ảnh mẫu</span>
+                        <span>Cho phép phóng to, thu nhỏ và kéo ngang để xem chi tiết từng giai đoạn</span>
                       </div>
                       <AreaIndexTrendChart series={duLieuBieuDo} seed={`${chiTiet.id}-${chiTiet.ngay_tao}`} />
                     </div>

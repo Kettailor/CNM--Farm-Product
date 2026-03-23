@@ -2190,7 +2190,7 @@ textarea:focus {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: flex-start;
+  align-items: center;
   flex-wrap: wrap;
 }
 
@@ -2215,6 +2215,36 @@ textarea:focus {
   height: 12px;
   border-radius: 50%;
   display: inline-block;
+  flex: 0 0 auto;
+}
+
+.area-trend-chart-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.area-trend-chart-actions button {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.area-trend-chart-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.area-trend-chart-window {
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
 }
 
 .area-trend-tooltip-inline {
@@ -2237,14 +2267,31 @@ textarea:focus {
   gap: 6px;
 }
 
-.area-trend-chart {
-  width: 100%;
-  height: 360px;
+.area-trend-chart-hint {
+  font-size: 12px;
+  color: #64748b;
 }
 
-.area-trend-chart .grid {
+.area-trend-chart {
+  width: 100%;
+  height: 420px;
+  display: block;
+  overflow: visible;
+}
+
+.area-trend-chart .chart-surface {
+  fill: #f8fbfd;
+}
+
+.area-trend-chart .grid,
+.area-trend-chart .grid-vertical {
   stroke: #dbe4ea;
   stroke-width: 1;
+}
+
+.area-trend-chart .grid-vertical {
+  stroke-dasharray: 3 7;
+  opacity: 0.75;
 }
 
 .area-trend-chart .tick-x,
@@ -2253,8 +2300,40 @@ textarea:focus {
   font-size: 12px;
 }
 
+.area-trend-chart .drag-layer {
+  fill: transparent;
+}
+
+.area-trend-chart .drag-layer {
+  cursor: grab;
+}
+
+.area-trend-chart .drag-layer:active {
+  cursor: grabbing;
+}
+
+.area-trend-chart .trend-line {
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .area-trend-chart .active-line {
-  stroke: #cbd5e1;
+  stroke: #94a3b8;
   stroke-width: 1.5;
   stroke-dasharray: 4 4;
+}
+
+@media (max-width: 760px) {
+  .area-trend-chart {
+    height: 360px;
+  }
+
+  .area-trend-chart-toolbar {
+    align-items: flex-start;
+  }
+
+  .area-trend-chart-actions {
+    width: 100%;
+  }
 }
