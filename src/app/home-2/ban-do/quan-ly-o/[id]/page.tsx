@@ -95,6 +95,22 @@ const nhomKhuVucMap: Record<OLoai, { nhan: string; mau: string; bieu_tuong: stri
 
 const normalizeTypeText = (v: unknown) => String(v ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
+
+const bangTonTaiCache = new Map<string, boolean>();
+
+async function hasTable(fullName: string): Promise<boolean> {
+  if (bangTonTaiCache.has(fullName)) return bangTonTaiCache.get(fullName) ?? false;
+  try {
+    const rs = await db.query("select to_regclass($1) as regclass", [fullName]);
+    const exists = Boolean(rs.rows[0]?.regclass);
+    bangTonTaiCache.set(fullName, exists);
+    return exists;
+  } catch {
+    bangTonTaiCache.set(fullName, false);
+    return false;
+  }
+}
+
 const toNumber = (value: unknown, fallback: number | null = null) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -244,6 +260,9 @@ async function getChiTietKhuVuc(ownerId: string, khuVucId: string): Promise<ChiT
 
 async function getNhatKyNongDuoc(khuVucId: string): Promise<NhatKyNongDuoc[]> {
   try {
+    const hasNhatKy = await hasTable("du_lieu.nhat_ky_nong_duoc_khu_vuc");
+    const hasChiTiet = await hasTable("du_lieu.khu_vuc_chi_tiet");
+    if (!hasNhatKy || !hasChiTiet) return [];
     const rs = await db.query(
       `select nk.id, nk.ngay_ap_dung, nk.gio_bat_dau, nk.gio_ket_thuc, nk.san_pham, nk.thiet_bi, nk.lieu_luong,
               nk.dien_tich_ha, nk.thoi_gian_cach_ly, nk.loai_cay_trong, nk.toc_do_gio_km_h, nk.huong_gio,
@@ -282,6 +301,9 @@ async function getNhatKyNongDuoc(khuVucId: string): Promise<NhatKyNongDuoc[]> {
 
 async function getLichSuGhiChu(khuVucId: string): Promise<LichSuGhiChu[]> {
   try {
+    const hasLichSu = await hasTable("du_lieu.lich_su_ghi_chu_khu_vuc");
+    const hasChiTiet = await hasTable("du_lieu.khu_vuc_chi_tiet");
+    if (!hasLichSu || !hasChiTiet) return [];
     const rs = await db.query(
       `select ls.id, ls.loai_ban_ghi, ls.thoi_diem, ls.noi_dung, ls.nguoi_tao
        from du_lieu.lich_su_ghi_chu_khu_vuc ls
