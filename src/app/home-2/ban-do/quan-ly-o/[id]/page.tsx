@@ -7,8 +7,8 @@ type OLoai = "cropping" | "grazing" | "hay" | "resting" | "nguon_nuoc" | "phuong
 
 type FarmMapInfo = {
   farm_name: string;
-  latitude: number;
-  longitude: number;
+  latitude: number | string;
+  longitude: number | string;
   location_name: string | null;
 };
 
@@ -22,18 +22,19 @@ type ChiTietKhuVuc = {
   dien_tich_ha: number;
   dien_tich_m2: number;
   chu_vi_m: number;
-  dien_tich_kha_dung_ha: number;
+  dien_tich_kha_dung_ha: number | null;
   vi_tri_ten: string;
   tam_lat: number;
   tam_lng: number;
   ngay_tao: string;
   ngay_cap_nhat: string;
-  so_ngay_trong_chu_ky: number;
-  dse_ngay: number;
-  tong_thuc_an_kg_dm: number;
-  toc_do_tang_truong: number;
-  con_lai_ngay_chan_tha: number;
+  so_ngay_trong_chu_ky: number | null;
+  dse_ngay: number | null;
+  tong_thuc_an_kg_dm: number | null;
+  toc_do_tang_truong: number | null;
+  con_lai_ngay_chan_tha: number | null;
   polygon: Array<{ lat: number; lng: number }>;
+  chi_so: ChiSoThamThucVat[];
 };
 
 type ChiSoThamThucVat = {
@@ -45,10 +46,10 @@ type ChiSoThamThucVat = {
 };
 
 type NhatKyNongDuoc = {
+  id: string;
   ngay_ap_dung: string;
   gio_bat_dau: string;
   gio_ket_thuc: string;
-  khu_vuc: string;
   san_pham: string;
   thiet_bi: string;
   lieu_luong: string;
@@ -94,10 +95,27 @@ const nhomKhuVucMap: Record<OLoai, { nhan: string; mau: string; bieu_tuong: stri
 
 const normalizeTypeText = (v: unknown) => String(v ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-
-const toNumber = (value: unknown, fallback: number) => {
+const toNumber = (value: unknown, fallback: number | null = null) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const formatDate = (value: unknown) => {
+  if (!value) return "-";
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? "-" : date.toLocaleDateString("vi-VN");
+};
+
+const formatDateTime = (value: unknown) => {
+  if (!value) return "-";
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString("vi-VN");
+};
+
+const formatTime = (value: unknown) => {
+  if (!value) return "-";
+  const raw = String(value);
+  return raw.length >= 5 ? raw.slice(0, 5) : raw;
 };
 
 const detectAreaType = (raw: string): OLoai => {
@@ -112,6 +130,33 @@ const detectAreaType = (raw: string): OLoai => {
   if (raw.includes("nha kho") || raw.includes("warehouse")) return "nha_kho";
   return "cropping";
 };
+
+const mucDanhGia = (value: number) => {
+  if (value >= 0.65) return "Rất tốt";
+  if (value >= 0.5) return "Tốt";
+  if (value >= 0.35) return "Trung bình";
+  return "Thấp";
+};
+
+function taoChiSoTuMetadata(metadata: Record<string, unknown>): ChiSoThamThucVat[] {
+  const mapping = [
+    { ma: "NDVI", ten: "Thảm thực vật NDVI", mau: "#0ea5e9", keys: ["NDVI", "ndvi"] },
+    { ma: "EVI", ten: "Sinh khối tăng cường EVI", mau: "#10b981", keys: ["EVI", "evi"] },
+    { ma: "NDMI", ten: "Độ ẩm NDMI", mau: "#f59e0b", keys: ["NDMI", "ndmi"] },
+    { ma: "NDWI", ten: "Nước mặt NDWI", mau: "#ef4444", keys: ["NDWI", "ndwi"] },
+    { ma: "SAVI", ten: "Sinh khối đất SAVI", mau: "#8b5cf6", keys: ["SAVI", "savi"] },
+    { ma: "NDSI", ten: "Tín hiệu ẩm bề mặt NDSI", mau: "#3b82f6", keys: ["NDSI", "ndsi"] },
+  ] as const;
+
+  return mapping
+    .map((item) => {
+      const rawValue = item.keys.map((key) => metadata[key]).find((value) => value !== undefined && value !== null);
+      const giaTri = toNumber(rawValue);
+      if (giaTri === null) return null;
+      return { ten: item.ten, ma: item.ma, gia_tri: giaTri, muc: mucDanhGia(giaTri), mau: item.mau };
+    })
+    .filter(Boolean) as ChiSoThamThucVat[];
+}
 
 async function getLatestFarmMap(ownerId: string): Promise<FarmMapInfo | null> {
   try {
@@ -148,16 +193,17 @@ async function getChiTietKhuVuc(ownerId: string, khuVucId: string): Promise<ChiT
     if (!r) return null;
 
     const b = r.boundary_geojson ?? {};
+    const metadata = (b?.metadata ?? {}) as Record<string, unknown>;
     const polygon = Array.isArray(b?.geo?.polygon)
       ? b.geo.polygon
           .filter((p: any) => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng)))
           .map((p: any) => ({ lat: Number(p.lat), lng: Number(p.lng) }))
       : [];
-    const rawType = normalizeTypeText(b?.metadata?.areaType);
-    const fullText = normalizeTypeText([r.crop_type, r.grazing_status, r.status, b?.metadata?.usage, b?.metadata?.notes, b?.metadata?.farmType].join(" "));
+    const rawType = normalizeTypeText(metadata.areaType);
+    const fullText = normalizeTypeText([r.crop_type, r.grazing_status, r.status, metadata.usage, metadata.notes, metadata.farmType].join(" "));
     const nhom = rawType ? detectAreaType(rawType) : detectAreaType(fullText);
-    const dienTichHa = Number(r.area_ha ?? b?.metadata?.areaHecta ?? 0);
-    const dienTichKhaDung = Number((dienTichHa * 0.92).toFixed(3));
+    const dienTichHa = toNumber(r.area_ha ?? metadata.areaHecta, 0) ?? 0;
+    const dienTichKhaDung = toNumber(metadata.dien_tich_kha_dung_ha ?? metadata.usableAreaHa ?? metadata.coverage);
     const chuViM = polygon.length >= 3
       ? Number((polygon.reduce((tong: number, point: { lat: number; lng: number }, index: number) => {
           const next = polygon[(index + 1) % polygon.length];
@@ -165,179 +211,118 @@ async function getChiTietKhuVuc(ownerId: string, khuVucId: string): Promise<ChiT
           const dy = (next.lat - point.lat) * 110540;
           return tong + Math.sqrt(dx * dx + dy * dy);
         }, 0)).toFixed(1))
-      : Number((Math.sqrt(Math.max(dienTichHa, 0.1) * 10000) * 4.2).toFixed(1));
+      : 0;
 
     return {
       id: r.id,
       ten: r.name ?? "Khu vực chưa đặt tên",
-      loai: r.crop_type ?? "Chưa phân loại",
+      loai: String(r.crop_type ?? metadata.usage ?? "Chưa phân loại"),
       nhom,
-      mo_ta: b?.metadata?.notes ?? `${r.name ?? "Khu vực"} thuộc hệ thống KetKat-EcoFarm, phù hợp để theo dõi lịch sử canh tác và chăn thả theo thời gian thực.`,
-      trang_thai: r.status ?? r.grazing_status ?? "Đang theo dõi",
-      dien_tich_ha: toNumber(dienTichHa, 0),
-      dien_tich_m2: toNumber(Number((dienTichHa * 10000).toFixed(0)), 0),
-      chu_vi_m: toNumber(chuViM, 0),
-      dien_tich_kha_dung_ha: toNumber(dienTichKhaDung, 0),
-      vi_tri_ten: r.location_name ?? r.farm_name ?? "Khu vực nông trại",
-      tam_lat: toNumber(b?.geo?.lat ?? polygon[0]?.lat, 10.762622),
-      tam_lng: toNumber(b?.geo?.lng ?? polygon[0]?.lng, 106.660172),
-      ngay_tao: r.created_at ? new Date(r.created_at).toLocaleDateString("vi-VN") : "-",
-      ngay_cap_nhat: r.created_at ? new Date(r.created_at).toLocaleString("vi-VN") : "-",
-      so_ngay_trong_chu_ky: 27,
-      dse_ngay: 8,
-      tong_thuc_an_kg_dm: Number((dienTichHa * 267.5).toFixed(1)),
-      toc_do_tang_truong: Number((2.1 + dienTichHa * 0.13).toFixed(2)),
-      con_lai_ngay_chan_tha: Math.max(8, Math.round(dienTichHa * 2.4)),
+      mo_ta: String(metadata.notes ?? "Chưa có mô tả cho khu vực này."),
+      trang_thai: String(r.status ?? r.grazing_status ?? metadata.plantingStatus ?? "Đang theo dõi"),
+      dien_tich_ha: dienTichHa,
+      dien_tich_m2: Number((dienTichHa * 10000).toFixed(0)),
+      chu_vi_m: toNumber(chuViM, 0) ?? 0,
+      dien_tich_kha_dung_ha: dienTichKhaDung,
+      vi_tri_ten: String(r.location_name ?? r.farm_name ?? "Khu vực nông trại"),
+      tam_lat: toNumber(b?.geo?.lat ?? polygon[0]?.lat, 10.762622) ?? 10.762622,
+      tam_lng: toNumber(b?.geo?.lng ?? polygon[0]?.lng, 106.660172) ?? 106.660172,
+      ngay_tao: formatDate(r.created_at),
+      ngay_cap_nhat: formatDateTime(r.created_at),
+      so_ngay_trong_chu_ky: toNumber(metadata.so_ngay_trong_chu_ky ?? metadata.daysInCycle),
+      dse_ngay: toNumber(metadata.dse_ngay ?? metadata.dsePerDay),
+      tong_thuc_an_kg_dm: toNumber(metadata.tong_thuc_an_kg_dm ?? metadata.feedOnOfferKgDmHa),
+      toc_do_tang_truong: toNumber(metadata.toc_do_tang_truong ?? metadata.pastureGrowthRateKgHaDay),
+      con_lai_ngay_chan_tha: toNumber(metadata.con_lai_ngay_chan_tha ?? metadata.remainingGrazingDays),
       polygon,
+      chi_so: taoChiSoTuMetadata(metadata),
     };
   } catch {
     return null;
   }
 }
 
-function taoChiSoThamThucVat(): ChiSoThamThucVat[] {
-  return [
-    { ten: "Thảm thực vật NDVI", ma: "NDVI", gia_tri: 0.61, muc: "Tốt", mau: "#0ea5e9" },
-    { ten: "Sinh khối tăng cường EVI", ma: "EVI", gia_tri: 0.5, muc: "Ổn định", mau: "#10b981" },
-    { ten: "Độ ẩm NDMI", ma: "NDMI", gia_tri: 0.42, muc: "Trung bình", mau: "#f59e0b" },
-    { ten: "Nước mặt NDWI", ma: "NDWI", gia_tri: 0.28, muc: "Thấp", mau: "#ef4444" },
-    { ten: "Sinh khối đất SAVI", ma: "SAVI", gia_tri: 0.57, muc: "Khá", mau: "#8b5cf6" },
-    { ten: "Tín hiệu ẩm bề mặt NDSI", ma: "NDSI", gia_tri: 0.49, muc: "Ổn định", mau: "#3b82f6" },
-  ];
+async function getNhatKyNongDuoc(khuVucId: string): Promise<NhatKyNongDuoc[]> {
+  try {
+    const rs = await db.query(
+      `select nk.id, nk.ngay_ap_dung, nk.gio_bat_dau, nk.gio_ket_thuc, nk.san_pham, nk.thiet_bi, nk.lieu_luong,
+              nk.dien_tich_ha, nk.thoi_gian_cach_ly, nk.loai_cay_trong, nk.toc_do_gio_km_h, nk.huong_gio,
+              nk.nhiet_do_c, nk.do_am_pct, nk.nguoi_van_hanh, nk.nguoi_giam_sat, nk.doi_tuong_ap_dung
+       from du_lieu.nhat_ky_nong_duoc_khu_vuc nk
+       join du_lieu.khu_vuc_chi_tiet ct on ct.id = nk.khu_vuc_chi_tiet_id
+       where ct.khu_vuc_id = $1
+       order by nk.ngay_ap_dung desc, nk.gio_bat_dau desc
+       limit 50`,
+      [khuVucId]
+    );
+
+    return rs.rows.map((r: any) => ({
+      id: String(r.id),
+      ngay_ap_dung: formatDate(r.ngay_ap_dung),
+      gio_bat_dau: formatTime(r.gio_bat_dau),
+      gio_ket_thuc: formatTime(r.gio_ket_thuc),
+      san_pham: String(r.san_pham ?? "-"),
+      thiet_bi: String(r.thiet_bi ?? "-"),
+      lieu_luong: String(r.lieu_luong ?? "-"),
+      dien_tich: r.dien_tich_ha !== null && r.dien_tich_ha !== undefined ? `${Number(r.dien_tich_ha).toFixed(2)} ha` : "-",
+      thoi_gian_cach_ly: String(r.thoi_gian_cach_ly ?? "-"),
+      loai_cay_trong: String(r.loai_cay_trong ?? "-"),
+      toc_do_gio: r.toc_do_gio_km_h !== null && r.toc_do_gio_km_h !== undefined ? `${Number(r.toc_do_gio_km_h).toFixed(1)} km/h` : "-",
+      huong_gio: String(r.huong_gio ?? "-"),
+      nhiet_do: r.nhiet_do_c !== null && r.nhiet_do_c !== undefined ? `${Number(r.nhiet_do_c).toFixed(1)}°C` : "-",
+      do_am: r.do_am_pct !== null && r.do_am_pct !== undefined ? `${Number(r.do_am_pct).toFixed(0)}%` : "-",
+      van_hanh: String(r.nguoi_van_hanh ?? "-"),
+      giam_sat: String(r.nguoi_giam_sat ?? "-"),
+      doi_tuong_ap_dung: String(r.doi_tuong_ap_dung ?? "-"),
+    }));
+  } catch {
+    return [];
+  }
 }
 
-function taoNhatKyNongDuoc(tenKhuVuc: string): NhatKyNongDuoc[] {
-  return [
-    {
-      ngay_ap_dung: "19/07/2025",
-      gio_bat_dau: "12:34",
-      gio_ket_thuc: "16:34",
-      khu_vuc: tenKhuVuc,
-      san_pham: "Glyphosate 360",
-      thiet_bi: "Bình phun đeo vai",
-      lieu_luong: "1,17 lít/ha",
-      dien_tich: "7,74 ha",
-      thoi_gian_cach_ly: "5 ngày",
-      loai_cay_trong: "Cao lương Archer",
-      toc_do_gio: "12,8 km/h",
-      huong_gio: "Nam",
-      nhiet_do: "17°C",
-      do_am: "69%",
-      van_hanh: "Nhân sự 3",
-      giam_sat: "Giám sát 3",
-      doi_tuong_ap_dung: "Khách hàng 3",
-    },
-    {
-      ngay_ap_dung: "02/08/2025",
-      gio_bat_dau: "17:29",
-      gio_ket_thuc: "20:29",
-      khu_vuc: tenKhuVuc,
-      san_pham: "Glyphosate 360",
-      thiet_bi: "Bình phun đeo vai",
-      lieu_luong: "3,28 lít/ha",
-      dien_tich: "15,39 ha",
-      thoi_gian_cach_ly: "3 ngày",
-      loai_cay_trong: "Cải xoăn",
-      toc_do_gio: "11,0 km/h",
-      huong_gio: "Đông Bắc",
-      nhiet_do: "23°C",
-      do_am: "46%",
-      van_hanh: "Nhân sự 4",
-      giam_sat: "Giám sát 2",
-      doi_tuong_ap_dung: "Khách hàng 2",
-    },
-    {
-      ngay_ap_dung: "24/08/2025",
-      gio_bat_dau: "17:00",
-      gio_ket_thuc: "19:00",
-      khu_vuc: tenKhuVuc,
-      san_pham: "2,4-D Amin",
-      thiet_bi: "Bình phun đeo vai",
-      lieu_luong: "1,99 lít/ha",
-      dien_tich: "5,39 ha",
-      thoi_gian_cach_ly: "6 ngày",
-      loai_cay_trong: "Yến mạch Bannister",
-      toc_do_gio: "14,0 km/h",
-      huong_gio: "Đông Bắc",
-      nhiet_do: "19°C",
-      do_am: "68%",
-      van_hanh: "Nhân sự 1",
-      giam_sat: "Giám sát 3",
-      doi_tuong_ap_dung: "Khách hàng 1",
-    },
-  ];
+async function getLichSuGhiChu(khuVucId: string): Promise<LichSuGhiChu[]> {
+  try {
+    const rs = await db.query(
+      `select ls.id, ls.loai_ban_ghi, ls.thoi_diem, ls.noi_dung, ls.nguoi_tao
+       from du_lieu.lich_su_ghi_chu_khu_vuc ls
+       join du_lieu.khu_vuc_chi_tiet ct on ct.id = ls.khu_vuc_chi_tiet_id
+       where ct.khu_vuc_id = $1
+       order by ls.thoi_diem desc
+       limit 50`,
+      [khuVucId]
+    );
+
+    return rs.rows.map((r: any) => ({
+      id: String(r.id),
+      loai: String(r.loai_ban_ghi ?? "Ghi chú"),
+      ngay: formatDateTime(r.thoi_diem),
+      noi_dung: String(r.noi_dung ?? "-"),
+      nguoi_dung: String(r.nguoi_tao ?? "-"),
+    }));
+  } catch {
+    return [];
+  }
 }
 
 export const dynamic = "force-dynamic";
 
-function taoLichSuVaGhiChu(tenKhuVuc: string): LichSuGhiChu[] {
-  return [
-    {
-      id: "ghi_chu_5_0",
-      loai: "Lịch sử vật nuôi",
-      ngay: "18:26 13/03/2026",
-      noi_dung: "Đàn Sữa nhóm D đã được chuyển ra khỏi khu vực này.",
-      nguoi_dung: "user1@ketkat-ecofarm.vn",
-    },
-    {
-      id: "ghi_chu_5_1",
-      loai: "Ghi chú",
-      ngay: "18:26 19/02/2026",
-      noi_dung: `Ghi chú cho ${tenKhuVuc}: đã kiểm tra đầy đủ các điểm cấp nước và cảm biến hiện trường.`,
-      nguoi_dung: "user1@ketkat-ecofarm.vn",
-    },
-    {
-      id: "ghi_chu_5_2",
-      loai: "Lịch sử vật nuôi",
-      ngay: "18:26 28/01/2026",
-      noi_dung: "Đàn Cừu Merino B đã được đưa vào khu vực để bắt đầu chu kỳ chăn thả mới.",
-      nguoi_dung: "user2@ketkat-ecofarm.vn",
-    },
-  ];
+function renderMetric(label: string, value: number | null, suffix = "") {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value === null ? "Chưa có dữ liệu" : `${value.toLocaleString("vi-VN")}${suffix}`}</strong>
+    </div>
+  );
 }
 
 export default async function ChiTietKhuVucPage({ params }: { params: { id: string } }) {
   const ownerId = cookies().get("ownerId")?.value;
   const mapData = ownerId ? await getLatestFarmMap(ownerId) : null;
   const chiTiet = ownerId ? await getChiTietKhuVuc(ownerId, params.id) : null;
+  const nhatKy = chiTiet ? await getNhatKyNongDuoc(chiTiet.id) : [];
+  const lichSu = chiTiet ? await getLichSuGhiChu(chiTiet.id) : [];
   const farmName = mapData?.farm_name || "KetKat-EcoFarm";
-  const lat = toNumber(chiTiet?.tam_lat ?? mapData?.latitude, 10.762622);
-  const lng = toNumber(chiTiet?.tam_lng ?? mapData?.longitude, 106.660172);
-  const thongTin = chiTiet ?? {
-    id: params.id,
-    ten: "Khu vực đồi phía Bắc 04",
-    loai: "Kê",
-    nhom: "grazing" as OLoai,
-    mo_ta: "Khu vực chăn thả kết hợp canh tác kê, phù hợp theo dõi độ che phủ và lịch sử sử dụng nông dược.",
-    trang_thai: "Đang chăn thả",
-    dien_tich_ha: 0.001,
-    dien_tich_m2: 10,
-    chu_vi_m: 11.9,
-    dien_tich_kha_dung_ha: 0.0009,
-    vi_tri_ten: mapData?.location_name ?? "Khu trung tâm nông trại",
-    tam_lat: lat,
-    tam_lng: lng,
-    ngay_tao: "23/03/2026",
-    ngay_cap_nhat: "23/03/2026 08:30",
-    so_ngay_trong_chu_ky: 27,
-    dse_ngay: 8,
-    tong_thuc_an_kg_dm: 2383,
-    toc_do_tang_truong: 15,
-    con_lai_ngay_chan_tha: 19,
-    polygon: [
-      { lat: lat + 0.0006, lng: lng - 0.0004 },
-      { lat: lat + 0.00085, lng: lng + 0.0001 },
-      { lat: lat + 0.0003, lng: lng + 0.00075 },
-      { lat: lat - 0.00035, lng: lng + 0.00055 },
-      { lat: lat - 0.00055, lng: lng - 0.0001 },
-      { lat: lat - 0.0001, lng: lng - 0.00065 },
-    ],
-  };
-
-  const chiSo = taoChiSoThamThucVat();
-  const nhatKy = taoNhatKyNongDuoc(thongTin.ten);
-  const lichSu = taoLichSuVaGhiChu(thongTin.ten);
-  const nhomInfo = nhomKhuVucMap[thongTin.nhom];
+  const nhomInfo = nhomKhuVucMap[chiTiet?.nhom ?? "cropping"];
 
   return (
     <main className="dashboard-page area-detail-page">
@@ -372,181 +357,203 @@ export default async function ChiTietKhuVucPage({ params }: { params: { id: stri
         </aside>
 
         <div className="dashboard-main area-detail-main">
-          <section className="area-header-card area-detail-hero">
-            <div>
-              <p className="area-detail-badge">{nhomInfo.bieu_tuong} {nhomInfo.nhan}</p>
-              <h1>{thongTin.ten}</h1>
-              <p className="area-detail-subtitle">Trang chi tiết khu vực chuẩn tiếng Việt cho hệ thống KetKat-EcoFarm, mô phỏng bố cục theo ảnh tham chiếu.</p>
-            </div>
-            <div className="area-header-actions">
-              <a href="/home-2/ban-do/quan-ly-o" className="area-link-btn">← Danh sách khu vực</a>
-              <a href="/home-2/ban-do" className="area-link-btn primary">Xem toàn bộ bản đồ</a>
-            </div>
-          </section>
-
-          <section className="area-detail-top-grid">
-            <article className="area-detail-card">
+          {!chiTiet ? (
+            <section className="area-detail-card">
               <div className="area-detail-card-head">
-                <h2>Thông tin chi tiết</h2>
-                <span className="area-detail-pill" style={{ backgroundColor: `${nhomInfo.mau}1a`, color: nhomInfo.mau }}>{thongTin.trang_thai}</span>
+                <h2>Không tìm thấy dữ liệu khu vực</h2>
+                <a href="/home-2/ban-do/quan-ly-o" className="area-link-btn">← Quay lại danh sách</a>
               </div>
-              <dl className="area-detail-info-list">
-                <div><dt>Tên khu vực</dt><dd>{thongTin.ten}</dd></div>
-                <div><dt>Trạng thái</dt><dd>{thongTin.trang_thai}</dd></div>
-                <div><dt>Loại cây trồng / mục đích</dt><dd>{thongTin.loai}</dd></div>
-                <div><dt>Diện tích</dt><dd>{thongTin.dien_tich_ha.toFixed(3)} ha</dd></div>
-                <div><dt>Diện tích khả dụng</dt><dd>{thongTin.dien_tich_kha_dung_ha.toFixed(3)} ha</dd></div>
-                <div><dt>Chu vi</dt><dd>{thongTin.chu_vi_m.toFixed(1)} m</dd></div>
-                <div><dt>Vị trí</dt><dd>{thongTin.vi_tri_ten}</dd></div>
-                <div><dt>Tọa độ tâm</dt><dd>{thongTin.tam_lat.toFixed(6)}, {thongTin.tam_lng.toFixed(6)}</dd></div>
-                <div><dt>Ngày tạo</dt><dd>{thongTin.ngay_tao}</dd></div>
-                <div><dt>Cập nhật gần nhất</dt><dd>{thongTin.ngay_cap_nhat}</dd></div>
-                <div className="full"><dt>Mô tả</dt><dd>{thongTin.mo_ta}</dd></div>
-              </dl>
-            </article>
+              <p className="area-farm-note">Khu vực này chưa tồn tại trong cơ sở dữ liệu hoặc bạn không có quyền truy cập.</p>
+            </section>
+          ) : (
+            <>
+              <section className="area-header-card area-detail-hero">
+                <div>
+                  <p className="area-detail-badge">{nhomInfo.bieu_tuong} {nhomInfo.nhan}</p>
+                  <h1>{chiTiet.ten}</h1>
+                  <p className="area-detail-subtitle">Chi tiết khu vực đang được hiển thị trực tiếp từ dữ liệu hiện có trong cơ sở dữ liệu KetKat-EcoFarm.</p>
+                </div>
+                <div className="area-header-actions">
+                  <a href="/home-2/ban-do/quan-ly-o" className="area-link-btn">← Danh sách khu vực</a>
+                  <a href="/home-2/ban-do" className="area-link-btn primary">Xem toàn bộ bản đồ</a>
+                </div>
+              </section>
 
-            <article className="area-detail-card">
-              <div className="area-detail-card-head">
-                <h2>Vị trí khu vực</h2>
-                <span className="area-detail-muted">{thongTin.vi_tri_ten}</span>
-              </div>
-              <div className="area-detail-map-wrap">
-                <MapViewSwitcher
-                  lat={thongTin.tam_lat}
-                  lng={thongTin.tam_lng}
-                  zoom={18}
-                  title={`Bản đồ khu vực ${thongTin.ten}`}
-                  frameClassName="area-detail-map"
-                  polygon={thongTin.polygon}
-                  fitToPolygon={thongTin.polygon.length >= 3}
-                  hideEcoNote
-                />
-              </div>
-            </article>
-          </section>
-
-          <section className="area-detail-card area-detail-pasture">
-            <div className="area-detail-card-head">
-              <h2>Quản lý thảm thực vật và chăn thả</h2>
-              <span className="area-detail-muted">Dữ liệu tổng hợp cho chu kỳ hiện tại</span>
-            </div>
-
-            <div className="area-detail-kpis">
-              <div><span>Hình thức sử dụng</span><strong>{nhomInfo.nhan}</strong></div>
-              <div><span>Loại cây trồng</span><strong>{thongTin.loai}</strong></div>
-              <div><span>Số ngày trong chu kỳ</span><strong>{thongTin.so_ngay_trong_chu_ky}</strong></div>
-              <div><span>Tải trọng DSE/ngày</span><strong>{thongTin.dse_ngay}</strong></div>
-              <div><span>Thức ăn sẵn có</span><strong>{thongTin.tong_thuc_an_kg_dm.toLocaleString("vi-VN")} kg DM/ha</strong></div>
-              <div><span>Tăng trưởng thảm thực vật</span><strong>{thongTin.toc_do_tang_truong.toFixed(2)} kg/ha/ngày</strong></div>
-              <div><span>Ngày chăn thả còn lại</span><strong>{thongTin.con_lai_ngay_chan_tha}</strong></div>
-              <div><span>Diện tích khả dụng</span><strong>{thongTin.dien_tich_kha_dung_ha.toFixed(3)} ha</strong></div>
-            </div>
-
-            <div className="area-detail-index-grid">
-              {chiSo.map((item) => (
-                <article key={item.ma} className="area-index-card">
-                  <div className="area-index-head">
-                    <div>
-                      <p>{item.ten}</p>
-                      <strong>{item.ma}</strong>
-                    </div>
-                    <span style={{ color: item.mau }}>{item.gia_tri.toFixed(2)}</span>
+              <section className="area-detail-top-grid">
+                <article className="area-detail-card">
+                  <div className="area-detail-card-head">
+                    <h2>Thông tin chi tiết</h2>
+                    <span className="area-detail-pill" style={{ backgroundColor: `${nhomInfo.mau}1a`, color: nhomInfo.mau }}>{chiTiet.trang_thai}</span>
                   </div>
-                  <div className="area-index-bar"><span style={{ width: `${Math.min(item.gia_tri * 100, 100)}%`, backgroundColor: item.mau }} /></div>
-                  <small>Mức đánh giá: {item.muc}</small>
+                  <dl className="area-detail-info-list">
+                    <div><dt>Tên khu vực</dt><dd>{chiTiet.ten}</dd></div>
+                    <div><dt>Trạng thái</dt><dd>{chiTiet.trang_thai}</dd></div>
+                    <div><dt>Loại cây trồng / mục đích</dt><dd>{chiTiet.loai}</dd></div>
+                    <div><dt>Diện tích</dt><dd>{chiTiet.dien_tich_ha.toFixed(3)} ha</dd></div>
+                    <div><dt>Diện tích khả dụng</dt><dd>{chiTiet.dien_tich_kha_dung_ha === null ? "Chưa có dữ liệu" : `${chiTiet.dien_tich_kha_dung_ha.toFixed(3)} ha`}</dd></div>
+                    <div><dt>Chu vi</dt><dd>{chiTiet.chu_vi_m.toFixed(1)} m</dd></div>
+                    <div><dt>Vị trí</dt><dd>{chiTiet.vi_tri_ten}</dd></div>
+                    <div><dt>Tọa độ tâm</dt><dd>{chiTiet.tam_lat.toFixed(6)}, {chiTiet.tam_lng.toFixed(6)}</dd></div>
+                    <div><dt>Ngày tạo</dt><dd>{chiTiet.ngay_tao}</dd></div>
+                    <div><dt>Cập nhật gần nhất</dt><dd>{chiTiet.ngay_cap_nhat}</dd></div>
+                    <div className="full"><dt>Mô tả</dt><dd>{chiTiet.mo_ta}</dd></div>
+                  </dl>
                 </article>
-              ))}
-            </div>
-          </section>
 
-          <section className="area-detail-card">
-            <div className="area-detail-card-head">
-              <h2>Nhật ký nông dược</h2>
-              <span className="area-detail-pill demo">Bản mô phỏng</span>
-            </div>
-            <div className="area-detail-table-wrap">
-              <table className="area-detail-table wide">
-                <thead>
-                  <tr>
-                    <th>Ngày áp dụng</th>
-                    <th>Bắt đầu</th>
-                    <th>Kết thúc</th>
-                    <th>Khu vực</th>
-                    <th>Sản phẩm</th>
-                    <th>Thiết bị</th>
-                    <th>Liều lượng</th>
-                    <th>Diện tích</th>
-                    <th>Cách ly</th>
-                    <th>Loại cây trồng</th>
-                    <th>Tốc độ gió</th>
-                    <th>Hướng gió</th>
-                    <th>Nhiệt độ</th>
-                    <th>Độ ẩm</th>
-                    <th>Vận hành</th>
-                    <th>Giám sát</th>
-                    <th>Đối tượng áp dụng</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {nhatKy.map((item, index) => (
-                    <tr key={`${item.ngay_ap_dung}-${index}`}>
-                      <td>{item.ngay_ap_dung}</td>
-                      <td>{item.gio_bat_dau}</td>
-                      <td>{item.gio_ket_thuc}</td>
-                      <td>{item.khu_vuc}</td>
-                      <td>{item.san_pham}</td>
-                      <td>{item.thiet_bi}</td>
-                      <td>{item.lieu_luong}</td>
-                      <td>{item.dien_tich}</td>
-                      <td>{item.thoi_gian_cach_ly}</td>
-                      <td>{item.loai_cay_trong}</td>
-                      <td>{item.toc_do_gio}</td>
-                      <td>{item.huong_gio}</td>
-                      <td>{item.nhiet_do}</td>
-                      <td>{item.do_am}</td>
-                      <td>{item.van_hanh}</td>
-                      <td>{item.giam_sat}</td>
-                      <td>{item.doi_tuong_ap_dung}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+                <article className="area-detail-card">
+                  <div className="area-detail-card-head">
+                    <h2>Vị trí khu vực</h2>
+                    <span className="area-detail-muted">{chiTiet.vi_tri_ten}</span>
+                  </div>
+                  <div className="area-detail-map-wrap">
+                    <MapViewSwitcher
+                      lat={chiTiet.tam_lat}
+                      lng={chiTiet.tam_lng}
+                      zoom={18}
+                      title={`Bản đồ khu vực ${chiTiet.ten}`}
+                      frameClassName="area-detail-map"
+                      polygon={chiTiet.polygon}
+                      fitToPolygon={chiTiet.polygon.length >= 3}
+                      hideEcoNote
+                    />
+                  </div>
+                </article>
+              </section>
 
-          <section className="area-detail-card">
-            <div className="area-detail-card-head">
-              <div>
-                <h2>Lịch sử và ghi chú</h2>
-                <p className="area-detail-inline-tabs"><span>Lịch sử</span><span>Ghi chú</span></p>
-              </div>
-              <span className="area-detail-muted">Theo dõi hoạt động gần nhất trong khu vực</span>
-            </div>
-            <div className="area-detail-table-wrap">
-              <table className="area-detail-table">
-                <thead>
-                  <tr>
-                    <th>Mã</th>
-                    <th>Loại</th>
-                    <th>Ngày</th>
-                    <th>Thông tin</th>
-                    <th>Người dùng</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lichSu.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.id}</td>
-                      <td>{item.loai}</td>
-                      <td>{item.ngay}</td>
-                      <td>{item.noi_dung}</td>
-                      <td>{item.nguoi_dung}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+              <section className="area-detail-card area-detail-pasture">
+                <div className="area-detail-card-head">
+                  <h2>Quản lý thảm thực vật và chăn thả</h2>
+                  <span className="area-detail-muted">Chỉ hiển thị dữ liệu hiện có trong cơ sở dữ liệu</span>
+                </div>
+
+                <div className="area-detail-kpis">
+                  <div><span>Hình thức sử dụng</span><strong>{nhomInfo.nhan}</strong></div>
+                  <div><span>Loại cây trồng</span><strong>{chiTiet.loai}</strong></div>
+                  {renderMetric("Số ngày trong chu kỳ", chiTiet.so_ngay_trong_chu_ky)}
+                  {renderMetric("Tải trọng DSE/ngày", chiTiet.dse_ngay)}
+                  {renderMetric("Thức ăn sẵn có", chiTiet.tong_thuc_an_kg_dm, " kg DM/ha")}
+                  {renderMetric("Tăng trưởng thảm thực vật", chiTiet.toc_do_tang_truong, " kg/ha/ngày")}
+                  {renderMetric("Ngày chăn thả còn lại", chiTiet.con_lai_ngay_chan_tha)}
+                  {renderMetric("Diện tích khả dụng", chiTiet.dien_tich_kha_dung_ha, " ha")}
+                </div>
+
+                {chiTiet.chi_so.length > 0 ? (
+                  <div className="area-detail-index-grid">
+                    {chiTiet.chi_so.map((item) => (
+                      <article key={item.ma} className="area-index-card">
+                        <div className="area-index-head">
+                          <div>
+                            <p>{item.ten}</p>
+                            <strong>{item.ma}</strong>
+                          </div>
+                          <span style={{ color: item.mau }}>{item.gia_tri.toFixed(2)}</span>
+                        </div>
+                        <div className="area-index-bar"><span style={{ width: `${Math.min(item.gia_tri * 100, 100)}%`, backgroundColor: item.mau }} /></div>
+                        <small>Mức đánh giá: {item.muc}</small>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="area-farm-note">Chưa có chỉ số thảm thực vật nào được lưu cho khu vực này trong database.</p>
+                )}
+              </section>
+
+              <section className="area-detail-card">
+                <div className="area-detail-card-head">
+                  <h2>Nhật ký nông dược</h2>
+                  <span className="area-detail-muted">Nguồn dữ liệu: bảng `du_lieu.nhat_ky_nong_duoc_khu_vuc`</span>
+                </div>
+                {nhatKy.length > 0 ? (
+                  <div className="area-detail-table-wrap">
+                    <table className="area-detail-table wide">
+                      <thead>
+                        <tr>
+                          <th>Ngày áp dụng</th>
+                          <th>Bắt đầu</th>
+                          <th>Kết thúc</th>
+                          <th>Sản phẩm</th>
+                          <th>Thiết bị</th>
+                          <th>Liều lượng</th>
+                          <th>Diện tích</th>
+                          <th>Cách ly</th>
+                          <th>Loại cây trồng</th>
+                          <th>Tốc độ gió</th>
+                          <th>Hướng gió</th>
+                          <th>Nhiệt độ</th>
+                          <th>Độ ẩm</th>
+                          <th>Vận hành</th>
+                          <th>Giám sát</th>
+                          <th>Đối tượng áp dụng</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {nhatKy.map((item) => (
+                          <tr key={item.id}>
+                            <td>{item.ngay_ap_dung}</td>
+                            <td>{item.gio_bat_dau}</td>
+                            <td>{item.gio_ket_thuc}</td>
+                            <td>{item.san_pham}</td>
+                            <td>{item.thiet_bi}</td>
+                            <td>{item.lieu_luong}</td>
+                            <td>{item.dien_tich}</td>
+                            <td>{item.thoi_gian_cach_ly}</td>
+                            <td>{item.loai_cay_trong}</td>
+                            <td>{item.toc_do_gio}</td>
+                            <td>{item.huong_gio}</td>
+                            <td>{item.nhiet_do}</td>
+                            <td>{item.do_am}</td>
+                            <td>{item.van_hanh}</td>
+                            <td>{item.giam_sat}</td>
+                            <td>{item.doi_tuong_ap_dung}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="area-farm-note">Chưa có bản ghi nhật ký nông dược cho khu vực này.</p>
+                )}
+              </section>
+
+              <section className="area-detail-card">
+                <div className="area-detail-card-head">
+                  <div>
+                    <h2>Lịch sử và ghi chú</h2>
+                    <p className="area-detail-inline-tabs"><span>Lịch sử</span><span>Ghi chú</span></p>
+                  </div>
+                  <span className="area-detail-muted">Nguồn dữ liệu: bảng `du_lieu.lich_su_ghi_chu_khu_vuc`</span>
+                </div>
+                {lichSu.length > 0 ? (
+                  <div className="area-detail-table-wrap">
+                    <table className="area-detail-table">
+                      <thead>
+                        <tr>
+                          <th>Mã</th>
+                          <th>Loại</th>
+                          <th>Ngày</th>
+                          <th>Thông tin</th>
+                          <th>Người dùng</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {lichSu.map((item) => (
+                          <tr key={item.id}>
+                            <td>{item.id}</td>
+                            <td>{item.loai}</td>
+                            <td>{item.ngay}</td>
+                            <td>{item.noi_dung}</td>
+                            <td>{item.nguoi_dung}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="area-farm-note">Chưa có lịch sử hoặc ghi chú nào cho khu vực này.</p>
+                )}
+              </section>
+            </>
+          )}
         </div>
       </section>
     </main>
