@@ -331,6 +331,25 @@ function taoPathDuong(data: Array<{ label: string; value: number | null }>) {
   return points;
 }
 
+
+function nhanMocChiSo(label: string) {
+  if (label === "NDVI") return ["None", "Sparse", "Dense"];
+  if (label === "EVI") return ["None", "Low", "High"];
+  if (label === "NDMI") return ["Bare", "Stress", "High"];
+  if (label === "NDWI") return ["Drought", "Humidity", "Water"];
+  if (label === "SAVI") return ["Low", "Medium", "High"];
+  return ["Ground", "Overcast", "Snow"];
+}
+
+function mauThanhChiSo(label: string) {
+  if (label === "NDVI") return "linear-gradient(90deg, #ef4444 0%, #f59e0b 35%, #fde68a 55%, #86efac 78%, #16a34a 100%)";
+  if (label === "EVI") return "linear-gradient(90deg, #dbeafe 0%, #38bdf8 35%, #0ea5e9 55%, #84cc16 78%, #22c55e 100%)";
+  if (label === "NDMI") return "linear-gradient(90deg, #d97706 0%, #facc15 35%, #67e8f9 58%, #60a5fa 100%)";
+  if (label === "NDWI") return "linear-gradient(90deg, #f59e0b 0%, #fde68a 35%, #a7f3d0 65%, #22c55e 100%)";
+  if (label === "SAVI") return "linear-gradient(90deg, #e2e8f0 0%, #7dd3fc 35%, #38bdf8 55%, #bbf7d0 82%, #84cc16 100%)";
+  return "linear-gradient(90deg, #ef4444 0%, #f8fafc 45%, #93c5fd 100%)";
+}
+
 function renderMetric(label: string, value: number | null, suffix = "") {
   return (
     <div>
@@ -451,45 +470,44 @@ export default async function ChiTietKhuVucPage({ params }: { params: { id: stri
                 <div className="area-detail-card-head">
                   <div>
                     <h2>Chỉ số thảm thực vật</h2>
-                    <span className="area-detail-muted">Cắt lớp bản đồ theo khu vực đang chọn, tương tự màn hình tạo ô.</span>
+                    
                   </div>
                 </div>
 
-                <div className="area-detail-thumb-grid">
+                <div className="area-detail-thumb-grid compact">
                   <article className="area-detail-thumb-card">
                     <span>Vệ tinh</span>
                     <MapViewSwitcher lat={chiTiet.tam_lat} lng={chiTiet.tam_lng} zoom={17} title={`Vệ tinh ${chiTiet.ten}`} initialMode="satellite" frameClassName="area-detail-thumb-map" polygon={chiTiet.polygon} fitToPolygon={chiTiet.polygon.length >= 3} hideModeTabs hideEcoNote />
                   </article>
                   <article className="area-detail-thumb-card">
-                    <span>Địa hình</span>
-                    <MapViewSwitcher lat={chiTiet.tam_lat} lng={chiTiet.tam_lng} zoom={16} title={`Địa hình ${chiTiet.ten}`} initialMode="terrain" frameClassName="area-detail-thumb-map" polygon={chiTiet.polygon} fitToPolygon={chiTiet.polygon.length >= 3} hideModeTabs hideEcoNote />
-                  </article>
-                  <article className="area-detail-thumb-card">
-                    <span>Đường bộ</span>
-                    <MapViewSwitcher lat={chiTiet.tam_lat} lng={chiTiet.tam_lng} zoom={16} title={`Đường bộ ${chiTiet.ten}`} initialMode="roadmap" frameClassName="area-detail-thumb-map" polygon={chiTiet.polygon} fitToPolygon={chiTiet.polygon.length >= 3} hideModeTabs hideEcoNote />
-                  </article>
-                  <article className="area-detail-thumb-card">
-                    <span>Lớp thảm thực vật</span>
+                    <span>Lớp thảm thực vật NDVI</span>
                     <MapViewSwitcher lat={chiTiet.tam_lat} lng={chiTiet.tam_lng} zoom={12} title={`Thảm thực vật ${chiTiet.ten}`} initialMode="eco" frameClassName="area-detail-thumb-map" polygon={chiTiet.polygon} fitToPolygon={chiTiet.polygon.length >= 3} hideModeTabs hideEcoNote />
                   </article>
                 </div>
 
                 {chiTiet.chi_so.length > 0 ? (
                   <>
-                    <div className="area-detail-index-grid">
-                      {chiTiet.chi_so.map((item) => (
-                        <article key={item.ma} className="area-index-card">
-                          <div className="area-index-head">
-                            <div>
-                              <p>{item.ten}</p>
-                              <strong>{item.ma}</strong>
+                    <div className="area-detail-scale-grid">
+                      {chiTiet.chi_so.map((item) => {
+                        const moc = nhanMocChiSo(item.ma);
+                        return (
+                          <article key={item.ma} className="area-detail-scale-card">
+                            <div className="area-detail-scale-head">
+                              <div>
+                                <p>{item.ten}</p>
+                                <strong>{item.ma}</strong>
+                              </div>
+                              <span style={{ color: item.mau }}>{item.gia_tri.toFixed(2)}</span>
                             </div>
-                            <span style={{ color: item.mau }}>{item.gia_tri.toFixed(2)}</span>
-                          </div>
-                          <div className="area-index-bar"><span style={{ width: `${Math.min(item.gia_tri * 100, 100)}%`, backgroundColor: item.mau }} /></div>
-                          <small>Mức đánh giá: {item.muc}</small>
-                        </article>
-                      ))}
+                            <div className="area-detail-scale-track" style={{ backgroundImage: mauThanhChiSo(item.ma) }}>
+                              <span className="area-detail-scale-dot" style={{ left: `calc(${Math.min(item.gia_tri * 100, 100)}% - 7px)` }} />
+                            </div>
+                            <div className="area-detail-scale-labels">
+                              {moc.map((label) => <span key={label}>{label}</span>)}
+                            </div>
+                          </article>
+                        );
+                      })}
                     </div>
 
                     <div className="area-detail-chart-card">
