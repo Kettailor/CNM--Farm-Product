@@ -94,6 +94,12 @@ const nhomKhuVucMap: Record<OLoai, { nhan: string; mau: string; bieu_tuong: stri
 
 const normalizeTypeText = (v: unknown) => String(v ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
+
+const toNumber = (value: unknown, fallback: number) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 const detectAreaType = (raw: string): OLoai => {
   if (raw.includes("cropping") || raw.includes("trong trot") || raw.includes("cay trong") || raw.includes("lua") || raw.includes("ke")) return "cropping";
   if (raw.includes("grazing") || raw.includes("chan tha")) return "grazing";
@@ -133,7 +139,7 @@ async function getChiTietKhuVuc(ownerId: string, khuVucId: string): Promise<ChiT
        join du_lieu.nong_trai n on n.id = dc.farm_id
        left join du_lieu.vi_tri_nong_trai l on l.farm_id = n.id
        where n.owner_id = $1 and dc.id = $2
-       order by l.created_at desc nulls last
+       order by n.created_at desc
        limit 1`,
       [ownerId, khuVucId]
     );
@@ -168,13 +174,13 @@ async function getChiTietKhuVuc(ownerId: string, khuVucId: string): Promise<ChiT
       nhom,
       mo_ta: b?.metadata?.notes ?? `${r.name ?? "Khu vực"} thuộc hệ thống KetKat-EcoFarm, phù hợp để theo dõi lịch sử canh tác và chăn thả theo thời gian thực.`,
       trang_thai: r.status ?? r.grazing_status ?? "Đang theo dõi",
-      dien_tich_ha: dienTichHa,
-      dien_tich_m2: Number((dienTichHa * 10000).toFixed(0)),
-      chu_vi_m: chuViM,
-      dien_tich_kha_dung_ha: dienTichKhaDung,
+      dien_tich_ha: toNumber(dienTichHa, 0),
+      dien_tich_m2: toNumber(Number((dienTichHa * 10000).toFixed(0)), 0),
+      chu_vi_m: toNumber(chuViM, 0),
+      dien_tich_kha_dung_ha: toNumber(dienTichKhaDung, 0),
       vi_tri_ten: r.location_name ?? r.farm_name ?? "Khu vực nông trại",
-      tam_lat: Number(b?.geo?.lat ?? polygon[0]?.lat ?? 10.762622),
-      tam_lng: Number(b?.geo?.lng ?? polygon[0]?.lng ?? 106.660172),
+      tam_lat: toNumber(b?.geo?.lat ?? polygon[0]?.lat, 10.762622),
+      tam_lng: toNumber(b?.geo?.lng ?? polygon[0]?.lng, 106.660172),
       ngay_tao: r.created_at ? new Date(r.created_at).toLocaleDateString("vi-VN") : "-",
       ngay_cap_nhat: r.created_at ? new Date(r.created_at).toLocaleString("vi-VN") : "-",
       so_ngay_trong_chu_ky: 27,
@@ -295,8 +301,8 @@ export default async function ChiTietKhuVucPage({ params }: { params: { id: stri
   const mapData = ownerId ? await getLatestFarmMap(ownerId) : null;
   const chiTiet = ownerId ? await getChiTietKhuVuc(ownerId, params.id) : null;
   const farmName = mapData?.farm_name || "KetKat-EcoFarm";
-  const lat = chiTiet?.tam_lat ?? mapData?.latitude ?? 10.762622;
-  const lng = chiTiet?.tam_lng ?? mapData?.longitude ?? 106.660172;
+  const lat = toNumber(chiTiet?.tam_lat ?? mapData?.latitude, 10.762622);
+  const lng = toNumber(chiTiet?.tam_lng ?? mapData?.longitude, 106.660172);
   const thongTin = chiTiet ?? {
     id: params.id,
     ten: "Khu vực đồi phía Bắc 04",
