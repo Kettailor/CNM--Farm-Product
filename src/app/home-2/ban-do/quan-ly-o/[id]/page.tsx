@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import TopbarUserMenu from "@/components/topbar-user-menu";
 import MapViewSwitcher from "@/components/map-view-switcher";
+import AreaIndexTrendChart from "@/components/area-index-trend-chart";
 
 type OLoai = "cropping" | "grazing" | "hay" | "resting" | "nguon_nuoc" | "phuong_tien" | "chan_nuoi" | "dung_cu" | "nha_kho";
 
@@ -330,27 +331,7 @@ export const dynamic = "force-dynamic";
 
 
 function taoDuLieuBieuDo(chiSo: ChiSoThamThucVat[]) {
-  const labels = ["NDVI", "EVI", "NDMI", "NDWI", "SAVI", "NDSI"];
-  return labels.map((label) => {
-    const item = chiSo.find((entry) => entry.ma === label);
-    return { label, value: item?.gia_tri ?? null, mau: item?.mau ?? "#94a3b8" };
-  });
-}
-
-function taoPathDuong(data: Array<{ label: string; value: number | null }>) {
-  const width = 1000;
-  const height = 220;
-  const paddingX = 40;
-  const paddingY = 24;
-  const points = data
-    .map((item, index) => {
-      const x = paddingX + (index * (width - paddingX * 2)) / Math.max(data.length - 1, 1);
-      const value = item.value ?? 0;
-      const y = height - paddingY - value * 140;
-      return `${x},${y}`;
-    })
-    .join(" ");
-  return points;
+  return chiSo.map((item) => ({ key: item.ma, label: item.ma, color: item.mau, value: item.gia_tri }));
 }
 
 
@@ -390,7 +371,6 @@ export default async function ChiTietKhuVucPage({ params }: { params: { id: stri
   const farmName = mapData?.farm_name || "KetKat-EcoFarm";
   const nhomInfo = nhomKhuVucMap[chiTiet?.nhom ?? "cropping"];
   const duLieuBieuDo = chiTiet ? taoDuLieuBieuDo(chiTiet.chi_so) : [];
-  const pathChiSo = duLieuBieuDo.length > 0 ? taoPathDuong(duLieuBieuDo) : "";
 
   return (
     <main className="dashboard-page area-detail-page">
@@ -535,27 +515,9 @@ export default async function ChiTietKhuVucPage({ params }: { params: { id: stri
                     <div className="area-detail-chart-card">
                       <div className="area-detail-chart-head">
                         <strong>Biểu đồ chỉ số khu vực</strong>
-                        <span>Giá trị đọc được đã lưu khi tạo khu vực</span>
+                        <span>Biểu diễn nhiều đường theo phong cách dashboard ảnh mẫu</span>
                       </div>
-                      <svg className="area-detail-index-chart" viewBox="0 0 1000 220" preserveAspectRatio="none">
-                        <g className="area-detail-chart-grid">
-                          {[0.2, 0.4, 0.6, 0.8].map((tick) => (
-                            <line key={tick} x1="40" y1={220 - 24 - tick * 140} x2="960" y2={220 - 24 - tick * 140} />
-                          ))}
-                        </g>
-                        <polyline points={pathChiSo} />
-                        {duLieuBieuDo.map((item, index) => {
-                          const x = 40 + (index * (1000 - 80)) / Math.max(duLieuBieuDo.length - 1, 1);
-                          const y = 220 - 24 - (item.value ?? 0) * 140;
-                          return (
-                            <g key={item.label}>
-                              <circle cx={x} cy={y} r="6" fill={item.mau} />
-                              <text x={x} y="212" textAnchor="middle">{item.label}</text>
-                              <text x={x} y={y - 12} textAnchor="middle">{item.value?.toFixed(2) ?? "-"}</text>
-                            </g>
-                          );
-                        })}
-                      </svg>
+                      <AreaIndexTrendChart series={duLieuBieuDo} seed={`${chiTiet.id}-${chiTiet.ngay_tao}`} />
                     </div>
                   </>
                 ) : (

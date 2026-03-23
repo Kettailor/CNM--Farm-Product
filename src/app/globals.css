@@ -2180,3 +2180,81 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 }
+
+.area-trend-chart-shell {
+  display: grid;
+  gap: 12px;
+}
+
+.area-trend-chart-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.area-trend-chart-badges {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.area-trend-badge,
+.area-trend-tooltip-inline span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #334155;
+}
+
+.area-trend-badge i,
+.area-trend-tooltip-inline i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.area-trend-tooltip-inline {
+  padding: 10px 12px;
+  border: 1px solid #d7e0e6;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.area-trend-tooltip-inline strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.area-trend-tooltip-inline div {
+  display: grid;
+  gap: 6px;
+}
+
+.area-trend-chart {
+  width: 100%;
+  height: 360px;
+}
+
+.area-trend-chart .grid {
+  stroke: #dbe4ea;
+  stroke-width: 1;
+}
+
+.area-trend-chart .tick-x,
+.area-trend-chart .tick-y {
+  fill: #64748b;
+  font-size: 12px;
+}
+
+.area-trend-chart .active-line {
+  stroke: #cbd5e1;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
