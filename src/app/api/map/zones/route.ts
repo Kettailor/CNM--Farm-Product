@@ -29,6 +29,12 @@ type ZonePayload = {
     farmType: "cattle" | "sheep" | "pig" | "poultry" | "crop";
     shapeRatio: number;
     rotationDeg: number;
+    NDVI?: number;
+    EVI?: number;
+    NDMI?: number;
+    NDWI?: number;
+    SAVI?: number;
+    NDSI?: number;
   };
   resources: Array<{ id: string; type: string; name: string; status: string; lastSeen: string; quantity: number }>;
 };

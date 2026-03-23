@@ -164,6 +164,8 @@ export default function AreaEditorWorkbench({ lat, lng, zoomLevel, boundaryScale
           areaHecta: Number(safeGeo.areaHa.toFixed(4)), usage: meta.usage, soilType, waterSource, manager,
           plantingStatus: plantingStatusLabel, priority: "medium", notes: `${desc} | Giống: ${cropType} | Loại: ${meta.label}`,
           areaType, farmType: areaType === "chan_nuoi" || areaType === "grazing" ? "cattle" : "crop", shapeRatio: 1.2, rotationDeg: 0,
+          NDVI: Number(metrics.NDVI.toFixed(2)), EVI: Number(metrics.EVI.toFixed(2)), NDMI: Number(metrics.NDMI.toFixed(2)),
+          NDWI: Number(metrics.NDWI.toFixed(2)), SAVI: Number(metrics.SAVI.toFixed(2)), NDSI: Number(metrics.NDSI.toFixed(2)),
         },
         resources: [{ id: "m1", type: "metric", name: "vệ tinh", status: "online", lastSeen: new Date().toISOString(), quantity: Number(metrics.NDVI.toFixed(2)) }],
       };
