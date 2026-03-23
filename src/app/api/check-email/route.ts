@@ -1,0 +1,34 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = (await request.json()) as { email?: string };
+    const email = body?.email?.trim()?.toLowerCase();
+
+    if (!email) {
+      return NextResponse.json({ message: "Email là bắt buộc." }, { status: 400 });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json({ message: "Email không hợp lệ." }, { status: 400 });
+    }
+
+    const result = await db.query(
+      "select 1 from du_lieu.chu_so_huu where lower(email) = $1 limit 1",
+      [email]
+    );
+
+    return NextResponse.json({ exists: result.rows.length > 0 });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        message: "Không thể kiểm tra email lúc này.",
+        error: String(error),
+      },
+      { status: 500 }
+    );
+  }
+}
+

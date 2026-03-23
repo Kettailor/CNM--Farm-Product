@@ -2,7 +2,7 @@
 .banner-section {
 	//Style one
 	&.style-v1 {
-		background: url(../img/banner/hero1-bg.jpg) no-repeat center center;
+		background: linear-gradient(135deg, #1f3b2d 0%, #2f5d46 100%);
 		background-size: cover;
 		padding: 185px 0 110px;
 		position: relative;
@@ -409,7 +409,7 @@
 				max-width: 1314px;
 			}
 		}
-		background: url(../img/banner/hero3-bg.png) no-repeat center center;
+		background: linear-gradient(135deg, #234231 0%, #3b6b4f 100%);
 		background-size: cover;
 		padding-top: 80px;
 		.hero-contentv03 {
@@ -681,7 +681,7 @@
 
 //BreadCrumnd Banner
 .breadcrumnd-banner {
-	background: url(../img/about/bread-bg.png) no-repeat center center;
+	background: linear-gradient(135deg, #214733 0%, #4d7a5c 100%);
 	background-size: cover;
 	position: relative;
 	padding: 150px 0;

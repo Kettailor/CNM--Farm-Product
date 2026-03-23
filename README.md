@@ -34,3 +34,86 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Database design for smart farm traceability
+
+A comprehensive PostgreSQL schema for the smart farm and product traceability domain is available in:
+
+- `docs/database/farm_traceability_schema.sql`
+- `docs/database/README.md`
+
+
+## Run the full project with Docker
+
+This repository now includes a Docker setup for the full project:
+
+- `Dockerfile` for the Next.js application
+- `docker-compose.yml` for the app + PostgreSQL database
+- automatic database initialization from `docs/database/farm_traceability_schema.sql`
+- deployment guide at `docs/database/docker-deployment.md`
+
+### Start
+
+```bash
+docker compose up --build
+```
+
+Or use the helper scripts:
+
+```powershell
+./scripts/docker-up.ps1
+```
+
+```bash
+./scripts/docker-up.sh
+```
+
+### Stop
+
+```bash
+docker compose down
+```
+
+### View the database easily
+
+You can inspect the running PostgreSQL database in two convenient ways:
+
+- Use Adminer in Docker: `docker compose --profile tools up -d adminer`
+- Use a VS Code plugin such as SQLTools + SQLTools PostgreSQL Driver
+
+Connection info for desktop apps/plugins:
+
+- Host: `127.0.0.1`
+- Port: `5432`
+- Database: `farmhub`
+- Username: `farmhub`
+- Password: `farmhub`
+
+Connection info for Adminer at `http://localhost:8080`:
+
+- System: `PostgreSQL`
+- Server: `db`
+- Username: `farmhub`
+- Password: `farmhub`
+- Database: `farmhub`
+
+> In Adminer, do **not** use `localhost` as the server name. Adminer runs in a separate container, so `localhost` points to the Adminer container itself, not PostgreSQL.
+
+Once you log in to Adminer, you can inspect the database like this:
+
+- Use **Databases** to see the list of available databases on the server.
+- Open the `farmhub` database, then use **Schema** / **Tables and views** to browse tables.
+- Click a table name to see its columns, indexes, foreign keys, and data rows.
+- Use **SQL command** to run queries such as `SELECT * FROM farm.some_table LIMIT 20;` or joins to inspect relationships.
+
+If you do **not** see any tables, the most common reason is that you are connected to the wrong database/schema or the PostgreSQL volume was created before the init SQL ran. This project creates tables inside the `farm` schema, not the default `public` schema, and the bootstrap SQL only runs the first time the `postgres_data` volume is created. To recreate the schema from scratch, run:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+### Windows note
+
+If you see an error like `open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified` or `unable to get image 'cnm-farm-product-traceability-db'`, Docker Desktop is not running yet. Start Docker Desktop first, wait for the engine to become available, then run the command again. See `docs/database/docker-deployment.md` for troubleshooting steps.
+

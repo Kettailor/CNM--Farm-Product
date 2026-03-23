@@ -733,7 +733,8 @@
 //version02
 .feature-videov02 {
 	// background: url(../img/about/feature-video02.png) no-repeat center center;
-	background: url(../img/about/feature-video02.jpg) no-repeat center center;
+	// background: url(../img/about/feature-video02.jpg) no-repeat center center;
+	background: $p900-clr;
 	background-size: cover;
 	padding: 270px 0 170px;
 	.feature-video-wrap {
