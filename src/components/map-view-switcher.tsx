@@ -18,6 +18,7 @@ type Props = {
   lng: number;
   zoom?: number;
   title: string;
+  initialMode?: ViewMode;
   frameClassName?: string;
   polygon?: MapPolygon[];
   zones?: MapZone[];
@@ -38,8 +39,8 @@ const viewItems: Array<{ key: ViewMode; label: string }> = [
   { key: "eco", label: "Độ cao & thảm thực vật" },
 ];
 
-export default function MapViewSwitcher({ lat, lng, zoom = 16, title, frameClassName, polygon = [], zones = [], fitToPolygon = false, frameOverlay, hideModeTabs = false, hideEcoNote = false, onViewChange }: Props) {
-  const [mode, setMode] = useState<ViewMode>("satellite");
+export default function MapViewSwitcher({ lat, lng, zoom = 16, title, initialMode = "satellite", frameClassName, polygon = [], zones = [], fitToPolygon = false, frameOverlay, hideModeTabs = false, hideEcoNote = false, onViewChange }: Props) {
+  const [mode, setMode] = useState<ViewMode>(initialMode);
   const [isLoading, setIsLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -51,13 +52,18 @@ export default function MapViewSwitcher({ lat, lng, zoom = 16, title, frameClass
   const modeLayersRef = useRef<Record<ViewMode, any>>({ satellite: null, terrain: null, roadmap: null, eco: null });
 
   useEffect(() => {
+    if (hideModeTabs) {
+      setMode(initialMode);
+      return;
+    }
     const saved = localStorage.getItem(STORAGE_KEY) as ViewMode | null;
     if (saved && ["satellite", "terrain", "roadmap", "eco"].includes(saved)) setMode(saved);
-  }, []);
+  }, [hideModeTabs, initialMode]);
 
   useEffect(() => {
+    if (hideModeTabs) return;
     localStorage.setItem(STORAGE_KEY, mode);
-  }, [mode]);
+  }, [hideModeTabs, mode]);
 
   useEffect(() => {
     let alive = true;

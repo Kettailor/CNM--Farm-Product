@@ -1981,3 +1981,92 @@ textarea:focus {
     height: 280px;
   }
 }
+
+.area-detail-thumb-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.area-detail-thumb-card {
+  border: 1px solid #d7e0e6;
+  border-radius: 12px;
+  background: #fbfcfd;
+  padding: 10px;
+}
+
+.area-detail-thumb-card > span {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #41515b;
+}
+
+.area-detail-thumb-map {
+  width: 100%;
+  height: 150px;
+  border-radius: 8px;
+}
+
+.area-detail-chart-card {
+  margin-top: 14px;
+  border: 1px solid #d7e0e6;
+  border-radius: 14px;
+  padding: 14px;
+  background: linear-gradient(180deg, #f9fbfc 0%, #eef5f8 100%);
+}
+
+.area-detail-chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.area-detail-chart-head strong {
+  font-size: 15px;
+  color: #2f3f49;
+}
+
+.area-detail-chart-head span {
+  font-size: 12px;
+  color: #6b7c86;
+}
+
+.area-detail-index-chart {
+  width: 100%;
+  height: 240px;
+}
+
+.area-detail-chart-grid line {
+  stroke: #d9e3e8;
+  stroke-width: 1;
+}
+
+.area-detail-index-chart polyline {
+  fill: none;
+  stroke: #0f766e;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.area-detail-index-chart text {
+  fill: #50626d;
+  font-size: 12px;
+}
+
+@media (max-width: 1100px) {
+  .area-detail-thumb-grid {
+    grid-template-columns: repeat(2, minmax(200px, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .area-detail-thumb-grid {
+    grid-template-columns: 1fr;
+  }
+}
