@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 
 type ZonePayload = {
@@ -8,7 +9,14 @@ type ZonePayload = {
   status: "healthy" | "warning" | "critical";
   occupancy: number;
   coverage: string;
-  geo: { lat: number; lng: number; latSpan: number; lngSpan: number };
+  geo: {
+    lat: number;
+    lng: number;
+    latSpan: number;
+    lngSpan: number;
+    polygon?: Array<{ lat: number; lng: number }>;
+    bounds?: { south: number; west: number; north: number; east: number };
+  };
   metadata: {
     areaHecta: number;
     usage: string;
@@ -39,6 +47,17 @@ const toZone = (row: any) => {
       lng: Number(b.geo?.lng ?? 106.6295),
       latSpan: Number(b.geo?.latSpan ?? 0.0015),
       lngSpan: Number(b.geo?.lngSpan ?? 0.0018),
+      polygon: Array.isArray(b.geo?.polygon)
+        ? b.geo.polygon.filter((p: any) => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng))).map((p: any) => ({ lat: Number(p.lat), lng: Number(p.lng) }))
+        : [],
+      bounds: b.geo?.bounds
+        ? {
+            south: Number(b.geo.bounds.south ?? 0),
+            west: Number(b.geo.bounds.west ?? 0),
+            north: Number(b.geo.bounds.north ?? 0),
+            east: Number(b.geo.bounds.east ?? 0),
+          }
+        : undefined,
     },
     metadata: {
       areaHecta: Number(row.area_ha ?? b.metadata?.areaHecta ?? 1),
@@ -66,9 +85,28 @@ const toBoundaryGeojson = (z: ZonePayload) => ({
   resources: z.resources,
 });
 
+async function getOwnerFarmId() {
+  const ownerId = cookies().get("ownerId")?.value;
+  if (!ownerId) return null;
+
+  const rs = await db.query(
+    `select id
+     from du_lieu.nong_trai
+     where owner_id = $1
+     order by created_at desc
+     limit 1`,
+    [ownerId]
+  );
+
+  return rs.rows[0]?.id as string | undefined;
+}
+
 export async function GET() {
   try {
-    const rs = await db.query("select * from farm.paddocks order by created_at asc");
+    const farmId = await getOwnerFarmId();
+    if (!farmId) return NextResponse.json({ zones: [] });
+
+    const rs = await db.query("select * from du_lieu.dong_chan_tha where farm_id = $1 order by created_at asc", [farmId]);
     return NextResponse.json({ zones: rs.rows.map(toZone) });
   } catch (error) {
     return NextResponse.json({ message: "Không thể kết nối dữ liệu map từ PostgreSQL.", error: String(error) }, { status: 500 });
@@ -77,24 +115,59 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const zone = (await request.json()) as ZonePayload;
-  const q = `insert into farm.paddocks(farm_id,paddock_code,name,area_ha,crop_type,grazing_status,notes,boundary_geojson,status)
-             values((select id from farm.farms order by created_at asc limit 1),$1,$2,$3,$4,$5,$6,$7,$8) returning *`;
-  const vals = [zone.code, zone.name, zone.metadata.areaHecta, zone.metadata.usage, zone.metadata.plantingStatus, zone.metadata.notes, toBoundaryGeojson(zone), zone.status === "critical" ? "maintenance" : "active"];
-  const rs = await db.query(q, vals);
-  return NextResponse.json({ zone: toZone(rs.rows[0]) });
+
+  try {
+    const farmId = await getOwnerFarmId();
+    if (!farmId) {
+      return NextResponse.json({ message: "Không tìm thấy trang trại của tài khoản hiện tại." }, { status: 404 });
+    }
+
+    const existingName = await db.query(
+      `select id from du_lieu.dong_chan_tha where farm_id = $1 and lower(trim(name)) = lower(trim($2)) limit 1`,
+      [farmId, zone.name]
+    );
+    if (existingName.rows[0]?.id) {
+      return NextResponse.json({ message: `Tên ô "${zone.name}" đã tồn tại. Vui lòng đặt tên khác.` }, { status: 409 });
+    }
+
+    const q = `insert into du_lieu.dong_chan_tha(farm_id,paddock_code,name,area_ha,crop_type,grazing_status,notes,boundary_geojson,status)
+               values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`;
+    const vals = [farmId, zone.code, zone.name, zone.metadata.areaHecta, zone.metadata.usage, zone.metadata.plantingStatus, zone.metadata.notes, toBoundaryGeojson(zone), zone.status === "critical" ? "maintenance" : "active"];
+
+    const rs = await db.query(q, vals);
+    return NextResponse.json({ zone: toZone(rs.rows[0]) });
+  } catch (error: any) {
+    if (error?.code === "23505") {
+      return NextResponse.json(
+        { message: `Mã khu ${zone.code} đã tồn tại. Vui lòng thử lại.` },
+        { status: 409 }
+      );
+    }
+
+    return NextResponse.json({ message: "Không thể tạo khu mới." }, { status: 500 });
+  }
 }
 
 export async function PUT(request: NextRequest) {
   const zone = (await request.json()) as ZonePayload;
-  const q = `update farm.paddocks set name=$2, area_ha=$3, crop_type=$4, grazing_status=$5, notes=$6, boundary_geojson=$7, status=$8 where id=$1 returning *`;
-  const vals = [zone.id, zone.name, zone.metadata.areaHecta, zone.metadata.usage, zone.metadata.plantingStatus, zone.metadata.notes, toBoundaryGeojson(zone), zone.status === "critical" ? "maintenance" : "active"];
+  const farmId = await getOwnerFarmId();
+  if (!farmId) return NextResponse.json({ message: "Không tìm thấy trang trại của tài khoản hiện tại." }, { status: 404 });
+
+  const q = `update du_lieu.dong_chan_tha
+             set name=$3, area_ha=$4, crop_type=$5, grazing_status=$6, notes=$7, boundary_geojson=$8, status=$9
+             where id=$1 and farm_id=$2
+             returning *`;
+  const vals = [zone.id, farmId, zone.name, zone.metadata.areaHecta, zone.metadata.usage, zone.metadata.plantingStatus, zone.metadata.notes, toBoundaryGeojson(zone), zone.status === "critical" ? "maintenance" : "active"];
   const rs = await db.query(q, vals);
-  return NextResponse.json({ zone: toZone(rs.rows[0]) });
+  return NextResponse.json({ zone: rs.rows[0] ? toZone(rs.rows[0]) : null });
 }
 
 export async function DELETE(request: NextRequest) {
   const { id } = (await request.json()) as { id: string };
-  await db.query("delete from farm.paddocks where id = $1", [id]);
+  const farmId = await getOwnerFarmId();
+  if (!farmId) return NextResponse.json({ message: "Không tìm thấy trang trại của tài khoản hiện tại." }, { status: 404 });
+
+  await db.query("delete from du_lieu.dong_chan_tha where id = $1 and farm_id = $2", [id, farmId]);
   return NextResponse.json({ ok: true });
 }
 
