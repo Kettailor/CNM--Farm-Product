@@ -36,7 +36,7 @@ const menuItems = [
   { icon: "🧩", ten: "Quản lý khu vực", href: "/home-2/ban-do/quan-ly-o" },
   { icon: "🐄", ten: "Vật nuôi", href: "#" },
   { icon: "🌧️", ten: "Thời tiết", href: "#" },
-  { icon: "⚙️", ten: "Profile", href: "/home-2/profile" },
+  { icon: "⚙️", ten: "Hồ sơ", href: "/home-2/profile" },
 ];
 
 const normalizeTypeText = (v: unknown) => String(v ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -194,7 +194,7 @@ export default async function BanDoTrangTraiPage({ searchParams }: { searchParam
         <a href="/home-2/ban-do/quan-ly-o" className="dashboard-taskbar-item">Quản lý khu vực</a>
         <a href="#" className="dashboard-taskbar-item">Vật nuôi</a>
         <a href="#" className="dashboard-taskbar-item">Cảnh báo</a>
-        <a href="/home-2/profile" className="dashboard-taskbar-item">Profile</a>
+        <a href="/home-2/profile" className="dashboard-taskbar-item">Hồ sơ</a>
       </nav>
 
       <section className="dashboard-layout dashboard-layout-with-toggle">
@@ -231,11 +231,11 @@ export default async function BanDoTrangTraiPage({ searchParams }: { searchParam
           <section className="farm-map-panel">
             <div className="farm-map-panel-head">
               <div className="farm-map-filters">
-                <a href="/home-2/ban-do?layer=all" className={activeLayer === "all" ? "active" : ""}>All Pastures</a>
-                <a href="/home-2/ban-do?layer=cropping" className={activeLayer === "cropping" ? "active" : ""}>Cropping</a>
-                <a href="/home-2/ban-do?layer=grazing" className={activeLayer === "grazing" ? "active" : ""}>Grazing</a>
-                <a href="/home-2/ban-do?layer=hay" className={activeLayer === "hay" ? "active" : ""}>Hay</a>
-                <a href="/home-2/ban-do?layer=resting" className={activeLayer === "resting" ? "active" : ""}>Resting</a>
+                <a href="/home-2/ban-do?layer=all" className={activeLayer === "all" ? "active" : ""}>Tất cả khu vực</a>
+                <a href="/home-2/ban-do?layer=cropping" className={activeLayer === "cropping" ? "active" : ""}>Trồng trọt</a>
+                <a href="/home-2/ban-do?layer=grazing" className={activeLayer === "grazing" ? "active" : ""}>Chăn thả</a>
+                <a href="/home-2/ban-do?layer=hay" className={activeLayer === "hay" ? "active" : ""}>Cỏ khô</a>
+                <a href="/home-2/ban-do?layer=resting" className={activeLayer === "resting" ? "active" : ""}>Nghỉ đất</a>
                 <a href="/home-2/ban-do?layer=nguon_nuoc" className={activeLayer === "nguon_nuoc" ? "active" : ""}>Nguồn nước</a>
                 <a href="/home-2/ban-do?layer=phuong_tien" className={activeLayer === "phuong_tien" ? "active" : ""}>Phương tiện</a>
                 <a href="/home-2/ban-do?layer=chan_nuoi" className={activeLayer === "chan_nuoi" ? "active" : ""}>Chăn nuôi</a>
