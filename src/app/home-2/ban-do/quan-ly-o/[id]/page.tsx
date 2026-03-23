@@ -2,7 +2,6 @@ import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import TopbarUserMenu from "@/components/topbar-user-menu";
 import MapViewSwitcher from "@/components/map-view-switcher";
-import type { ReactNode } from "react";
 
 type OLoai = "cropping" | "grazing" | "hay" | "resting" | "nguon_nuoc" | "phuong_tien" | "chan_nuoi" | "dung_cu" | "nha_kho";
 
@@ -69,7 +68,7 @@ type LichSuGhiChu = {
   id: string;
   loai: string;
   ngay: string;
-  noi_dung: ReactNode;
+  noi_dung: string;
   nguoi_dung: string;
 };
 
@@ -263,27 +262,29 @@ function taoNhatKyNongDuoc(tenKhuVuc: string): NhatKyNongDuoc[] {
   ];
 }
 
+export const dynamic = "force-dynamic";
+
 function taoLichSuVaGhiChu(tenKhuVuc: string): LichSuGhiChu[] {
   return [
     {
       id: "ghi_chu_5_0",
       loai: "Lịch sử vật nuôi",
       ngay: "18:26 13/03/2026",
-      noi_dung: <>Đàn <strong>Sữa nhóm D</strong> đã được chuyển ra khỏi khu vực này.</>,
+      noi_dung: "Đàn Sữa nhóm D đã được chuyển ra khỏi khu vực này.",
       nguoi_dung: "user1@ketkat-ecofarm.vn",
     },
     {
       id: "ghi_chu_5_1",
       loai: "Ghi chú",
       ngay: "18:26 19/02/2026",
-      noi_dung: <>Ghi chú cho <strong>{tenKhuVuc}</strong>: đã kiểm tra đầy đủ các điểm cấp nước và cảm biến hiện trường.</>,
+      noi_dung: `Ghi chú cho ${tenKhuVuc}: đã kiểm tra đầy đủ các điểm cấp nước và cảm biến hiện trường.`,
       nguoi_dung: "user1@ketkat-ecofarm.vn",
     },
     {
       id: "ghi_chu_5_2",
       loai: "Lịch sử vật nuôi",
       ngay: "18:26 28/01/2026",
-      noi_dung: <>Đàn <strong>Cừu Merino B</strong> đã được đưa vào khu vực để bắt đầu chu kỳ chăn thả mới.</>,
+      noi_dung: "Đàn Cừu Merino B đã được đưa vào khu vực để bắt đầu chu kỳ chăn thả mới.",
       nguoi_dung: "user2@ketkat-ecofarm.vn",
     },
   ];
