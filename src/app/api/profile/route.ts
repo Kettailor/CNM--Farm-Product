@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { db } from "@/lib/db";
+import { layOwnerIdTuServerCookie } from "@/lib/auth";
 
 const toNumberOrNull = (v: unknown) => {
   if (v === null || v === undefined || v === "") return null;
@@ -10,7 +10,7 @@ const toNumberOrNull = (v: unknown) => {
 
 export async function GET() {
   try {
-    const ownerId = cookies().get("ownerId")?.value;
+    const ownerId = layOwnerIdTuServerCookie();
     if (!ownerId) return NextResponse.json({ message: "Chưa đăng nhập." }, { status: 401 });
 
     const rs = await db.query(
@@ -36,7 +36,7 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   const client = await db.connect();
   try {
-    const ownerId = cookies().get("ownerId")?.value;
+    const ownerId = layOwnerIdTuServerCookie();
     if (!ownerId) return NextResponse.json({ message: "Chưa đăng nhập." }, { status: 401 });
 
     const body = await request.json();

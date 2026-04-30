@@ -26,7 +26,13 @@ type Props = {
   frameOverlay?: ReactNode;
   hideModeTabs?: boolean;
   hideEcoNote?: boolean;
+  lockMap?: boolean;
   onViewChange?: (v: { lat: number; lng: number; zoom: number }) => void;
+  onPixelMetricsChange?: (v: {
+    zoom: number;
+    size: { x: number; y: number };
+    pixelBounds: { minX: number; minY: number; maxX: number; maxY: number };
+  }) => void;
 };
 
 const STORAGE_KEY = "ketkat-map-view-mode";
@@ -39,7 +45,7 @@ const viewItems: Array<{ key: ViewMode; label: string }> = [
   { key: "eco", label: "Độ cao & thảm thực vật" },
 ];
 
-export default function MapViewSwitcher({ lat, lng, zoom = 16, title, initialMode = "satellite", frameClassName, polygon = [], zones = [], fitToPolygon = false, frameOverlay, hideModeTabs = false, hideEcoNote = false, onViewChange }: Props) {
+export default function MapViewSwitcher({ lat, lng, zoom = 16, title, initialMode = "satellite", frameClassName, polygon = [], zones = [], fitToPolygon = false, frameOverlay, hideModeTabs = false, hideEcoNote = false, lockMap = false, onViewChange, onPixelMetricsChange }: Props) {
   const [mode, setMode] = useState<ViewMode>(initialMode);
   const [isLoading, setIsLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
@@ -50,6 +56,7 @@ export default function MapViewSwitcher({ lat, lng, zoom = 16, title, initialMod
   const polygonRef = useRef<any>(null);
   const zonesLayerRef = useRef<any>(null);
   const modeLayersRef = useRef<Record<ViewMode, any>>({ satellite: null, terrain: null, roadmap: null, eco: null });
+  const lastFitKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (hideModeTabs) {
@@ -94,15 +101,30 @@ export default function MapViewSwitcher({ lat, lng, zoom = 16, title, initialMod
         }
       }, 120);
 
-      map.on("moveend zoomend", () => {
+      const emitMapMetrics = () => {
         try {
           const c = map.getCenter();
           const z = map.getZoom();
           onViewChange?.({ lat: Number(c.lat), lng: Number(c.lng), zoom: Number(z) });
+
+          const size = map.getSize();
+          const bounds = map.getPixelBounds();
+          const minX = Number(bounds?.min?.x ?? 0);
+          const minY = Number(bounds?.min?.y ?? 0);
+          const maxX = Number(bounds?.max?.x ?? size.x ?? 0);
+          const maxY = Number(bounds?.max?.y ?? size.y ?? 0);
+          onPixelMetricsChange?.({
+            zoom: Number(z),
+            size: { x: Number(size.x), y: Number(size.y) },
+            pixelBounds: { minX, minY, maxX, maxY },
+          });
         } catch {
           // ignore transient map state while unmounting
         }
-      });
+      };
+
+      map.on("moveend zoomend resize", emitMapMetrics);
+      setTimeout(emitMapMetrics, 0);
     };
 
     initMap();
@@ -119,6 +141,28 @@ export default function MapViewSwitcher({ lat, lng, zoom = 16, title, initialMod
       setMapReady(false);
     };
   }, [lat, lng, zoom]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    if (lockMap) {
+      map.dragging?.disable();
+      map.scrollWheelZoom?.disable();
+      map.doubleClickZoom?.disable();
+      map.touchZoom?.disable();
+      map.boxZoom?.disable();
+      map.keyboard?.disable();
+      return;
+    }
+
+    map.dragging?.enable();
+    map.scrollWheelZoom?.enable();
+    map.doubleClickZoom?.enable();
+    map.touchZoom?.enable();
+    map.boxZoom?.enable();
+    map.keyboard?.enable();
+  }, [lockMap, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -273,10 +317,37 @@ export default function MapViewSwitcher({ lat, lng, zoom = 16, title, initialMod
         const targetBounds =
           polygonRef.current?.getBounds?.() ||
           zonesLayerRef.current?.getBounds?.();
-        if (targetBounds?.isValid?.() && hostRef.current?.isConnected) {
+        const fitKey = JSON.stringify({
+          polygon: validPolygon.map((p) => [Number(p.lat).toFixed(6), Number(p.lng).toFixed(6)]),
+          zones: validZones.map((z) => ({
+            id: z.id,
+            polygon: z.polygon.map((p) => [Number(p.lat).toFixed(6), Number(p.lng).toFixed(6)]),
+          })),
+        });
+
+        if (targetBounds?.isValid?.() && hostRef.current?.isConnected && lastFitKeyRef.current !== fitKey) {
+          lastFitKeyRef.current = fitKey;
           setTimeout(() => {
             try {
               map.fitBounds(targetBounds, { padding: [18, 18], animate: false });
+              try {
+                const c = map.getCenter();
+                const z = map.getZoom();
+                onViewChange?.({ lat: Number(c.lat), lng: Number(c.lng), zoom: Number(z) });
+                const size = map.getSize();
+                const bounds = map.getPixelBounds();
+                const minX = Number(bounds?.min?.x ?? 0);
+                const minY = Number(bounds?.min?.y ?? 0);
+                const maxX = Number(bounds?.max?.x ?? size.x ?? 0);
+                const maxY = Number(bounds?.max?.y ?? size.y ?? 0);
+                onPixelMetricsChange?.({
+                  zoom: Number(z),
+                  size: { x: Number(size.x), y: Number(size.y) },
+                  pixelBounds: { minX, minY, maxX, maxY },
+                });
+              } catch {
+                // ignore transient leaflet pane errors
+              }
             } catch {
               // ignore transient leaflet pane errors
             }
@@ -306,7 +377,7 @@ export default function MapViewSwitcher({ lat, lng, zoom = 16, title, initialMod
         {isLoading && <div className="map-eco-loading">Đang tải dữ liệu bản đồ...</div>}
       </div>
 
-      {mode === "eco" && !hideEcoNote && <p className="map-ndvi-note">Đã tối ưu bằng tile CDN (ArcGIS + CARTO + NASA GIBS), giữ đúng 4 kiểu xem và giảm giật khi chuyển mode.</p>}
+
     </div>
   );
 }

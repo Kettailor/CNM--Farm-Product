@@ -96,15 +96,15 @@ export default function RegistrationPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: f.email.trim() }),
         });
-        const checkData = (await checkRes.json()) as { exists?: boolean; message?: string };
-        if (!checkRes.ok) {
-          return setError(checkData.message || "Không thể kiểm tra email lúc này.");
-        }
-        if (checkData.exists) {
+        const checkData = (await checkRes.json()) as { exists?: boolean; can_check?: boolean; message?: string };
+        if (checkRes.ok && checkData.can_check !== false && checkData.exists) {
           return setError("Email đã tồn tại trong hệ thống. Vui lòng dùng email khác.");
         }
+        if (!checkRes.ok && checkData.message) {
+          setError(checkData.message);
+        }
       } catch {
-        return setError("Không thể kiểm tra email lúc này.");
+        setError("Không thể kiểm tra email lúc này, hệ thống sẽ tiếp tục bước đăng ký.");
       } finally {
         setEmailChecking(false);
       }
@@ -133,5 +133,5 @@ export default function RegistrationPage() {
       {step === 4 && <><div className="form-field full"><label>Chăn nuôi</label><div className="check-grid">{LIVESTOCK.map((x) => <label key={x} className="check-item"><input type="checkbox" checked={f.livestockTypes.includes(x)} onChange={() => pick("livestockTypes", x)} />{x}</label>)}</div></div>{f.livestockTypes.map((x) => <div className="form-field" key={`qty-${x}`}><label>Số lượng {x} *</label><input type="number" min="1" value={f.livestockQty[x] || ""} onChange={(e) => setF((p) => ({ ...p, livestockQty: { ...p.livestockQty, [x]: e.target.value } }))} />{(!f.livestockQty[x] || Number(f.livestockQty[x]) <= 0) && <p className="form-error">Vui lòng nhập số lượng lớn hơn 0 cho {x}.</p>}</div>)}<div className="form-field full"><label>Cây trồng</label><div className="check-grid">{CROPS.map((x) => <label key={x} className="check-item"><input type="checkbox" checked={f.cropTypes.includes(x)} onChange={() => pick("cropTypes", x)} />{x}</label>)}</div></div><div className="form-field full"><label>Tài nguyên và thiết bị nông nghiệp</label><div className="check-grid">{RESOURCES.map((x) => <label key={x} className="check-item"><input type="checkbox" checked={f.resourceTypes.includes(x)} onChange={() => pick("resourceTypes", x)} />{x}</label>)}</div></div><div className="form-field"><label>Khác (mô tả)</label><input value={f.otherActivity} onChange={(e) => setF({ ...f, otherActivity: e.target.value })} /></div><div className="form-field full"><label>Yếu tố đặc thù của trang trại</label><textarea rows={3} value={f.specialFactors} onChange={(e) => setF({ ...f, specialFactors: e.target.value })} /></div></>}
       {step === 5 && <><div className="form-field"><label>Đơn vị tải vật nuôi</label><input value="DSE" readOnly /></div><div className="form-field"><label>Lượng mưa năm (mm)</label><input value={f.annualRainfall} onChange={(e) => setF({ ...f, annualRainfall: e.target.value })} /></div><div className="form-field"><label>Đơn vị diện tích đất</label><input value="Hecta" readOnly /></div><div className="form-field"><label>Sức tải</label><input value={f.carryingCapacity} onChange={(e) => setF({ ...f, carryingCapacity: e.target.value })} /></div><div className="form-field"><label>Đơn vị sức tải</label><input value="SDH/100mm" readOnly /></div><div className="form-field"><label>Đơn vị chiều dài</label><input value="Mét, kilômét" readOnly /></div><div className="form-field"><label>Đơn vị khối lượng</label><input value="Kg, tấn" readOnly /></div><div className="form-field"><label>Mốc bắt đầu mùa xuân</label><input value={f.springStart} onChange={(e) => setF({ ...f, springStart: e.target.value })} /></div><div className="form-field"><label>Đơn vị nhiệt độ</label><input value="Độ C (°C)" readOnly /></div><div className="form-field"><label>Đơn vị thể tích</label><input value="Lít, megalít" readOnly /></div></>}
       {step === 6 && <><div className="form-field full"><label>Chọn ít nhất một nguồn</label><div className="check-grid">{HEARD.map((x) => <label key={x} className="check-item"><input type="checkbox" checked={f.heardFrom.includes(x)} onChange={() => pick("heardFrom", x)} />{x}</label>)}</div></div>{f.heardFrom.includes("Khác") && <div className="form-field full"><label>Nguồn khác (ghi rõ)</label><input value={f.heardOther} onChange={(e) => setF({ ...f, heardOther: e.target.value })} /></div>}</>}
-    </div><div className="wizard-actions"><button type="button" className="secondary-btn" disabled={step === 1 || loading || emailChecking} onClick={() => setStep((s) => (s > 1 ? ((s - 1) as StepKey) : s))}>Quay lại</button><button type="button" className="submit-btn" disabled={!validStep() || loading || emailChecking} onClick={onNext}>{loading ? "Đang lưu..." : emailChecking ? "Đang kiểm tra email..." : step === 6 ? "Hoàn tất" : "Tiếp tục"}</button></div>{error && <p className="form-error">{error}</p>}</div></section></main>;
+    </div><div className="wizard-actions"><button type="button" className="secondary-btn" disabled={step === 1 || loading || emailChecking} onClick={() => setStep((s) => (s > 1 ? ((s - 1) as StepKey) : s))}>Quay lại</button><button type="button" className="submit-btn" disabled={!validStep() || loading || emailChecking} onClick={onNext}>{loading ? "Đang lưu..." : emailChecking ? "Đang kiểm tra email..." : step === 6 ? "Hoàn tất" : "Tiếp tục"}</button></div>{error && <p className="form-error">{error}</p>}<p style={{ marginTop: 12, fontSize: 14, color: "#475569" }}>Đã có tài khoản? <a href="/login" style={{ color: "#047857", fontWeight: 600 }}>Đăng nhập</a>.</p></div></section></main>;
 }

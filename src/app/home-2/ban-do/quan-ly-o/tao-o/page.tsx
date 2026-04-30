@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
-import { cookies } from "next/headers";
 import TopbarUserMenu from "@/components/topbar-user-menu";
 import AreaEditorWorkbench from "./area-editor-workbench";
+import { layOwnerIdTuServerCookie } from "@/lib/auth";
 
 type FarmMapInfo = {
   farm_name: string;
@@ -16,7 +16,7 @@ const menuItems = [
   { icon: "🗺️", ten: "Bản đồ nông trại", href: "/home-2/ban-do" },
   { icon: "🧩", ten: "Quản lý khu vực", href: "/home-2/ban-do/quan-ly-o" },
   { icon: "🐄", ten: "Vật nuôi", href: "#" },
-  { icon: "⚙️", ten: "Profile", href: "/home-2/profile" },
+  { icon: "⚙️", ten: "Hồ sơ", href: "/home-2/profile" },
 ];
 
 async function getLatestFarmMap(ownerId: string): Promise<FarmMapInfo | null> {
@@ -37,7 +37,7 @@ async function getLatestFarmMap(ownerId: string): Promise<FarmMapInfo | null> {
 }
 
 export default async function TaoOMoiPage() {
-  const ownerId = cookies().get("ownerId")?.value;
+  const ownerId = layOwnerIdTuServerCookie();
   const mapData = ownerId ? await getLatestFarmMap(ownerId) : null;
   const farmName = mapData?.farm_name || "Trang trại";
   const lat = Number(mapData?.latitude ?? 10.762622);

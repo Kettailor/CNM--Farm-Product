@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { db } from "@/lib/db";
+import { layOwnerIdTuServerCookie } from "@/lib/auth";
 
 type ZonePayload = {
   id?: string;
   name: string;
   code: string;
-  status: "healthy" | "warning" | "critical";
+  status: "healthy" | "warning" | "critical" | "cancelled";
   occupancy: number;
   coverage: string;
   geo: {
@@ -41,11 +41,13 @@ type ZonePayload = {
 
 const toZone = (row: any) => {
   const b = row.boundary_geojson ?? {};
+  const dbStatus = String(row.status ?? "").toLowerCase();
+  const isCancelled = String(b.status ?? "").toLowerCase() === "cancelled" || (dbStatus === "inactive" && String(b.status ?? "").toLowerCase() !== "active");
   return {
     id: row.id,
     name: row.name,
     code: row.paddock_code,
-    status: (b.status ?? "healthy") as ZonePayload["status"],
+    status: (isCancelled ? "cancelled" : (b.status ?? "healthy")) as ZonePayload["status"],
     occupancy: Number(b.occupancy ?? 0),
     coverage: String(b.coverage ?? `${Number(row.area_ha ?? 0).toFixed(1)} ha`),
     geo: {
@@ -92,7 +94,7 @@ const toBoundaryGeojson = (z: ZonePayload) => ({
 });
 
 async function getOwnerFarmId() {
-  const ownerId = cookies().get("ownerId")?.value;
+  const ownerId = layOwnerIdTuServerCookie();
   if (!ownerId) return null;
 
   const rs = await db.query(
@@ -138,7 +140,7 @@ export async function POST(request: NextRequest) {
 
     const q = `insert into du_lieu.dong_chan_tha(farm_id,paddock_code,name,area_ha,crop_type,grazing_status,notes,boundary_geojson,status)
                values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`;
-    const vals = [farmId, zone.code, zone.name, zone.metadata.areaHecta, zone.metadata.usage, zone.metadata.plantingStatus, zone.metadata.notes, toBoundaryGeojson(zone), zone.status === "critical" ? "maintenance" : "active"];
+    const vals = [farmId, zone.code, zone.name, zone.metadata.areaHecta, zone.metadata.usage, zone.metadata.plantingStatus, zone.metadata.notes, toBoundaryGeojson(zone), zone.status === "cancelled" ? "inactive" : (zone.status === "critical" ? "maintenance" : "active")];
 
     const rs = await db.query(q, vals);
     return NextResponse.json({ zone: toZone(rs.rows[0]) });
@@ -163,7 +165,7 @@ export async function PUT(request: NextRequest) {
              set name=$3, area_ha=$4, crop_type=$5, grazing_status=$6, notes=$7, boundary_geojson=$8, status=$9
              where id=$1 and farm_id=$2
              returning *`;
-  const vals = [zone.id, farmId, zone.name, zone.metadata.areaHecta, zone.metadata.usage, zone.metadata.plantingStatus, zone.metadata.notes, toBoundaryGeojson(zone), zone.status === "critical" ? "maintenance" : "active"];
+  const vals = [zone.id, farmId, zone.name, zone.metadata.areaHecta, zone.metadata.usage, zone.metadata.plantingStatus, zone.metadata.notes, toBoundaryGeojson(zone), zone.status === "cancelled" ? "inactive" : (zone.status === "critical" ? "maintenance" : "active")];
   const rs = await db.query(q, vals);
   return NextResponse.json({ zone: rs.rows[0] ? toZone(rs.rows[0]) : null });
 }
@@ -173,7 +175,14 @@ export async function DELETE(request: NextRequest) {
   const farmId = await getOwnerFarmId();
   if (!farmId) return NextResponse.json({ message: "Không tìm thấy trang trại của tài khoản hiện tại." }, { status: 404 });
 
-  await db.query("delete from du_lieu.dong_chan_tha where id = $1 and farm_id = $2", [id, farmId]);
-  return NextResponse.json({ ok: true });
+  const rs = await db.query("select boundary_geojson from du_lieu.dong_chan_tha where id = $1 and farm_id = $2 limit 1", [id, farmId]);
+  const currentBoundary = rs.rows[0]?.boundary_geojson ?? {};
+  const nextBoundary = { ...currentBoundary, status: "cancelled" };
+
+  await db.query(
+    "update du_lieu.dong_chan_tha set status = 'inactive', boundary_geojson = $3 where id = $1 and farm_id = $2",
+    [id, farmId, nextBoundary]
+  );
+  return NextResponse.json({ ok: true, softDeleted: true });
 }
 

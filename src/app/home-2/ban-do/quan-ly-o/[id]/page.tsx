@@ -1,8 +1,8 @@
 import { db } from "@/lib/db";
-import { cookies } from "next/headers";
 import TopbarUserMenu from "@/components/topbar-user-menu";
 import MapViewSwitcher from "@/components/map-view-switcher";
 import AreaIndexTrendChart from "@/components/area-index-trend-chart";
+import { layOwnerIdTuServerCookie } from "@/lib/auth";
 
 type OLoai = "cropping" | "grazing" | "hay" | "resting" | "nguon_nuoc" | "phuong_tien" | "chan_nuoi" | "dung_cu" | "nha_kho";
 
@@ -34,6 +34,7 @@ type ChiTietKhuVuc = {
   tong_thuc_an_kg_dm: number | null;
   toc_do_tang_truong: number | null;
   con_lai_ngay_chan_tha: number | null;
+  thong_so_theo_loai: Record<string, unknown>;
   polygon: Array<{ lat: number; lng: number }>;
   chi_so: ChiSoThamThucVat[];
 };
@@ -155,6 +156,18 @@ const mucDanhGia = (value: number) => {
   return "Thấp";
 };
 
+const chuanHoaTrangThai = (raw: unknown) => {
+  const text = normalizeTypeText(raw);
+  if (!text) return "Đang theo dõi";
+  if (text === "active" || text.includes("dang hoat dong")) return "Đang hoạt động";
+  if (text.includes("tam dung") || text.includes("inactive")) return "Tạm dừng";
+  if (text.includes("sua chua") || text.includes("maintenance")) return "Sửa chữa";
+  if (text.includes("healthy")) return "Ổn định";
+  if (text.includes("degraded")) return "Suy giảm";
+  if (text.includes("critical")) return "Cảnh báo";
+  return String(raw ?? "Đang theo dõi");
+};
+
 function taoChiSoTuMetadata(metadata: Record<string, unknown>): ChiSoThamThucVat[] {
   const mapping = [
     { ma: "NDVI", ten: "Thảm thực vật NDVI", mau: "#0ea5e9", keys: ["NDVI", "ndvi"] },
@@ -236,7 +249,7 @@ async function getChiTietKhuVuc(ownerId: string, khuVucId: string): Promise<ChiT
       loai: String(r.crop_type ?? metadata.usage ?? "Chưa phân loại"),
       nhom,
       mo_ta: String(metadata.notes ?? "Chưa có mô tả cho khu vực này."),
-      trang_thai: String(r.status ?? r.grazing_status ?? metadata.plantingStatus ?? "Đang theo dõi"),
+      trang_thai: chuanHoaTrangThai(r.status ?? r.grazing_status ?? metadata.plantingStatus),
       dien_tich_ha: dienTichHa,
       dien_tich_m2: Number((dienTichHa * 10000).toFixed(0)),
       chu_vi_m: toNumber(chuViM, 0) ?? 0,
@@ -251,6 +264,7 @@ async function getChiTietKhuVuc(ownerId: string, khuVucId: string): Promise<ChiT
       tong_thuc_an_kg_dm: toNumber(metadata.tong_thuc_an_kg_dm ?? metadata.feedOnOfferKgDmHa),
       toc_do_tang_truong: toNumber(metadata.toc_do_tang_truong ?? metadata.pastureGrowthRateKgHaDay),
       con_lai_ngay_chan_tha: toNumber(metadata.con_lai_ngay_chan_tha ?? metadata.remainingGrazingDays),
+      thong_so_theo_loai: (metadata.thong_so_theo_loai as Record<string, unknown>) ?? {},
       polygon,
       chi_so: taoChiSoTuMetadata(metadata),
     };
@@ -336,12 +350,12 @@ function taoDuLieuBieuDo(chiSo: ChiSoThamThucVat[]) {
 
 
 function nhanMocChiSo(label: string) {
-  if (label === "NDVI") return ["None", "Sparse", "Dense"];
-  if (label === "EVI") return ["None", "Low", "High"];
-  if (label === "NDMI") return ["Bare", "Stress", "High"];
-  if (label === "NDWI") return ["Drought", "Humidity", "Water"];
-  if (label === "SAVI") return ["Low", "Medium", "High"];
-  return ["Ground", "Overcast", "Snow"];
+  if (label === "NDVI") return ["Không có", "Thưa", "Dày"];
+  if (label === "EVI") return ["Thấp", "Trung bình", "Cao"];
+  if (label === "NDMI") return ["Khô", "Thiếu ẩm", "Ẩm tốt"];
+  if (label === "NDWI") return ["Khô hạn", "Ẩm", "Nhiều nước"];
+  if (label === "SAVI") return ["Thấp", "Trung bình", "Cao"];
+  return ["Nền đất", "U ám", "Tuyết"];
 }
 
 function mauThanhChiSo(label: string) {
@@ -362,8 +376,46 @@ function renderMetric(label: string, value: number | null, suffix = "") {
   );
 }
 
+const nhanThongSoTheoLoai: Record<string, string> = {
+  loai_khu_vuc: "Loại khu vực",
+  loai_hang_luu_tru: "Loại hàng lưu trữ",
+  suc_chua_luu_kho: "Sức chứa lưu kho",
+  don_vi_suc_chua: "Đơn vị sức chứa",
+  nhiet_do_bao_quan_c: "Nhiệt độ bảo quản (°C)",
+  do_am_bao_quan_pct: "Độ ẩm bảo quản (%)",
+  hinh_thuc_luu_tru: "Hình thức lưu trữ",
+  muc_do_thong_gio: "Mức độ thông gió",
+  nhom_dung_cu: "Nhóm dụng cụ",
+  dung_cu_chinh: "Dụng cụ chính",
+  tan_suat_su_dung: "Tần suất sử dụng",
+  chu_ky_bao_tri_ngay: "Chu kỳ bảo trì (ngày)",
+  khu_vuc_luu_tru: "Khu vực lưu trữ",
+  loai_phuong_tien: "Loại phương tiện",
+  suc_chua_toi_da: "Sức chứa tối đa",
+  nhien_lieu_chinh: "Nhiên liệu chính",
+  tan_suat_hoat_dong: "Tần suất hoạt động",
+  giong_vat_nuoi: "Giống vật nuôi",
+  nguon_nuoc: "Nguồn nước",
+  hinh_thuc_chan_nuoi: "Hình thức chăn nuôi",
+  mat_do_chan_nuoi_con_m2: "Mật độ chăn nuôi (con/m²)",
+  kieu_nguon_nuoc: "Kiểu nguồn nước",
+  chat_luong_nguon_nuoc: "Chất lượng nguồn nước",
+  luu_luong_m3_ngay: "Lưu lượng (m³/ngày)",
+  phuong_thuc_cap_nuoc: "Phương thức cấp nước",
+  thong_so_chinh: "Thông số chính",
+  loai_dat: "Loại đất",
+  mua_vu_chinh: "Mùa vụ chính",
+  muc_tieu_san_xuat: "Mục tiêu sản xuất",
+};
+
+function dinhDangGiaTriThongSo(value: unknown) {
+  if (value === null || value === undefined || value === "") return "Chưa có dữ liệu";
+  if (typeof value === "number") return value.toLocaleString("vi-VN");
+  return String(value).replaceAll("_", " ");
+}
+
 export default async function ChiTietKhuVucPage({ params }: { params: { id: string } }) {
-  const ownerId = cookies().get("ownerId")?.value;
+  const ownerId = layOwnerIdTuServerCookie();
   const mapData = ownerId ? await getLatestFarmMap(ownerId) : null;
   const chiTiet = ownerId ? await getChiTietKhuVuc(ownerId, params.id) : null;
   const nhatKy = chiTiet ? await getNhatKyNongDuoc(chiTiet.id) : [];
@@ -423,6 +475,7 @@ export default async function ChiTietKhuVucPage({ params }: { params: { id: stri
                 </div>
                 <div className="area-header-actions">
                   <a href="/home-2/ban-do/quan-ly-o" className="area-link-btn">← Danh sách khu vực</a>
+                  <a href={`/home-2/ban-do/quan-ly-o/${chiTiet.id}/chinh-sua`} className="area-link-btn">Chỉnh sửa khu vực</a>
                   <a href="/home-2/ban-do" className="area-link-btn primary">Xem toàn bộ bản đồ</a>
                 </div>
               </section>
@@ -446,6 +499,19 @@ export default async function ChiTietKhuVucPage({ params }: { params: { id: stri
                     <div><dt>Cập nhật gần nhất</dt><dd>{chiTiet.ngay_cap_nhat}</dd></div>
                     <div className="full"><dt>Mô tả</dt><dd>{chiTiet.mo_ta}</dd></div>
                   </dl>
+                  {Object.keys(chiTiet.thong_so_theo_loai).length > 0 && (
+                    <>
+                      <h3 style={{ marginTop: 14, marginBottom: 8 }}>Thông số theo loại khu vực</h3>
+                      <dl className="area-detail-info-list">
+                        {Object.entries(chiTiet.thong_so_theo_loai).map(([key, value]) => (
+                          <div key={key}>
+                            <dt>{nhanThongSoTheoLoai[key] ?? key.replaceAll("_", " ")}</dt>
+                            <dd>{dinhDangGiaTriThongSo(value)}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </>
+                  )}
                 </article>
 
                 <article className="area-detail-card">
@@ -504,7 +570,7 @@ export default async function ChiTietKhuVucPage({ params }: { params: { id: stri
                     <div className="area-detail-chart-card">
                       <div className="area-detail-chart-head">
                         <strong>Biểu đồ chỉ số khu vực</strong>
-                        <span>Cho phép phóng to, thu nhỏ và kéo ngang để xem chi tiết từng giai đoạn</span>
+                        <span>Di chuột vào biểu đồ để xem giá trị chi tiết tại từng mốc thời gian</span>
                       </div>
                       <AreaIndexTrendChart series={duLieuBieuDo} seed={`${chiTiet.id}-${chiTiet.ngay_tao}`} />
                     </div>

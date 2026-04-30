@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
-import { cookies } from "next/headers";
 import TopbarUserMenu from "@/components/topbar-user-menu";
 import MapViewSwitcher from "@/components/map-view-switcher";
+import { layOwnerIdTuServerCookie } from "@/lib/auth";
 
 type FarmMapInfo = {
   farm_name: string;
@@ -20,6 +20,7 @@ type OQuanLy = {
   dac_tinh: string;
   suc_chua: string;
   mau: string;
+  colorHex: string;
   areaHa: number;
   centerLat: number;
   centerLng: number;
@@ -27,6 +28,7 @@ type OQuanLy = {
   pointCount: number;
   createdAt: string;
   polygon: Array<{ lat: number; lng: number }>;
+  biHuy: boolean;
 };
 
 const menuItems = [
@@ -38,6 +40,7 @@ const menuItems = [
 ];
 
 const normalizeTypeText = (v: unknown) => String(v ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const isHexColor = (value: unknown) => /^#[0-9a-f]{6}$/i.test(String(value ?? "").trim());
 
 const detectAreaType = (raw: string): OLoai => {
   if (raw.includes("cropping") || raw.includes("trong trot") || raw.includes("cay trong")) return "cropping";
@@ -50,6 +53,18 @@ const detectAreaType = (raw: string): OLoai => {
   if (raw.includes("dung cu") || raw.includes("tool")) return "dung_cu";
   if (raw.includes("nha kho") || raw.includes("warehouse")) return "nha_kho";
   return "cropping";
+};
+
+const zoneColorByType: Record<OLoai, string> = {
+  cropping: "#2e7d32",
+  grazing: "#43a047",
+  hay: "#c48a00",
+  resting: "#8d6e63",
+  nguon_nuoc: "#1e88e5",
+  phuong_tien: "#546e7a",
+  chan_nuoi: "#fb8c00",
+  dung_cu: "#8e24aa",
+  nha_kho: "#6d4c41",
 };
 
 async function getDanhSachO(ownerId: string): Promise<OQuanLy[]> {
@@ -71,6 +86,10 @@ async function getDanhSachO(ownerId: string): Promise<OQuanLy[]> {
       const nhom: OLoai = rawType ? detectAreaType(rawType) : detectAreaType(typeText);
       const mapColor: Record<OLoai, string> = { cropping: "cropping", grazing: "grazing", hay: "hay", resting: "resting", nguon_nuoc: "nuoc", phuong_tien: "phuong-tien", chan_nuoi: "chan-nuoi", dung_cu: "dung-cu", nha_kho: "nha-kho" };
       const mapIcon: Record<OLoai, string> = { cropping: "🌱", grazing: "🐄", hay: "🌾", resting: "🟫", nguon_nuoc: "💧", phuong_tien: "🚜", chan_nuoi: "🐄", dung_cu: "🧰", nha_kho: "🏚️" };
+      const colorValue = b?.metadata?.areaColor ?? b?.metadata?.area_color;
+      const colorHex = isHexColor(colorValue) ? String(colorValue) : zoneColorByType[nhom];
+
+      const biHuy = String(r.status ?? "").toLowerCase() === "cancelled" || String(b?.status ?? "").toLowerCase() === "cancelled";
 
       return {
         id: r.id,
@@ -78,8 +97,8 @@ async function getDanhSachO(ownerId: string): Promise<OQuanLy[]> {
         loai: r.crop_type ?? "Chưa phân loại",
         nhom,
         dac_tinh: r.grazing_status ?? "Chưa cập nhật",
-        suc_chua: r.status ?? "-",
-        mau: mapColor[nhom],
+        suc_chua: biHuy ? "Đã hủy" : (r.status ?? "-"),
+        mau: isHexColor(colorHex) ? `hex-${colorHex.slice(1).toLowerCase()}` : mapColor[nhom],
         areaHa: Number(r.area_ha ?? b?.metadata?.areaHecta ?? 0),
         centerLat: Number(b?.geo?.lat ?? 10.762622),
         centerLng: Number(b?.geo?.lng ?? 106.660172),
@@ -89,6 +108,8 @@ async function getDanhSachO(ownerId: string): Promise<OQuanLy[]> {
         polygon: Array.isArray(b?.geo?.polygon)
           ? b.geo.polygon.filter((p: any) => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng))).map((p: any) => ({ lat: Number(p.lat), lng: Number(p.lng) }))
           : [],
+        colorHex,
+        biHuy,
       };
     });
   } catch {
@@ -113,22 +134,25 @@ async function getLatestFarmMap(ownerId: string): Promise<FarmMapInfo | null> {
   }
 }
 
-export default async function QuanLyOPage({ searchParams }: { searchParams?: { layer?: string } }) {
-  const ownerId = cookies().get("ownerId")?.value;
+export default async function QuanLyOPage({ searchParams }: { searchParams?: { layer?: string; trang_thai?: string } }) {
+  const ownerId = layOwnerIdTuServerCookie();
   const mapData = ownerId ? await getLatestFarmMap(ownerId) : null;
   const dsO = ownerId ? await getDanhSachO(ownerId) : [];
   const farmName = mapData?.farm_name || "Trang trại";
   const lat = mapData?.latitude ?? 10.762622;
   const lng = mapData?.longitude ?? 106.660172;
   const layer = searchParams?.layer ?? "all";
+  const trangThai = searchParams?.trang_thai ?? "hoat_dong";
   const activeLayer: "all" | OLoai = ["all", "cropping", "grazing", "hay", "resting", "nguon_nuoc", "phuong_tien", "chan_nuoi", "dung_cu", "nha_kho"].includes(layer ?? "")
     ? (layer as "all" | OLoai)
     : "all";
-  const dsOHienThi = activeLayer === "all" ? dsO : dsO.filter((o) => o.nhom === activeLayer);
-  const zoneColorByType: Record<OLoai, string> = { cropping: "#2e7d32", grazing: "#43a047", hay: "#c48a00", resting: "#8d6e63", nguon_nuoc: "#1e88e5", phuong_tien: "#546e7a", chan_nuoi: "#fb8c00", dung_cu: "#8e24aa", nha_kho: "#6d4c41" };
+  const activeStatus: "hoat_dong" | "huy" | "tat_ca" = ["hoat_dong", "huy", "tat_ca"].includes(trangThai) ? (trangThai as "hoat_dong" | "huy" | "tat_ca") : "hoat_dong";
+  const dsTheoTrangThai = activeStatus === "tat_ca" ? dsO : dsO.filter((o) => (activeStatus === "huy" ? o.biHuy : !o.biHuy));
+  const dsOHienThi = activeLayer === "all" ? dsTheoTrangThai : dsTheoTrangThai.filter((o) => o.nhom === activeLayer);
+  const dsHuy = dsO.filter((o) => o.biHuy);
   const zoneOverlays = dsOHienThi
-    .filter((o) => o.polygon.length >= 3)
-    .map((o) => ({ id: o.id, label: o.ten, color: zoneColorByType[o.nhom], polygon: o.polygon }));
+    .filter((o) => !o.biHuy && o.polygon.length >= 3)
+    .map((o) => ({ id: o.id, label: o.ten, color: o.colorHex, polygon: o.polygon }));
 
   return (
     <main className="dashboard-page area-page">
@@ -167,26 +191,32 @@ export default async function QuanLyOPage({ searchParams }: { searchParams?: { l
             </div>
             <div className="area-header-actions">
               <a href="/home-2/ban-do" className="area-link-btn">← Quay lại</a>
-              <a href="/home-2/ban-do/quan-ly-o/tao-o" className="area-link-btn primary">+ Tạo ô mới</a>
+              <a href="/home-2/ban-do/quan-ly-o/tao-o" className="area-link-btn primary">+ Tạo khu vực mới</a>
             </div>
           </section>
 
           <section className="area-tabs">
-            <a href="/home-2/ban-do/quan-ly-o?layer=all" className={activeLayer === "all" ? "active" : ""}>Tất cả khu vực</a>
-            <a href="/home-2/ban-do/quan-ly-o?layer=cropping" className={activeLayer === "cropping" ? "active" : ""}>Trồng trọt</a>
-            <a href="/home-2/ban-do/quan-ly-o?layer=grazing" className={activeLayer === "grazing" ? "active" : ""}>Chăn thả</a>
-            <a href="/home-2/ban-do/quan-ly-o?layer=hay" className={activeLayer === "hay" ? "active" : ""}>Cỏ khô</a>
-            <a href="/home-2/ban-do/quan-ly-o?layer=resting" className={activeLayer === "resting" ? "active" : ""}>Nghỉ đất</a>
-            <a href="/home-2/ban-do/quan-ly-o?layer=nguon_nuoc" className={activeLayer === "nguon_nuoc" ? "active" : ""}>Nguồn nước</a>
-            <a href="/home-2/ban-do/quan-ly-o?layer=phuong_tien" className={activeLayer === "phuong_tien" ? "active" : ""}>Phương tiện</a>
-            <a href="/home-2/ban-do/quan-ly-o?layer=chan_nuoi" className={activeLayer === "chan_nuoi" ? "active" : ""}>Chăn nuôi</a>
-            <a href="/home-2/ban-do/quan-ly-o?layer=dung_cu" className={activeLayer === "dung_cu" ? "active" : ""}>Dụng cụ</a>
-            <a href="/home-2/ban-do/quan-ly-o?layer=nha_kho" className={activeLayer === "nha_kho" ? "active" : ""}>Nhà kho</a>
+            <a href={`/home-2/ban-do/quan-ly-o?layer=all&trang_thai=${activeStatus}`} className={activeLayer === "all" ? "active" : ""}>Tất cả khu vực</a>
+            <a href={`/home-2/ban-do/quan-ly-o?layer=cropping&trang_thai=${activeStatus}`} className={activeLayer === "cropping" ? "active" : ""}>Trồng trọt</a>
+            <a href={`/home-2/ban-do/quan-ly-o?layer=grazing&trang_thai=${activeStatus}`} className={activeLayer === "grazing" ? "active" : ""}>Chăn thả</a>
+            <a href={`/home-2/ban-do/quan-ly-o?layer=hay&trang_thai=${activeStatus}`} className={activeLayer === "hay" ? "active" : ""}>Cỏ khô</a>
+            <a href={`/home-2/ban-do/quan-ly-o?layer=resting&trang_thai=${activeStatus}`} className={activeLayer === "resting" ? "active" : ""}>Nghỉ đất</a>
+            <a href={`/home-2/ban-do/quan-ly-o?layer=nguon_nuoc&trang_thai=${activeStatus}`} className={activeLayer === "nguon_nuoc" ? "active" : ""}>Nguồn nước</a>
+            <a href={`/home-2/ban-do/quan-ly-o?layer=phuong_tien&trang_thai=${activeStatus}`} className={activeLayer === "phuong_tien" ? "active" : ""}>Phương tiện</a>
+            <a href={`/home-2/ban-do/quan-ly-o?layer=chan_nuoi&trang_thai=${activeStatus}`} className={activeLayer === "chan_nuoi" ? "active" : ""}>Chăn nuôi</a>
+            <a href={`/home-2/ban-do/quan-ly-o?layer=dung_cu&trang_thai=${activeStatus}`} className={activeLayer === "dung_cu" ? "active" : ""}>Dụng cụ</a>
+            <a href={`/home-2/ban-do/quan-ly-o?layer=nha_kho&trang_thai=${activeStatus}`} className={activeLayer === "nha_kho" ? "active" : ""}>Nhà kho</a>
+          </section>
+
+          <section className="area-tabs">
+            <a href={`/home-2/ban-do/quan-ly-o?layer=${activeLayer}&trang_thai=hoat_dong`} className={activeStatus === "hoat_dong" ? "active" : ""}>Đang hoạt động</a>
+            <a href={`/home-2/ban-do/quan-ly-o?layer=${activeLayer}&trang_thai=huy`} className={activeStatus === "huy" ? "active" : ""}>Đã hủy</a>
+            <a href={`/home-2/ban-do/quan-ly-o?layer=${activeLayer}&trang_thai=tat_ca`} className={activeStatus === "tat_ca" ? "active" : ""}>Tất cả trạng thái</a>
           </section>
 
           <section className="area-grid">
             {dsOHienThi.map((o) => (
-              <article className={`area-card area-card-${o.mau}`} key={o.id}>
+              <article className={`area-card area-card-${o.mau}`} key={o.id} style={{ borderLeft: `4px solid ${o.colorHex}` }}>
                 <h3>{o.icon} {o.ten}</h3>
                 <p>Loại khu vực: {o.loai}</p>
                 <p>Đặc tính: {o.dac_tinh}</p>
@@ -194,7 +224,10 @@ export default async function QuanLyOPage({ searchParams }: { searchParams?: { l
                 <p>Diện tích: {o.areaHa.toFixed(3)} ha</p>
                 <p>Tọa độ tâm: {o.centerLat.toFixed(6)}, {o.centerLng.toFixed(6)}</p>
                 <p>Số đỉnh: {o.pointCount} · Tạo ngày: {o.createdAt}</p>
-                <div className="area-card-actions"><a href={`/home-2/ban-do/quan-ly-o/${o.id}`} className="area-link-btn primary">Xem chi tiết</a></div>
+                <div className="area-card-actions">
+                  <a href={`/home-2/ban-do/quan-ly-o/${o.id}`} className="area-link-btn">Xem chi tiết</a>
+                  {!o.biHuy && <a href={`/home-2/ban-do/quan-ly-o/${o.id}/chinh-sua`} className="area-link-btn primary">Chỉnh sửa</a>}
+                </div>
                 <div className="area-thumb-map-wrap">
                   <MapViewSwitcher
                     lat={o.centerLat}
@@ -210,7 +243,7 @@ export default async function QuanLyOPage({ searchParams }: { searchParams?: { l
                 </div>
               </article>
             ))}
-            {dsOHienThi.length === 0 && <p>Chưa có ô nào trong bộ lọc hiện tại.</p>}
+            {dsOHienThi.length === 0 && <p>Chưa có khu vực nào trong bộ lọc hiện tại.</p>}
           </section>
 
           <section className="area-overview-map">
@@ -218,7 +251,7 @@ export default async function QuanLyOPage({ searchParams }: { searchParams?: { l
               <h2>Bản đồ phân khu trang trại (vệ tinh)</h2>
               <span>{mapData?.location_name || `${lat}, ${lng}`}</span>
             </div>
-            <p className="area-farm-note">Bản đồ cố định kích thước và luôn hiển thị ô đã tạo theo bộ lọc lớp.</p>
+            <p className="area-farm-note">Bản đồ chỉ hiển thị khu vực chưa hủy theo bộ lọc.</p>
             <div className="area-overview-map-wrap fixed">
               <MapViewSwitcher
                 lat={lat}
@@ -230,6 +263,30 @@ export default async function QuanLyOPage({ searchParams }: { searchParams?: { l
                 fitToPolygon={zoneOverlays.length > 0}
               />
             </div>
+          </section>
+
+          <section className="area-detail-card">
+            <div className="area-overview-head">
+              <h2>Khu vực đã hủy ({dsHuy.length})</h2>
+              <span>Các khu vực này vẫn lưu trong CSDL</span>
+            </div>
+            {dsHuy.length === 0 ? (
+              <p className="area-farm-note">Chưa có khu vực nào bị hủy.</p>
+            ) : (
+              <div className="area-grid">
+                {dsHuy.map((o) => (
+                  <article className={`area-card area-card-${o.mau}`} key={`cancelled-${o.id}`} style={{ borderLeft: `4px solid ${o.colorHex}`, opacity: 0.75 }}>
+                    <h3>{o.icon} {o.ten}</h3>
+                    <p>Trạng thái: Đã hủy</p>
+                    <p>Diện tích: {o.areaHa.toFixed(3)} ha</p>
+                    <p>Tạo ngày: {o.createdAt}</p>
+                    <div className="area-card-actions">
+                      <a href={`/home-2/ban-do/quan-ly-o/${o.id}`} className="area-link-btn">Xem chi tiết</a>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </section>
         </div>
       </section>

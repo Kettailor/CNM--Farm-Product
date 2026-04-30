@@ -11,6 +11,7 @@ type Props = {
   lng: number;
   zoomLevel: number;
   overlayColor: string;
+  initialPolygon?: Array<{ lat: number; lng: number }>;
   onGeometryChange?: (v: {
     areaHa: number;
     perimeterM: number;
@@ -57,7 +58,7 @@ const haversineM = (a: { lat: number; lng: number }, b: { lat: number; lng: numb
   return 2 * EARTH_RADIUS * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 };
 
-export default function InteractiveAreaEditor({ lat, lng, zoomLevel, overlayColor, onGeometryChange }: Props) {
+export default function InteractiveAreaEditor({ lat, lng, zoomLevel, overlayColor, initialPolygon, onGeometryChange }: Props) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [points, setPoints] = useState<Point[]>([
     { x: 32, y: 26 },
@@ -69,8 +70,26 @@ export default function InteractiveAreaEditor({ lat, lng, zoomLevel, overlayColo
   ]);
   const [viewport, setViewport] = useState({ width: 720, height: 420 });
   const [mapView, setMapView] = useState({ lat, lng, zoom: zoomLevel });
+  const [khoaBanDo, setKhoaBanDo] = useState(false);
+  const [cheDoKeoToanBo, setCheDoKeoToanBo] = useState(false);
+  const [pixelMetrics, setPixelMetrics] = useState<{
+    zoom: number;
+    size: { x: number; y: number };
+    pixelBounds: { minX: number; minY: number; maxX: number; maxY: number };
+  } | null>(null);
+  const daChinhSuaThuCongRef = useRef(false);
 
   const polygonPoints = useMemo(() => points.map((p) => `${p.x},${p.y}`).join(" "), [points]);
+  const activeMetrics = useMemo(() => {
+    const w = Number(pixelMetrics?.size?.x);
+    const h = Number(pixelMetrics?.size?.y);
+    const minX = Number(pixelMetrics?.pixelBounds?.minX);
+    const minY = Number(pixelMetrics?.pixelBounds?.minY);
+    if (Number.isFinite(w) && Number.isFinite(h) && w > 1 && h > 1 && Number.isFinite(minX) && Number.isFinite(minY)) {
+      return { width: w, height: h, minX, minY, usePixelBounds: true as const };
+    }
+    return { width: viewport.width, height: viewport.height, minX: 0, minY: 0, usePixelBounds: false as const };
+  }, [pixelMetrics, viewport.width, viewport.height]);
 
   useEffect(() => {
     const wrap = wrapRef.current;
@@ -92,16 +111,45 @@ export default function InteractiveAreaEditor({ lat, lng, zoomLevel, overlayColo
   }, []);
 
   useEffect(() => {
+    if (daChinhSuaThuCongRef.current) return;
+    if (!initialPolygon || initialPolygon.length < 3) return;
+    if (activeMetrics.width <= 1 || activeMetrics.height <= 1) return;
+
+    const validPolygon = initialPolygon.filter((p) => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng)));
+    if (validPolygon.length < 3) return;
+
+    const viewLat = Number.isFinite(mapView.lat) ? mapView.lat : lat;
+    const viewLng = Number.isFinite(mapView.lng) ? mapView.lng : lng;
+    const viewZoom = Number.isFinite(mapView.zoom) ? mapView.zoom : zoomLevel;
+    const { x: cx, y: cy } = projectToWorld(viewLat, viewLng, viewZoom);
+    const topLeftX = activeMetrics.usePixelBounds ? activeMetrics.minX : cx - activeMetrics.width / 2;
+    const topLeftY = activeMetrics.usePixelBounds ? activeMetrics.minY : cy - activeMetrics.height / 2;
+
+    const nextPoints = validPolygon.map((p) => {
+      const world = projectToWorld(Number(p.lat), Number(p.lng), viewZoom);
+      return {
+        x: clamp(((world.x - topLeftX) / activeMetrics.width) * 100),
+        y: clamp(((world.y - topLeftY) / activeMetrics.height) * 100),
+      };
+    });
+
+    setPoints(nextPoints);
+  }, [initialPolygon, lat, lng, zoomLevel, mapView, activeMetrics]);
+
+
+  useEffect(() => {
     const viewLat = Number.isFinite(mapView.lat) ? mapView.lat : lat;
     const viewLng = Number.isFinite(mapView.lng) ? mapView.lng : lng;
     const viewZoom = Number.isFinite(mapView.zoom) ? mapView.zoom : zoomLevel;
     const { x: cx, y: cy, worldSize } = projectToWorld(viewLat, viewLng, viewZoom);
     const metersPerPixel = getMetersPerPixel(viewLat, viewZoom);
+    const topLeftX = activeMetrics.usePixelBounds ? activeMetrics.minX : cx - activeMetrics.width / 2;
+    const topLeftY = activeMetrics.usePixelBounds ? activeMetrics.minY : cy - activeMetrics.height / 2;
 
     const polygon = points.map((p) => {
-      const dxPx = ((p.x - 50) / 100) * viewport.width;
-      const dyPx = ((p.y - 50) / 100) * viewport.height;
-      return unprojectFromWorld(cx + dxPx, cy + dyPx, worldSize);
+      const worldX = topLeftX + (p.x / 100) * activeMetrics.width;
+      const worldY = topLeftY + (p.y / 100) * activeMetrics.height;
+      return unprojectFromWorld(worldX, worldY, worldSize);
     });
 
     if (polygon.length < 3) return;
@@ -142,10 +190,10 @@ export default function InteractiveAreaEditor({ lat, lng, zoomLevel, overlayColo
     const areaM2ByPixels = Math.abs(
       points.reduce((acc, p, i) => {
         const n = points[(i + 1) % points.length];
-        const x1 = (p.x / 100) * viewport.width;
-        const y1 = (p.y / 100) * viewport.height;
-        const x2 = (n.x / 100) * viewport.width;
-        const y2 = (n.y / 100) * viewport.height;
+        const x1 = (p.x / 100) * activeMetrics.width;
+        const y1 = (p.y / 100) * activeMetrics.height;
+        const x2 = (n.x / 100) * activeMetrics.width;
+        const y2 = (n.y / 100) * activeMetrics.height;
         return acc + x1 * y2 - x2 * y1;
       }, 0) / 2
     ) * (metersPerPixel ** 2);
@@ -159,9 +207,10 @@ export default function InteractiveAreaEditor({ lat, lng, zoomLevel, overlayColo
       polygon,
       bounds,
     });
-  }, [points, lat, lng, zoomLevel, viewport.width, viewport.height, mapView, onGeometryChange]);
+  }, [points, lat, lng, zoomLevel, activeMetrics, mapView, onGeometryChange]);
 
   const startDrag = (mode: "vertex" | "edge" | "move", idx: number, e: React.MouseEvent<Element>) => {
+    daChinhSuaThuCongRef.current = true;
     e.preventDefault();
     const wrap = wrapRef.current;
     if (!wrap) return;
@@ -173,7 +222,7 @@ export default function InteractiveAreaEditor({ lat, lng, zoomLevel, overlayColo
     const onMove = (ev: MouseEvent) => {
       const dx = ((ev.clientX - startX) / rect.width) * 100;
       const dy = ((ev.clientY - startY) / rect.height) * 100;
-      setPoints((prev) => {
+      setPoints(() => {
         const next = base.map((p) => ({ ...p }));
         if (mode === "move") return next.map((p) => ({ x: clamp(p.x + dx), y: clamp(p.y + dy) }));
         if (mode === "vertex") {
@@ -200,23 +249,39 @@ export default function InteractiveAreaEditor({ lat, lng, zoomLevel, overlayColo
 
   return (
     <div className="area-editor-map-wrap">
+      <div className="area-editor-toolbar" role="group" aria-label="Khóa mở thao tác bản đồ">
+        <button type="button" className={`area-mode-btn ${khoaBanDo ? "active" : ""}`} onClick={() => setKhoaBanDo((v) => !v)}>
+          {khoaBanDo ? "🔒 Bản đồ đang khóa" : "🔓 Bản đồ đang mở"}
+        </button>
+        <button type="button" className={`area-mode-btn ${cheDoKeoToanBo ? "active" : ""}`} onClick={() => setCheDoKeoToanBo((v) => !v)}>
+          {cheDoKeoToanBo ? "✋ Đang kéo cả khu vực" : "🖐️ Bật kéo cả khu vực"}
+        </button>
+      </div>
+      <p className="area-editor-hint">Kéo các điểm để chỉnh khu vực. Bật “kéo cả khu vực” để dời toàn bộ ô sang vị trí mới hoặc nới rộng bằng các điểm cạnh.</p>
       <MapViewSwitcher
         lat={lat}
         lng={lng}
         zoom={zoomLevel}
         title="Bản đồ tạo ô"
         frameClassName="area-editor-map"
+        polygon={initialPolygon ?? []}
+        fitToPolygon={Boolean(initialPolygon && initialPolygon.length >= 3)}
+        lockMap={khoaBanDo}
         onViewChange={setMapView}
+        onPixelMetricsChange={setPixelMetrics}
         frameOverlay={
-          <div className="area-overlay-layer" ref={wrapRef}>
+          <div className={`area-overlay-layer ${khoaBanDo ? "is-locked" : "is-editing"}`} ref={wrapRef}>
             <svg className="area-overlay-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+              {cheDoKeoToanBo && <polygon points={polygonPoints} fill="transparent" stroke="transparent" strokeWidth="8" onMouseDown={(e) => startDrag("move", 0, e)} />}
               <polygon points={polygonPoints} fill={overlayColor} fillOpacity="0.28" stroke={overlayColor} strokeWidth="0.5" />
               {points.map((p, i) => {
                 const n = points[(i + 1) % points.length];
                 const mid = { x: (p.x + n.x) / 2, y: (p.y + n.y) / 2 };
                 return (
                   <g key={`p-${i}`}>
+                    <circle cx={p.x} cy={p.y} r={3.4} className="area-node-hit" onMouseDown={(e) => startDrag("vertex", i, e)} />
                     <circle cx={p.x} cy={p.y} r={1.15} className="area-node" onMouseDown={(e) => startDrag("vertex", i, e)} />
+                    <circle cx={mid.x} cy={mid.y} r={2.6} className="area-edge-node-hit" onMouseDown={(e) => startDrag("edge", i, e)} />
                     <circle cx={mid.x} cy={mid.y} r={0.75} className="area-edge-node" onMouseDown={(e) => startDrag("edge", i, e)} />
                   </g>
                 );

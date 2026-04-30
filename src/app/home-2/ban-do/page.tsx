@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
-import { cookies } from "next/headers";
 import TopbarUserMenu from "@/components/topbar-user-menu";
 import MapViewSwitcher from "@/components/map-view-switcher";
+import { layOwnerIdTuServerCookie } from "@/lib/auth";
 
 type FarmMapInfo = {
   farm_name: string;
@@ -40,6 +40,7 @@ const menuItems = [
 ];
 
 const normalizeTypeText = (v: unknown) => String(v ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const isHexColor = (value: unknown) => /^#[0-9a-f]{6}$/i.test(String(value ?? "").trim());
 
 const detectAreaType = (raw: string): KhuLoai => {
   if (raw.includes("cropping") || raw.includes("trong trot") || raw.includes("cay trong")) return "cropping";
@@ -52,6 +53,18 @@ const detectAreaType = (raw: string): KhuLoai => {
   if (raw.includes("dung cu") || raw.includes("tool")) return "dung_cu";
   if (raw.includes("nha kho") || raw.includes("warehouse")) return "nha_kho";
   return "cropping";
+};
+
+const mauMacDinhTheoLoai: Record<KhuLoai, string> = {
+  cropping: "#2e7d32",
+  grazing: "#43a047",
+  hay: "#c48a00",
+  resting: "#8d6e63",
+  nguon_nuoc: "#1e88e5",
+  phuong_tien: "#546e7a",
+  chan_nuoi: "#fb8c00",
+  dung_cu: "#8e24aa",
+  nha_kho: "#6d4c41",
 };
 
 async function getLatestFarmMap(ownerId: string): Promise<FarmMapInfo | null> {
@@ -134,7 +147,8 @@ async function getDanhSachKhuVuc(ownerId: string): Promise<KhuVucBanDo[]> {
       const rawType = normalizeTypeText(b?.metadata?.areaType);
       const kindText = normalizeTypeText([r.crop_type, b?.metadata?.usage, b?.metadata?.notes, b?.metadata?.farmType].join(" "));
       const nhom: KhuLoai = rawType ? detectAreaType(rawType) : detectAreaType(kindText);
-      const mau = nhom === "cropping" ? "#2e7d32" : nhom === "grazing" ? "#43a047" : nhom === "hay" ? "#c48a00" : nhom === "resting" ? "#8d6e63" : nhom === "nguon_nuoc" ? "#1e88e5" : nhom === "phuong_tien" ? "#546e7a" : nhom === "chan_nuoi" ? "#fb8c00" : nhom === "dung_cu" ? "#8e24aa" : "#6d4c41";
+      const mauTuMeta = b?.metadata?.areaColor ?? b?.metadata?.area_color;
+      const mau = isHexColor(mauTuMeta) ? String(mauTuMeta) : mauMacDinhTheoLoai[nhom];
       const polygon = Array.isArray(b?.geo?.polygon)
         ? b.geo.polygon
             .filter((p: any) => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng)))
@@ -158,7 +172,7 @@ async function getDanhSachKhuVuc(ownerId: string): Promise<KhuVucBanDo[]> {
 }
 
 export default async function BanDoTrangTraiPage({ searchParams }: { searchParams?: { layer?: string } }) {
-  const ownerId = cookies().get("ownerId")?.value;
+  const ownerId = layOwnerIdTuServerCookie();
   const mapData = ownerId ? await getLatestFarmMap(ownerId) : null;
   const [thongKe, khuVuc] = ownerId
     ? await Promise.all([getBanDoThongKe(ownerId), getDanhSachKhuVuc(ownerId)])

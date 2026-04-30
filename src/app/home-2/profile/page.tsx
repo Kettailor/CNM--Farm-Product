@@ -16,7 +16,7 @@ const menuItems = [
   { icon: "🗺️", ten: "Bản đồ", href: "/home-2/ban-do" },
   { icon: "🧩", ten: "Quản lý ô", href: "/home-2/ban-do/quan-ly-o" },
   { icon: "🐄", ten: "Vật nuôi", href: "#" },
-  { icon: "⚙️", ten: "Profile", href: "/home-2/profile" },
+  { icon: "⚙️", ten: "Hồ sơ", href: "/home-2/profile" },
 ];
 
 const asNum = (v: string) => (v === "" ? null : Number(v));
@@ -65,7 +65,7 @@ export default function ProfilePage() {
         <a href="/home-2/ban-do" className="dashboard-taskbar-item">Bản đồ</a>
         <a href="/home-2/ban-do/quan-ly-o" className="dashboard-taskbar-item">Quản lý ô</a>
         <a href="#" className="dashboard-taskbar-item">Cảnh báo</a>
-        <a href="/home-2/profile" className="dashboard-taskbar-item active">Profile</a>
+        <a href="/home-2/profile" className="dashboard-taskbar-item active">Hồ sơ</a>
       </nav>
 
       <section className="dashboard-layout dashboard-layout-with-toggle">

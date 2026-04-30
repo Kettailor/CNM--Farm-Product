@@ -12,10 +12,34 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
+      HOSTNAME: 0.0.0.0
       PORT: 3000
       DATABASE_URL: postgresql://farmhub:farmhub@db:5432/farmhub
-    ports:
-      - "3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://127.0.0.1:3000/api/health',res=>process.exit(res.statusCode===200?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    restart: unless-stopped
+
+  fastapi:
+    image: cnm-farm-product-traceability-fastapi
+    build:
+      context: ./backend-fastapi
+      dockerfile: Dockerfile
+    container_name: farmhub-fastapi
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
   db:
@@ -30,12 +54,13 @@ services:
       POSTGRES_USER: farmhub
       POSTGRES_PASSWORD: farmhub
     ports:
-      - "5432:5432"
+      - "127.0.0.1:55432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docs/database/farm_traceability_schema.sql:/docker-entrypoint-initdb.d/01_farm_traceability_schema.sql:ro
       - ./docs/database/02_seed_map_data.sql:/docker-entrypoint-initdb.d/02_seed_map_data.sql:ro
       - ./scripts/hop_nhat_toan_he_thong_vao_du_lieu.sql:/docker-entrypoint-initdb.d/03_hop_nhat_toan_he_thong_vao_du_lieu.sql:ro
+      - ./docs/database/04_blockchain_truy_xuat_tuong_lai.sql:/docker-entrypoint-initdb.d/04_blockchain_truy_xuat_tuong_lai.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U farmhub -d farmhub"]
       interval: 10s
@@ -52,7 +77,21 @@ services:
     environment:
       ADMINER_DEFAULT_SERVER: db
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: farmhub-nginx
+    depends_on:
+      app:
+        condition: service_healthy
+      fastapi:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     restart: unless-stopped
 
 volumes:

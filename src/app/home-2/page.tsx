@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
-import { cookies } from "next/headers";
 import TopbarUserMenu from "@/components/topbar-user-menu";
 import MapViewSwitcher from "@/components/map-view-switcher";
+import { layOwnerIdTuServerCookie } from "@/lib/auth";
 
 const menuItems = [
   { icon: "🏠", ten: "Tổng quan", href: "/home-2" },
@@ -9,7 +9,7 @@ const menuItems = [
   { icon: "🧩", ten: "Quản lý ô", href: "/home-2/ban-do/quan-ly-o" },
   { icon: "🐄", ten: "Vật nuôi", href: "#" },
   { icon: "🌧️", ten: "Thời tiết", href: "#" },
-  { icon: "⚙️", ten: "Profile", href: "/home-2/profile" },
+  { icon: "⚙️", ten: "Hồ sơ", href: "/home-2/profile" },
 ];
 
 type FarmMapInfo = { farm_name: string; latitude: number; longitude: number; location_name: string | null };
@@ -32,9 +32,9 @@ async function getLatestFarmMap(ownerId: string): Promise<FarmMapInfo | null> {
 }
 
 export default async function Home2DashboardPage() {
-  const ownerId = cookies().get("ownerId")?.value;
+  const ownerId = layOwnerIdTuServerCookie();
   const mapData = ownerId ? await getLatestFarmMap(ownerId) : null;
-  const farmName = mapData?.farm_name || "Ket Farm";
+  const farmName = mapData?.farm_name || "KetKat-EcoFarm";
   const lat = mapData?.latitude ?? 10.762622;
   const lng = mapData?.longitude ?? 106.660172;
 
@@ -54,7 +54,7 @@ export default async function Home2DashboardPage() {
         <a href="/home-2/ban-do/quan-ly-o" className="dashboard-taskbar-item">Quản lý ô</a>
         <a href="#" className="dashboard-taskbar-item">Vật nuôi</a>
         <a href="#" className="dashboard-taskbar-item">Cảnh báo</a>
-        <a href="/home-2/profile" className="dashboard-taskbar-item">Profile</a>
+        <a href="/home-2/profile" className="dashboard-taskbar-item">Hồ sơ</a>
       </nav>
 
       <section className="dashboard-layout dashboard-layout-with-toggle">

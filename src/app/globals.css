@@ -1,4 +1,8 @@
 @import "leaflet/dist/leaflet.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 
 * {
   box-sizing: border-box;
@@ -1076,6 +1080,49 @@ a {
   pointer-events: none;
 }
 
+.area-editor-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.area-mode-btn {
+  border: 1px solid #c8d8e3;
+  background: #fff;
+  color: #1f3342;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.area-mode-btn.active {
+  background: #0e7a4f;
+  border-color: #0e7a4f;
+  color: #fff;
+}
+
+.area-editor-hint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #4c5d68;
+}
+
+.area-overlay-layer.is-editing {
+  cursor: crosshair;
+}
+
+.area-overlay-layer.is-locked {
+  cursor: not-allowed;
+}
+
+.area-node-hit,
+.area-edge-node-hit {
+  fill: transparent;
+  pointer-events: all;
+}
+
 .area-node {
   fill: #fff;
   stroke: #1d3b4b;
@@ -1094,32 +1141,104 @@ a {
 
 .area-metrics-strip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(110px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: 10px;
   margin-bottom: 10px;
 }
 
 .area-metrics-strip span {
-  background: #f4f8fa;
-  border: 1px solid #dbe6ec;
-  border-radius: 8px;
-  padding: 6px 8px;
+  background: linear-gradient(180deg, #f8fbfd 0%, #f1f7fb 100%);
+  border: 1px solid #d7e4eb;
+  border-radius: 10px;
+  padding: 8px 10px;
   font-size: 12px;
-  color: #4a5d68;
+  color: #3f535f;
+}
+
+.area-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.area-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #415866;
+  background: #f3f8fb;
+  border: 1px solid #d5e3eb;
+}
+
+.area-chart-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.area-line-chart-wrap {
+  position: relative;
+  border-radius: 12px;
+  border: 1px solid #d8e3ea;
+  background: linear-gradient(180deg, #fbfdff 0%, #f2f7fb 100%);
+  overflow: hidden;
 }
 
 .area-line-chart {
   width: 100%;
-  height: 120px;
-  background: linear-gradient(180deg, #fafdff 0%, #f1f7fb 100%);
-  border: 1px solid #dbe6ec;
-  border-radius: 10px;
+  height: 220px;
+  display: block;
 }
 
 .area-line-chart polyline {
   fill: none;
-  stroke: #15826e;
-  stroke-width: 2;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.area-chart-tooltip {
+  position: absolute;
+  top: 8px;
+  transform: translateX(-50%);
+  min-width: 130px;
+  max-width: 180px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #d3dfe7;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10px 24px rgba(29, 52, 68, 0.16);
+  display: grid;
+  gap: 5px;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.area-chart-tooltip strong {
+  font-size: 11px;
+  color: #263944;
+}
+
+.area-chart-tooltip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #48606d;
+  font-weight: 600;
+}
+
+.area-chart-tooltip i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
 }
 
 
@@ -2181,159 +2300,99 @@ textarea:focus {
   }
 }
 
-.area-trend-chart-shell {
+.area-trend-lite {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
-.area-trend-chart-toolbar {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.area-trend-chart-badges {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.area-trend-badge,
-.area-trend-tooltip-inline span {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: #334155;
-}
-
-.area-trend-badge i,
-.area-trend-tooltip-inline i {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  display: inline-block;
-  flex: 0 0 auto;
-}
-
-.area-trend-chart-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.area-trend-chart-actions button {
-  border: 1px solid #cbd5e1;
-  background: #fff;
-  color: #0f172a;
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.area-trend-chart-actions button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.area-trend-chart-window {
-  font-size: 12px;
-  font-weight: 700;
-  color: #475569;
-}
-
-.area-trend-tooltip-inline {
-  padding: 10px 12px;
+.area-trend-lite-chart-wrap {
+  position: relative;
   border: 1px solid #d7e0e6;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-}
-
-.area-trend-tooltip-inline strong {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 13px;
-  color: #0f172a;
-}
-
-.area-trend-tooltip-inline div {
-  display: grid;
-  gap: 6px;
-}
-
-.area-trend-chart-hint {
-  font-size: 12px;
-  color: #64748b;
+  background: #f8fafc;
 }
 
 .area-trend-chart {
   width: 100%;
-  height: 420px;
+  height: 300px;
   display: block;
-  overflow: visible;
 }
 
-.area-trend-chart .chart-surface {
-  fill: #f8fbfd;
-}
-
-.area-trend-chart .grid,
-.area-trend-chart .grid-vertical {
-  stroke: #dbe4ea;
+.area-trend-chart .grid {
+  stroke: #d5dde3;
   stroke-width: 1;
-}
-
-.area-trend-chart .grid-vertical {
-  stroke-dasharray: 3 7;
-  opacity: 0.75;
 }
 
 .area-trend-chart .tick-x,
 .area-trend-chart .tick-y {
-  fill: #64748b;
+  fill: #5f7380;
   font-size: 12px;
 }
 
-.area-trend-chart .drag-layer {
-  fill: transparent;
-}
-
-.area-trend-chart .drag-layer {
-  cursor: grab;
-}
-
-.area-trend-chart .drag-layer:active {
-  cursor: grabbing;
-}
-
 .area-trend-chart .trend-line {
-  stroke-width: 3;
+  stroke-width: 2.8;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .area-trend-chart .active-line {
-  stroke: #94a3b8;
+  stroke: #9fb0bb;
   stroke-width: 1.5;
   stroke-dasharray: 4 4;
 }
 
+.area-trend-tooltip-inline {
+  position: absolute;
+  top: 10px;
+  transform: translateX(-50%);
+  min-width: 120px;
+  padding: 8px 10px;
+  border: 1px solid #d7e0e6;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  pointer-events: none;
+}
+
+.area-trend-tooltip-inline strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #1f3340;
+}
+
+.area-trend-tooltip-inline div {
+  display: grid;
+  gap: 4px;
+}
+
+.area-trend-tooltip-inline span,
+.area-trend-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #3f5562;
+  font-weight: 600;
+}
+
+.area-trend-tooltip-inline i,
+.area-trend-badge i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.area-trend-chart-badges {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 760px) {
   .area-trend-chart {
-    height: 360px;
-  }
-
-  .area-trend-chart-toolbar {
-    align-items: flex-start;
-  }
-
-  .area-trend-chart-actions {
-    width: 100%;
+    height: 250px;
   }
 }
