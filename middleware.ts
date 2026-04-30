@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { giaiMaTokenXacThuc, TEN_COOKIE_XAC_THUC } from "@/lib/auth";
 
-const TEN_COOKIE_XAC_THUC = "phien_dang_nhap";
-const danhSachCanDangNhap = ["/home-2"];
-const danhSachAnKhiDaDangNhap = ["/", "/login"];
+const danhSachCanDangNhap = ["/home-2", "/dashboard"];
+const danhSachAnKhiDaDangNhap = ["/login", "/register"];
 
 function daDangNhap(request: NextRequest) {
   const token = request.cookies.get(TEN_COOKIE_XAC_THUC)?.value;
-  return !!token;
+  return Boolean(giaiMaTokenXacThuc(token));
 }
 
 export function middleware(request: NextRequest) {
@@ -17,13 +17,14 @@ export function middleware(request: NextRequest) {
   if (canBaoVe && !hopLe) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
   const canAn = danhSachAnKhiDaDangNhap.includes(pathname);
   if (canAn && hopLe) {
     const url = request.nextUrl.clone();
-    url.pathname = "/home-2";
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
@@ -31,6 +32,6 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/login", "/home-2/:path*"],
+  matcher: ["/login", "/register", "/home-2/:path*", "/dashboard/:path*"],
 };
 
