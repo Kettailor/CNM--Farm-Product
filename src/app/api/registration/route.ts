@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { taoMatKhauHash } from "@/lib/auth";
 
 type RegistrationPayload = {
   owner: { fullName: string; email: string; password: string };
@@ -119,11 +120,12 @@ export async function POST(request: NextRequest) {
         throw new Error("EMAIL_EXISTS");
       }
 
+      const hashMatKhau = taoMatKhauHash(body.owner.password);
       const ownerResult = await client.query(
         `insert into du_lieu.chu_so_huu (full_name, email, password_hash)
-         values ($1, $2, md5($3))
+         values ($1, $2, $3)
          returning id`,
-        [body.owner.fullName.trim(), body.owner.email.trim(), body.owner.password]
+        [body.owner.fullName.trim(), body.owner.email.trim(), hashMatKhau]
       );
       const ownerId = ownerResult.rows[0].id as string;
 

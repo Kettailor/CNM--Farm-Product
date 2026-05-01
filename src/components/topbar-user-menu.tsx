@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import styles from "./topbar-user-menu.module.css";
 
 export default function TopbarUserMenu() {
   const [open, setOpen] = useState(false);
@@ -16,39 +17,18 @@ export default function TopbarUserMenu() {
   };
 
   return (
-    <div style={{ position: "relative" }}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        style={{ border: "1px solid #d9d9d9", borderRadius: 999, padding: "6px 10px", background: "#fff", cursor: "pointer" }}
-      >
-        👤
+    <div className={styles.wrap}>
+      <button type="button" onClick={() => setOpen((v) => !v)} className={styles.trigger} aria-expanded={open} aria-label="Mở menu người dùng">
+        <span className={styles.avatar}>👤</span>
+        <span>Người dùng</span>
       </button>
 
       {open && (
-        <div
-          style={{
-            position: "absolute",
-            right: 0,
-            top: "calc(100% + 8px)",
-            minWidth: 150,
-            background: "#fff",
-            border: "1px solid #e5e7eb",
-            borderRadius: 10,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
-            padding: 8,
-            zIndex: 30,
-          }}
-        >
-          <a href="/home-2/profile" style={{ display: "block", padding: "8px 10px", borderRadius: 8, textDecoration: "none", color: "#111827" }}>
+        <div className={styles.menu}>
+          <a href="/dashboard/settings" className={styles.item}>
             ⚙️ Cài đặt
           </a>
-          <button
-            type="button"
-            onClick={logout}
-            disabled={loading}
-            style={{ width: "100%", textAlign: "left", padding: "8px 10px", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", color: "#dc2626" }}
-          >
+          <button type="button" onClick={logout} disabled={loading} className={styles.logout}>
             {loading ? "Đang đăng xuất..." : "↪ Đăng xuất"}
           </button>
         </div>
@@ -56,4 +36,3 @@ export default function TopbarUserMenu() {
     </div>
   );
 }
-
