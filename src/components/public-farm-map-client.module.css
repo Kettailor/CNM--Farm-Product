@@ -1,0 +1,357 @@
+.mapShell {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+.sidebar,
+.mapPanel {
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(16, 32, 22, 0.08);
+  box-shadow: 0 20px 60px rgba(16, 32, 22, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.sidebar {
+  padding: 24px;
+  display: grid;
+  gap: 20px;
+  align-content: start;
+}
+
+.kicker {
+  margin: 0 0 8px;
+  color: #2f7d46;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+
+.title,
+.mapTitle {
+  margin: 0;
+  color: #173123;
+  line-height: 1.1;
+}
+
+.title {
+  font-size: clamp(26px, 3vw, 34px);
+}
+
+.mapTitle {
+  font-size: clamp(20px, 2vw, 26px);
+}
+
+.description {
+  margin: 12px 0 0;
+  color: #5a6a5d;
+  line-height: 1.6;
+}
+
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.statsRow > div {
+  padding: 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(247, 250, 246, 0.96), rgba(239, 245, 238, 0.96));
+  border: 1px solid rgba(16, 32, 22, 0.06);
+}
+
+.statsRow strong {
+  display: block;
+  font-size: 20px;
+  color: #173123;
+}
+
+.statsRow span {
+  color: #6d7d71;
+  font-size: 12px;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+}
+
+.listItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 18px;
+  padding: 12px;
+  text-align: left;
+  background: #f8fbf7;
+  cursor: pointer;
+}
+
+.listItemActive,
+.listItem:hover {
+  border-color: rgba(47, 125, 70, 0.22);
+  background: #eef8f1;
+}
+
+.avatar,
+.avatarSmall,
+.markerAvatar {
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+}
+
+.avatarSmall {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+
+.listCopy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.listCopy strong,
+.selectedBadge strong {
+  color: #173123;
+}
+
+.listCopy span,
+.selectedBadge span,
+.empty {
+  color: #617164;
+  font-size: 13px;
+}
+
+.empty {
+  margin: 4px 0 0;
+}
+
+.mapPanel {
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(520px, 1fr);
+}
+
+.mapHeader {
+  padding: 22px 24px 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.mapControls {
+  display: inline-flex;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(240, 248, 242, 0.9);
+  border: 1px solid rgba(47, 125, 70, 0.14);
+}
+
+.selectedBadge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(240, 248, 242, 0.92);
+  border: 1px solid rgba(47, 125, 70, 0.14);
+}
+
+.selectedBadge div {
+  display: grid;
+}
+
+.modeSwitch {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(240, 248, 242, 0.9);
+  border: 1px solid rgba(47, 125, 70, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  gap: 4px;
+}
+
+.modeButton {
+  border: 0;
+  background: transparent;
+  color: #59705f;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.modeButton:hover {
+  color: #173123;
+  transform: translateY(-1px);
+}
+
+.modeButtonActive {
+  background: linear-gradient(180deg, #2f7d46 0%, #27683b 100%);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(47, 125, 70, 0.28);
+}
+
+.mapStage {
+  position: relative;
+  margin: 18px 18px 18px;
+  border-radius: 26px;
+  overflow: hidden;
+  min-height: 520px;
+  border: 1px solid rgba(16, 32, 22, 0.08);
+  background: #dfeadc;
+}
+
+.mapStage :global(.leaflet-container) {
+  height: 100%;
+  width: 100%;
+  background: #dfeadc;
+  font-family: inherit;
+}
+
+.mapStage :global(.leaflet-control-attribution) {
+  font-size: 11px;
+}
+
+.mapStage :global(.leaflet-popup-content-wrapper) {
+  border-radius: 18px;
+  box-shadow: 0 20px 48px rgba(16, 32, 22, 0.18);
+}
+
+.mapStage :global(.leaflet-popup-content) {
+  margin: 14px 16px;
+}
+
+.mapLoadingHint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(23, 49, 35, 0.88);
+  font-weight: 600;
+  z-index: 300;
+  pointer-events: none;
+}
+
+.mapEmptyState {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(23, 49, 35, 0.88);
+  font-weight: 600;
+  z-index: 400;
+  pointer-events: none;
+}
+
+.mapStage :global(.farm-marker) {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  transform: translateY(-8px);
+}
+
+.mapStage :global(.farm-marker__ring) {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff 0%, #e2efe0 100%);
+  border: 3px solid #2f7d46;
+  box-shadow: 0 14px 30px rgba(18, 62, 32, 0.28);
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.mapStage :global(.farm-marker__ring)::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -12px;
+  width: 16px;
+  height: 16px;
+  background: #2f7d46;
+  transform: translateX(-50%) rotate(45deg);
+  border-radius: 4px;
+}
+
+.mapStage :global(.farm-marker__avatar) {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  object-fit: cover;
+  position: relative;
+  z-index: 1;
+}
+
+.mapStage :global(.farm-marker__label) {
+  max-width: 150px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(17, 44, 24, 0.78);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 1100px) {
+  .mapShell {
+    grid-template-columns: 1fr;
+  }
+
+  .mapPanel {
+    grid-template-rows: auto minmax(420px, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .sidebar,
+  .mapHeader,
+  .mapStage {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .mapStage {
+    min-height: 460px;
+    margin: 16px;
+  }
+
+  .statsRow {
+    grid-template-columns: 1fr;
+  }
+
+  .selectedBadge {
+    display: none;
+  }
+
+  .modeSwitch {
+    width: 100%;
+  }
+
+  .modeButton {
+    flex: 1 1 0;
+  }
+}

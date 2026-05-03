@@ -1,23 +1,19 @@
 import DashboardShell from "@/components/dashboard-shell";
-import MapViewSwitcher from "@/components/map-view-switcher";
+import DashboardTopActions from "@/components/dashboard-top-actions";
+import MapViewSwitcher from "@/components/dashboard-map-view-switcher";
 import { layOwnerIdTuServerCookie } from "@/lib/auth";
 import { getDashboardOverview } from "@/lib/dashboard-overview";
+import { redirect } from "next/navigation";
 import styles from "./page.module.css";
 
 const formatNumber = (value: number) => new Intl.NumberFormat("vi-VN").format(value);
 
 export default async function DashboardPage() {
   const ownerId = layOwnerIdTuServerCookie();
-  const data = ownerId
-    ? await getDashboardOverview(ownerId)
-    : {
-        farmName: "KetKat-EcoFarm",
-        locationName: null,
-        latitude: 10.762622,
-        longitude: 106.660172,
-        metrics: { assets: 0, sensors: 0, livestock: 0, zones: 0, waterSources: 0 },
-        latestZones: [],
-      };
+  if (!ownerId) redirect("/login?next=/dashboard");
+
+  const data = await getDashboardOverview(ownerId);
+  if (!data.farmId) redirect("/register/farm");
 
   return (
     <DashboardShell farmName={data.farmName} activePath="/dashboard">
@@ -30,23 +26,18 @@ export default async function DashboardPage() {
               <h1>{data.farmName}</h1>
             </div>
           </div>
-          <div className={styles.topIcons}>
-            <span>Ngôn ngữ</span>
-            <span>Thông báo</span>
-            <span>Biểu đồ</span>
-            <span>CNM</span>
-          </div>
+          <DashboardTopActions />
         </section>
 
         <section className={styles.heroStrip}>
           <div className={styles.heroHeader}>
             <div className={styles.heroLabel}>Quản lý tổng quan</div>
             <div className={styles.heroStats}>
-              <div className={styles.heroStat}><span>Trang trại</span><strong>{formatNumber(data.metrics.assets || 0)}</strong></div>
+              <div className={styles.heroStat}><span>Trang trại</span><strong>1</strong></div>
               <div className={styles.heroStat}><span>Người dùng</span><strong>0</strong></div>
               <div className={styles.heroStat}><span>Tài sản</span><strong>{formatNumber(data.metrics.assets || 0)}</strong></div>
               <div className={styles.heroStat}><span>Thiết bị di động</span><strong>0</strong></div>
-              <div className={styles.heroStat}><span>Khu vực chăn thả</span><strong>{formatNumber(data.metrics.zones || 0)}</strong></div>
+              <div className={styles.heroStat}><span>Khu vực</span><strong>{formatNumber(data.metrics.zones || 0)}</strong></div>
               <div className={styles.heroStat}><span>Cảm biến</span><strong>{formatNumber(data.metrics.sensors || 0)}</strong></div>
             </div>
           </div>

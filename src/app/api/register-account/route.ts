@@ -27,24 +27,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Mật khẩu phải có ít nhất 8 ký tự." }, { status: 400 });
     }
 
-    await db.query(`create schema if not exists du_lieu; create extension if not exists pgcrypto; create table if not exists du_lieu.chu_so_huu (id uuid primary key default gen_random_uuid(), full_name text not null, email text not null unique, password_hash text not null, created_at timestamptz not null default now());`);
-
-    const existed = await db.query("select id from du_lieu.chu_so_huu where email = $1 limit 1", [email]);
+    const existed = await db.query("select id from du_lieu.nguoi_dung where email = $1 limit 1", [email]);
     if (existed.rowCount) {
       return NextResponse.json({ message: "Email đã tồn tại trong hệ thống. Vui lòng dùng email khác." }, { status: 409 });
     }
 
     const passwordHash = taoMatKhauHash(password);
     const result = await db.query(
-      `insert into du_lieu.chu_so_huu (full_name, email, password_hash)
+      `insert into du_lieu.nguoi_dung (ho_ten, email, mat_khau_hash)
        values ($1, $2, $3)
-       returning id, full_name, email`,
+       returning id, ho_ten, email`,
       [fullName, email, passwordHash]
     );
 
     const user = result.rows[0] as { id: string; full_name: string; email: string };
     const token = taoTokenXacThuc(String(user.id));
-    const response = NextResponse.json({ message: "Tạo tài khoản thành công.", user });
+    const response = NextResponse.json({ message: "Tạo tài khoản thành công.", user, nextPath: "/register/farm" });
     response.cookies.set(TEN_COOKIE_XAC_THUC, token, cauHinhCookieXacThuc);
     response.cookies.set("ownerId", String(user.id), { ...cauHinhCookieXacThuc, httpOnly: false });
     return response;

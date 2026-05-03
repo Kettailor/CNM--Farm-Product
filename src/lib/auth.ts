@@ -20,7 +20,7 @@ export function taoMatKhauHash(matKhau: string) {
 
 export function kiemTraMatKhau(matKhauNhap: string, hashDaLuu: string) {
   if (hashDaLuu.startsWith("pbkdf2$")) {
-    const [_, vongLapRaw, salt, keyHex] = hashDaLuu.split("$");
+    const [, vongLapRaw, salt, keyHex] = hashDaLuu.split("$");
     const vongLap = Number(vongLapRaw);
     if (!Number.isFinite(vongLap) || !salt || !keyHex) return false;
     const keyTinh = pbkdf2Sync(matKhauNhap, salt, vongLap, PBKDF2_DO_DAI, "sha256");

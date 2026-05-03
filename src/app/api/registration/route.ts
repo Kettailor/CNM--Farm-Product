@@ -8,8 +8,6 @@ type RegistrationPayload = {
   location: { locationName?: string; mapsLink?: string; lat: string; lng: string };
   production: {
     livestock: Array<{ name: string; quantity: number }>;
-    crops: string[];
-    resources: string[];
   };
   settings: { annualRainfall: number; carryingCapacity: number; springStart: string };
   referral: { channels: string[]; otherNote?: string };
@@ -40,7 +38,7 @@ export async function POST(request: NextRequest) {
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || !isCoordInRange(lat, lng)) {
       return NextResponse.json({ message: "Vĩ độ hoặc kinh độ không hợp lệ." }, { status: 400 });
     }
-    if (!Array.isArray(body.production?.livestock) || !Array.isArray(body.production?.crops) || !Array.isArray(body.production?.resources)) {
+    if (!Array.isArray(body.production?.livestock)) {
       return NextResponse.json({ message: "Dữ liệu loại hình sản xuất không hợp lệ." }, { status: 400 });
     }
     const livestockInvalid = body.production.livestock.some((item) => !item?.name || !Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0);
@@ -154,23 +152,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      for (const crop of body.production.crops) {
-        if (!crop) continue;
-        await client.query(`insert into du_lieu.cay_trong_nong_trai (farm_id, crop_name) values ($1,$2)`, [farmId, crop]);
-      }
-
-      for (const resource of body.production.resources) {
-        if (!resource) continue;
-        await client.query(`insert into du_lieu.tai_nguyen_nong_trai (farm_id, resource_name) values ($1,$2)`, [farmId, resource]);
-      }
-
-      for (const channel of body.referral.channels) {
-        if (!channel) continue;
-        await client.query(
-          `insert into du_lieu.nguon_biet_den_nong_trai (farm_id, channel_name, other_note) values ($1,$2,$3)`,
-          [farmId, channel, channel === "Khác" ? body.referral.otherNote ?? null : null]
-        );
-      }
 
       await client.query("commit");
 

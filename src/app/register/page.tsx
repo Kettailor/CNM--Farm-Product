@@ -23,9 +23,9 @@ export default function RegistrationPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fullName: fullName.trim(), email: email.trim(), password }),
       });
-      const data = (await res.json()) as { message?: string };
+      const data = (await res.json()) as { message?: string; nextPath?: string };
       if (!res.ok) return setError(data.message || "Không thể tạo tài khoản.");
-      router.push("/register/farm");
+      router.push(data.nextPath || "/register/farm");
       router.refresh();
     } catch {
       setError("Không thể kết nối máy chủ.");

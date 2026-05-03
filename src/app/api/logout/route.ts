@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { cauHinhCookieXacThuc, TEN_COOKIE_XAC_THUC } from "@/lib/auth";
+import { TEN_COOKIE_XAC_THUC, cauHinhCookieXacThuc } from "@/lib/auth";
 
 export async function POST() {
   const response = NextResponse.json({ message: "Đăng xuất thành công." });
@@ -7,4 +7,3 @@ export async function POST() {
   response.cookies.set("ownerId", "", { ...cauHinhCookieXacThuc, maxAge: 0 });
   return response;
 }
-

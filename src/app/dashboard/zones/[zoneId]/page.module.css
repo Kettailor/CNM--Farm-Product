@@ -1,0 +1,266 @@
+.page {
+  display: grid;
+  gap: 16px;
+}
+
+.heroCard,
+.detailsCard,
+.mapCard,
+.metricCard,
+.panelCard,
+.emptyState {
+  border: 1px solid rgba(18, 44, 28, 0.08);
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 10px 25px rgba(13, 28, 19, 0.06);
+}
+
+.heroCard {
+  padding: 18px 20px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.kicker,
+.sectionLabel {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #7f8a82;
+}
+
+.heroTitleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.heroCard h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.heroSub {
+  margin: 6px 0 0;
+  color: #6d756f;
+}
+
+.heroBadge {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(31, 122, 74, 0.1);
+  color: #1f7a4a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.heroActions {
+  display: flex;
+  gap: 10px;
+}
+
+.secondaryButton,
+.primaryButton,
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 700;
+}
+
+.secondaryButton,
+.backLink {
+  border: 1px solid rgba(31, 122, 74, 0.18);
+  background: #fff;
+  color: #1f7a4a;
+}
+
+.primaryButton {
+  border: 1px solid #1f7a4a;
+  background: #1f7a4a;
+  color: #fff;
+}
+
+.contentGrid {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 16px;
+}
+
+.detailsCard,
+.mapCard,
+.panelCard {
+  padding: 18px;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.cardHeader h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.detailsGrid {
+  display: grid;
+  gap: 10px;
+}
+
+.infoBlock {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f8fbf8;
+}
+
+.infoBlock span {
+  color: #7f8a82;
+}
+
+.infoBlock strong {
+  color: #1f2b23;
+}
+
+.zoneMap {
+  width: 100%;
+  height: 420px;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metricCard {
+  padding: 18px;
+}
+
+.metricCard span {
+  display: block;
+  color: #7f8a82;
+  margin-bottom: 6px;
+}
+
+.metricCard strong {
+  font-size: 24px;
+  color: #1f2b23;
+}
+
+.bottomGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eef3ef;
+  color: #5d675f;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.timelineList,
+.noteList {
+  display: grid;
+  gap: 10px;
+}
+
+.timelineItem {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(18, 44, 28, 0.08);
+}
+
+.timelineDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-top: 5px;
+  background: #1f7a4a;
+  box-shadow: 0 0 0 4px rgba(31, 122, 74, 0.12);
+}
+
+.timelineItem strong,
+.noteItem strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.timelineItem p,
+.noteItem span,
+.placeholder {
+  margin: 0;
+  color: #6d756f;
+}
+
+.noteItem {
+  padding: 14px;
+  border-radius: 14px;
+  background: #f8fbf8;
+  display: grid;
+  gap: 6px;
+}
+
+.noteMeta {
+  display: inline-flex;
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(31, 122, 74, 0.1);
+  color: #1f7a4a;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.emptyState {
+  padding: 28px;
+}
+
+.emptyState h1 { margin: 0 0 8px; }
+.emptyState p { margin: 0 0 16px; color: #6d756f; }
+
+@media (max-width: 1024px) {
+  .contentGrid,
+  .bottomGrid,
+  .metricsGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .heroCard,
+  .contentGrid,
+  .bottomGrid,
+  .metricsGrid {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .infoBlock {
+    grid-template-columns: 1fr;
+  }
+
+  .zoneMap {
+    height: 320px;
+  }
+}

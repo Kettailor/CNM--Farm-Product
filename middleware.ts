@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { giaiMaTokenXacThuc, TEN_COOKIE_XAC_THUC } from "@/lib/auth";
 
-const danhSachCanDangNhap = ["/home-2", "/dashboard"];
 const danhSachAnKhiDaDangNhap = ["/login", "/register"];
 
 function daDangNhap(request: NextRequest) {
@@ -13,16 +12,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hopLe = daDangNhap(request);
 
-  const canBaoVe = danhSachCanDangNhap.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-  if (canBaoVe && !hopLe) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
-  }
-
-  const canAn = danhSachAnKhiDaDangNhap.includes(pathname);
-  if (canAn && hopLe) {
+  if (danhSachAnKhiDaDangNhap.includes(pathname) && hopLe) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
@@ -32,6 +22,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/login", "/register", "/home-2/:path*", "/dashboard/:path*"],
+  matcher: ["/login", "/register"],
 };
-

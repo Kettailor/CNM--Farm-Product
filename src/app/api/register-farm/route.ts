@@ -1,11 +1,12 @@
+import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { layOwnerIdTuRequest } from "@/lib/auth";
+import { layOwnerIdTuRequest, layOwnerIdTuServerCookie } from "@/lib/auth";
 
 type Payload = {
   farm: { name: string; areaHectare: number; specialFactors?: string; otherActivity?: string };
   location: { locationName?: string; mapsLink?: string; lat: string; lng: string };
-  production: { livestock: Array<{ name: string; quantity: number }>; crops: string[]; resources: string[] };
+  production: { livestock: Array<{ name: string; quantity: number }> };
   settings: { annualRainfall: number; carryingCapacity: number; springStart: string };
   referral: { channels: string[]; otherNote?: string };
 };
@@ -14,9 +15,20 @@ const isCoordInRange = (lat: number, lng: number) => lat >= -90 && lat <= 90 && 
 
 export async function POST(request: NextRequest) {
   try {
-    const ownerId = layOwnerIdTuRequest(request);
+    const ownerId = layOwnerIdTuRequest(request) || layOwnerIdTuServerCookie();
     if (!ownerId) {
       return NextResponse.json({ message: "Phiên đăng nhập không hợp lệ." }, { status: 401 });
+    }
+
+    const existing = await db.query(
+      `select t.id
+       from du_lieu.trang_trai t
+       where t.chu_so_huu_id = $1
+       limit 1`,
+      [ownerId]
+    );
+    if (existing.rows.length > 0) {
+      return NextResponse.json({ message: "Thông tin nông trại đã được lưu." }, { status: 409 });
     }
 
     const body = (await request.json()) as Payload;
@@ -34,40 +46,31 @@ export async function POST(request: NextRequest) {
     const client = await db.connect();
     try {
       await client.query("begin");
+      const farmId = randomUUID();
       const farmResult = await client.query(
-        `insert into du_lieu.nong_trai
-          (owner_id, name, farm_area_hectare, special_factors, other_activity, annual_rainfall, carrying_capacity, spring_start)
-         values ($1,$2,$3,$4,$5,$6,$7,$8)
+        `insert into du_lieu.trang_trai
+          (id, chu_so_huu_id, ma_trang_trai, ten_trang_trai, dia_chi, kinh_do, vi_do)
+         values ($1, $2, $3, $4, $5, $6, $7)
          returning id, created_at`,
-        [ownerId, body.farm.name.trim(), areaHectare, body.farm.specialFactors ?? null, body.farm.otherActivity ?? null, body.settings.annualRainfall ?? null, body.settings.carryingCapacity ?? null, body.settings.springStart ?? null]
+        [farmId, ownerId, `FARM-${farmId.slice(0, 8)}`, body.farm.name.trim(), body.location.locationName ?? null, lng, lat]
       );
-      const farmId = farmResult.rows[0].id as string;
 
       await client.query(
-        `insert into du_lieu.vi_tri_nong_trai (farm_id, location_name, maps_link, latitude, longitude)
+        `insert into du_lieu.vi_tri_trang_trai (trang_trai_id, ten_dia_diem, maps_link, kinh_do, vi_do)
          values ($1,$2,$3,$4,$5)`,
-        [farmId, body.location.locationName ?? null, body.location.mapsLink ?? null, lat, lng]
+        [farmId, body.location.locationName ?? null, body.location.mapsLink ?? null, lng, lat]
       );
 
       for (const item of body.production.livestock || []) {
         if (!item?.name) continue;
-        await client.query(`insert into du_lieu.chan_nuoi_nong_trai (farm_id, livestock_name, quantity) values ($1,$2,$3)`, [farmId, item.name, item.quantity ?? null]);
+        await client.query(
+          `insert into du_lieu.vat_nuoi (trang_trai_id, ma_vat_nuoi, the_nhan_dien, trang_thai)
+           values ($1,$2,$3,'đang hoạt động')`,
+          [farmId, `VN-${randomUUID().slice(0, 8)}`, item.name]
+        );
       }
-      for (const crop of body.production.crops || []) {
-        if (!crop) continue;
-        await client.query(`insert into du_lieu.cay_trong_nong_trai (farm_id, crop_name) values ($1,$2)`, [farmId, crop]);
-      }
-      for (const resource of body.production.resources || []) {
-        if (!resource) continue;
-        await client.query(`insert into du_lieu.tai_nguyen_nong_trai (farm_id, resource_name) values ($1,$2)`, [farmId, resource]);
-      }
-      for (const channel of body.referral.channels || []) {
-        if (!channel) continue;
-        await client.query(`insert into du_lieu.nguon_biet_den_nong_trai (farm_id, channel_name, other_note) values ($1,$2,$3)`, [farmId, channel, channel === "Khác" ? body.referral.otherNote ?? null : null]);
-      }
-
       await client.query("commit");
-      return NextResponse.json({ message: "Lưu thông tin nông trại thành công.", farmId, createdAt: farmResult.rows[0].created_at });
+      return NextResponse.json({ message: "Lưu thông tin nông trại thành công.", farmId, createdAt: farmResult.rows[0].created_at, nextPath: "/dashboard" });
     } catch (error) {
       await client.query("rollback");
       throw error;

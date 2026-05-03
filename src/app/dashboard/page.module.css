@@ -51,13 +51,6 @@
   font-size: 20px;
 }
 
-.topIcons {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  color: var(--brand);
-  font-weight: 700;
-}
 
 .heroStrip {
   padding: 16px;

@@ -64,10 +64,8 @@ services:
       - "127.0.0.1:55432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docs/database/farm_traceability_schema.sql:/docker-entrypoint-initdb.d/01_farm_traceability_schema.sql:ro
-      - ./docs/database/02_seed_map_data.sql:/docker-entrypoint-initdb.d/02_seed_map_data.sql:ro
-      - ./scripts/hop_nhat_toan_he_thong_vao_du_lieu.sql:/docker-entrypoint-initdb.d/03_hop_nhat_toan_he_thong_vao_du_lieu.sql:ro
-      - ./docs/database/04_blockchain_truy_xuat_tuong_lai.sql:/docker-entrypoint-initdb.d/04_blockchain_truy_xuat_tuong_lai.sql:ro
+      - ./database/FarmHub_schema.sql:/docker-entrypoint-initdb.d/00_FarmHub_schema.sql:ro
+      - ./scripts/hop_nhat_toan_he_thong_vao_du_lieu.sql:/docker-entrypoint-initdb.d/01_hop_nhat_toan_he_thong_vao_du_lieu.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U farmhub -d farmhub"]
       interval: 15s

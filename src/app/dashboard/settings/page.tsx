@@ -1,23 +1,38 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import MapViewSwitcher from "@/components/map-view-switcher";
+import MapViewSwitcher from "@/components/dashboard-map-view-switcher";
 import DashboardShell from "@/components/dashboard-shell";
+import { useRouter } from "next/navigation";
 
 type Profile = {
   owner_id?: string; full_name?: string; email?: string; farm_id?: string; farm_name?: string;
   farm_area_hectare?: number | null; special_factors?: string | null; other_activity?: string | null;
   annual_rainfall?: number | null; carrying_capacity?: number | null; spring_start?: string | null;
   location_name?: string | null; maps_link?: string | null; latitude?: number | null; longitude?: number | null;
+  is_map_shared?: boolean;
 };
 
 const asNum = (v: string) => (v === "" ? null : Number(v));
 
 export default function DashboardSettingsPage() {
+  const router = useRouter();
   const [form, setForm] = useState<Profile>({});
   const [msg, setMsg] = useState("");
 
-  useEffect(() => { fetch("/api/profile").then((r) => r.json()).then((d) => setForm(d.profile ?? {})); }, []);
+  useEffect(() => {
+    fetch("/api/profile")
+      .then((r) => {
+        if (r.status === 401) {
+          router.replace("/login?next=/dashboard/settings");
+          return null;
+        }
+        return r.json();
+      })
+      .then((d) => {
+        if (d) setForm(d.profile ?? {});
+      });
+  }, [router]);
 
   const fillLocationByCoordinates = (nextLat: number | null, nextLng: number | null) => {
     if (nextLat === null || nextLng === null) return {};
@@ -75,11 +90,21 @@ export default function DashboardSettingsPage() {
               <div className="card" style={{ padding: 16 }}><span className="muted">Vị trí</span><strong>{form.location_name || "Chưa khai báo"}</strong></div>
               <div className="card" style={{ padding: 16 }}><span className="muted">Mưa năm</span><strong>{form.annual_rainfall ?? 0}</strong></div>
             </div>
+            <div className="card" style={{ marginTop: 16, padding: 16, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+              <div>
+                <strong>Chia sẻ bản đồ trang trại</strong>
+                <p className="muted" style={{ marginTop: 4 }}>Bật để hiển thị trang trại của bạn trên bản đồ công khai cho khách vãng lai.</p>
+              </div>
+              <button type="button" className={form.is_map_shared ? "btn btn-primary" : "btn btn-secondary"} onClick={() => setForm({ ...form, is_map_shared: !form.is_map_shared })}>
+                {form.is_map_shared ? "Đang chia sẻ" : "Đang ẩn"}
+              </button>
+            </div>
           </article>
         </section>
 
         <section className="card" style={{ padding: 24 }}>
           <form id="settingForm" onSubmit={onSubmit} className="grid-2">
+            <input type="hidden" value={form.is_map_shared ? "true" : "false"} readOnly />
             <input className="input" placeholder="Họ tên" value={form.full_name ?? ""} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
             <input className="input" placeholder="Email" value={form.email ?? ""} onChange={(e) => setForm({ ...form, email: e.target.value })} />
             <input className="input" placeholder="Tên nông trại" value={form.farm_name ?? ""} onChange={(e) => setForm({ ...form, farm_name: e.target.value })} />

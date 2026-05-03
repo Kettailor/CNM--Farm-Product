@@ -54,9 +54,22 @@
 
 .filterBar {
   border-radius: 12px;
-  padding: 10px 14px;
+  padding: 14px;
   display: grid;
-  gap: 10px;
+  gap: 12px;
+}
+
+.filterHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: end;
+}
+
+.filterTitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .filterGroup {
@@ -89,6 +102,11 @@
   padding: 12px;
   box-shadow: 0 10px 25px rgba(13, 28, 19, 0.06);
   overflow: hidden;
+}
+
+.previewLink {
+  display: block;
+  color: inherit;
 }
 
 .previewMapWrap {
@@ -222,7 +240,8 @@
 
 @media (max-width: 900px) {
   .heroTitleRow,
-  .mapHeader {
+  .mapHeader,
+  .filterHeader {
     flex-direction: column;
     align-items: flex-start;
   }

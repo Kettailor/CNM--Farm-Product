@@ -1,243 +1,181 @@
-const featureSet = [
+import Link from "next/link";
+
+function FeatureIcon({ type }: { type: "zone" | "data" | "trace" }) {
+  if (type === "zone") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4.5 6.75A2.25 2.25 0 0 1 6.75 4.5h10.5A2.25 2.25 0 0 1 19.5 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 17.25V6.75Z" />
+        <path d="M8 8.25h8M8 12h8M8 15.75h5" />
+      </svg>
+    );
+  }
+
+  if (type === "data") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <ellipse cx="12" cy="5.75" rx="6.75" ry="2.75" />
+        <path d="M5.25 5.75v6.5c0 1.52 3.02 2.75 6.75 2.75s6.75-1.23 6.75-2.75v-6.5" />
+        <path d="M5.25 12.25v6.5c0 1.52 3.02 2.75 6.75 2.75s6.75-1.23 6.75-2.75v-6.5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6.5 4.75h7.25l3.75 3.75v10.75A1.75 1.75 0 0 1 15.75 21H6.5a1.75 1.75 0 0 1-1.75-1.75V6.5A1.75 1.75 0 0 1 6.5 4.75Z" />
+      <path d="M13.75 4.75v4h4" />
+      <path d="M8.25 12h7.5M8.25 15h5.25" />
+    </svg>
+  );
+}
+
+const features = [
   {
-    title: "Vận hành trực tiếp",
-    desc: "Quan sát tổng quan vận hành và trạng thái nông trại trong một màn hình.",
+    title: "Quản lý khu vực",
+    description: "Theo dõi các khu sản xuất, trồng trọt và vận hành trên một giao diện đồng bộ.",
+    type: "zone" as const,
   },
   {
-    title: "Bản đồ nông trại",
-    desc: "Định vị khu vực, phạm vi và cấu trúc không gian canh tác.",
+    title: "Dữ liệu tập trung",
+    description: "Tất cả thông tin trang trại, vùng và trạng thái hoạt động được chuẩn hóa trong một nơi.",
+    type: "data" as const,
   },
   {
-    title: "Cảm biến và tài sản",
-    desc: "Theo dõi tài nguyên, cảm biến và dữ liệu nền tảng đi cùng hệ thống.",
-  },
-  {
-    title: "Sẵn sàng truy xuất",
-    desc: "Sẵn sàng cho luồng truy xuất nguồn gốc và quản trị mở rộng.",
-  },
-  {
-    title: "Hồ sơ và cài đặt",
-    desc: "Quản lý tài khoản, hồ sơ và cấu hình dùng chung cho trang trại.",
-  },
-  {
-    title: "Phân tích và báo cáo",
-    desc: "Dễ dàng mở rộng sang số liệu, báo cáo và màn hình phân tích.",
+    title: "Truy xuất sẵn sàng",
+    description: "Hạ tầng dữ liệu đã sẵn sàng cho quy trình truy xuất nguồn gốc mở rộng về sau.",
+    type: "trace" as const,
   },
 ];
-
-const dashboardHighlights = [
-  { label: "Khu vực đang hoạt động", value: "12" },
-  { label: "Cảm biến đang kết nối", value: "48" },
-  { label: "Nguồn nước", value: "05" },
-  { label: "Trạng thái hệ thống", value: "Ổn định" },
-];
-
-const stories = [
-  {
-    title: "Cảm biến nhiệt độ thông minh",
-    desc: "Theo dõi nhiệt độ môi trường để tối ưu điều kiện chăn nuôi và canh tác.",
-  },
-  {
-    title: "Cảm biến quản lý năng lượng",
-    desc: "Giám sát năng lượng và giảm lãng phí trong các khu vận hành chính.",
-  },
-];
-
-const showcaseCards = ["Trang trại bò sữa", "Trang trại rau màu", "Mô hình tổng hợp"];
-
-const stats = [
-  { value: "01", label: "Trang vào" },
-  { value: "04", label: "Luồng chính" },
-  { value: "06", label: "Nhóm tính năng" },
-  { value: "100%", label: "Định hướng hệ thống" },
-];
-
-const appCards = ["Cửa hàng ứng dụng", "Google Play"];
 
 export default function HomePage() {
   return (
-    <main className="page-shell marketing-home">
-      <header className="topbar card">
-        <div>
-          <div className="brand">KetKat-EcoFarm</div>
-          <div className="brand-subtitle">Nền tảng quản trị và truy xuất nông trại số</div>
+    <main className="marketing-home marketing-landing">
+      <section className="marketing-landing-header card">
+        <div className="marketing-brand-block">
+          <a href="/" className="marketing-brand marketing-brand-with-logo">
+            <img src="/assets/logo_ketkatecofarm.png" alt="KetKat-EcoFarm" className="marketing-brand-logo" />
+            <span>KetKat-EcoFarm</span>
+          </a>
+          <p className="marketing-brand-subtitle">Nền tảng quản trị, bản đồ và truy xuất nông trại số</p>
         </div>
-        <nav className="topnav">
-          <a href="#features">Tính năng</a>
-          <a href="#stories">Trường hợp sử dụng</a>
-          <a href="#global">Phạm vi</a>
-          <a href="#apps">Ứng dụng</a>
-        </nav>
-        <div className="topbar-actions">
-          <a className="btn btn-ghost" href="/login">Đăng nhập</a>
-          <a className="btn btn-primary" href="/register">Bắt đầu ngay</a>
-        </div>
-      </header>
 
-      <section className="hero-spacer card">
-        <div className="hero-layout">
-          <div className="hero-copy">
-            <h1 className="hero-title">Giải pháp quản lý nông trại tập trung, rõ ràng và sẵn sàng cho vận hành thực tế</h1>
-            <p className="hero-subtitle">Giao diện này được xây dựng theo phong cách desktop marketing, nhưng toàn bộ nội dung, dữ liệu và chỉ số đều bám theo hệ thống KetKat-EcoFarm của bạn.</p>
-            <div className="hero-actions">
-              <a className="btn btn-primary" href="/register">Trải nghiệm ngay</a>
-              <a className="btn btn-ghost" href="/login">Đăng nhập</a>
-            </div>
+        <nav className="marketing-nav" aria-label="Điều hướng chính">
+          <a href="#tinh-nang">Tính năng</a>
+          <a href="#truong-hop">Trường hợp sử dụng</a>
+          <a href="#pham-vi">Phạm vi</a>
+          <a href="#ung-dung">Ứng dụng</a>
+       </nav>
+
+        <div className="marketing-actions">
+          <Link href="/login" className="btn btn-secondary">
+            Đăng nhập
+          </Link>
+          <Link href="/register" className="btn btn-primary">
+            Bắt đầu ngay
+          </Link>
+        </div>
+      </section>
+
+      <section className="marketing-hero card">
+        <div className="marketing-hero-copy">
+          <p className="section-eyebrow">Giải pháp quản lý nông trại tập trung</p>
+          <h1>Giải pháp quản lý nông trại tập trung, rõ ràng và sẵn sàng cho vận hành thực tế</h1>
+          <p className="marketing-hero-description">
+            Giao diện này được xây dựng theo phong cách desktop marketing, nhưng toàn bộ nội dung, dữ liệu và chỉ số đều bám theo hệ thống KetKat-EcoFarm của bạn.
+          </p>
+          <div className="marketing-hero-actions">
+            <Link href="/register" className="btn btn-primary">
+              Trải nghiệm ngay
+            </Link>
+            <Link href="/login" className="btn btn-secondary">
+              Đăng nhập
+            </Link>
+          </div>
+        </div>
+
+        <div className="marketing-dashboard card" aria-hidden="true">
+          <div className="marketing-dashboard-top">
+            <span className="marketing-badge">Bảng điều khiển</span>
+            <strong>KetKat-EcoFarm</strong>
+            <span className="marketing-status-pill">Đang hoạt động</span>
           </div>
 
-          <div className="hero-visual card">
-            <div className="hero-visual-header">
-              <div>
-                <p className="section-eyebrow" style={{ marginBottom: 6 }}>Bảng điều khiển</p>
-                <strong>KetKat-EcoFarm Overview</strong>
+          <div className="marketing-dashboard-body">
+            <aside className="marketing-side-rail">
+              <span className="marketing-rail-chip active" />
+              <span className="marketing-rail-chip" />
+              <span className="marketing-rail-chip" />
+            </aside>
+
+            <div className="marketing-map-panel card">
+              <div className="marketing-map-head">
+                <span>Bản đồ nông trại</span>
+                <span>Vị trí trung tâm</span>
               </div>
-              <span className="status-pill">Đang hoạt động</span>
-            </div>
-
-            <div className="dashboard-mock">
-              <div className="dashboard-sidebar">
-                <div className="sidebar-chip active" />
-                <div className="sidebar-chip" />
-                <div className="sidebar-chip" />
-                <div className="sidebar-chip" />
-                <div className="sidebar-chip" />
-              </div>
-
-              <div className="dashboard-main">
-                <div className="dashboard-map card">
-                  <div className="map-topline">
-                    <span>Bản đồ nông trại</span>
-                    <span>Vị trí trung tâm</span>
-                  </div>
-                  <div className="map-canvas">
-                    <div className="field field-large" />
-                    <div className="field field-medium" />
-                    <div className="field field-small" />
-                    <div className="field field-water" />
-                    <div className="map-pin map-pin-1" />
-                    <div className="map-pin map-pin-2" />
-                    <div className="map-pin map-pin-3" />
-                  </div>
-                </div>
-
-                <div className="dashboard-panels">
-                  {dashboardHighlights.map((item) => (
-                    <article key={item.label} className="dashboard-stat card">
-                      <div className="muted" style={{ fontSize: 12 }}>{item.label}</div>
-                      <strong>{item.value}</strong>
-                    </article>
-                  ))}
-                </div>
+              <div className="marketing-map-canvas">
+                <div className="marketing-field marketing-field-green" />
+                <div className="marketing-field marketing-field-blue" />
+                <div className="marketing-field marketing-field-accent" />
+                <span className="marketing-pin pin-one" />
+                <span className="marketing-pin pin-two" />
+                <span className="marketing-pin pin-three" />
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="features" className="section-block card">
-        <div className="section-center wide">
-          <p className="section-eyebrow">Tính năng</p>
-          <h2>Tổng quan theo đúng cấu trúc sản phẩm hiện có</h2>
-          <p>Các điểm điều hướng bên dưới bám theo những màn hình quan trọng nhất của hệ thống, giúp người dùng đi đúng vào dashboard, bản đồ và phần quản lý nông trại.</p>
+      <section className="marketing-map-link-card card">
+        <div className="marketing-map-link-copy">
+          <p className="section-eyebrow">Bản đồ nông trại</p>
+          <h2>Khám phá hệ sinh thái đối tác KetKat-EcoFarm ngay trên bản đồ</h2>
+          <p>Từ góc nhìn trực quan, bạn có thể mở ra một bức tranh kết nối nông trại rõ ràng, hiện đại và đầy tiềm năng tăng trưởng.</p>
         </div>
-        <div className="feature-grid">
-          {featureSet.map((item) => (
-            <article key={item.title} className="feature-tile card">
-              <div className="feature-dot" />
-              <strong>{item.title}</strong>
-              <p>{item.desc}</p>
-            </article>
-          ))}
-        </div>
+        <a href="/public/farm-map" className="marketing-nav-map-link marketing-nav-map-link-cta">
+          <span className="marketing-nav-map-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+              <path d="M12 21s6.5-5.3 6.5-10.5A6.5 6.5 0 0 0 5.5 10.5C5.5 15.7 12 21 12 21Z" />
+              <circle cx="12" cy="10.5" r="2.2" />
+            </svg>
+          </span>
+          <span>Bản đồ nông trại</span>
+        </a>
       </section>
 
-      <section className="story-section card">
-        <div className="section-center narrow">
-          <p className="section-eyebrow">Nền tảng của nông nghiệp thông minh</p>
-          <h2>Nông nghiệp thông minh bắt đầu từ dữ liệu cảm biến</h2>
-        </div>
-        <div className="story-grid">
-          {stories.map((story) => (
-            <article key={story.title} className="story-card card story-card-accent">
-              <div className="story-preview" />
-              <h3>{story.title}</h3>
-              <p>{story.desc}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section id="stories" className="section-block card">
-        <div className="section-center wide">
-          <p className="section-eyebrow">Trường hợp sử dụng</p>
-          <h2>Một số luồng thao tác tiêu biểu tại nông trại</h2>
-        </div>
-        <div className="video-grid">
-          {showcaseCards.map((video) => (
-            <article key={video} className="video-card card">
-              <div className="video-card-top">
-                <div className="play-button">▶</div>
-                <div className="video-meta">
-                  <span className="muted">Mô hình</span>
-                  <strong>{video}</strong>
-                </div>
-              </div>
-              <p>Thẻ nội dung mô phỏng bố cục quảng bá, nhưng vẫn phản ánh đúng nội dung dự án của bạn.</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section id="global" className="global-section card">
-        <div className="global-copy">
-          <p className="section-eyebrow">Phạm vi sử dụng</p>
-          <h2>Thiết kế cho nhiều mô hình trang trại</h2>
-          <p>Phần này đóng vai trò giới thiệu phạm vi ứng dụng của hệ thống, đồng thời giữ sự tập trung vào các màn hình chính.</p>
-        </div>
-        <div className="global-map">
-          <div className="global-map-grid">
-            <div className="global-card global-card-large">Trung tâm quản lý</div>
-            <div className="global-card">Bản đồ</div>
-            <div className="global-card">Cảm biến</div>
-            <div className="global-card">Vật nuôi</div>
-            <div className="global-card">Nguồn nước</div>
-            <div className="global-card">Khu vực</div>
-          </div>
-        </div>
-      </section>
-
-      <section id="apps" className="apps-band card">
-        <div>
-          <p className="section-eyebrow">Ứng dụng di động và máy tính bảng</p>
-          <h2>Đưa trải nghiệm quản lý nông trại đến mọi thiết bị.</h2>
-        </div>
-        <div className="store-buttons">
-          {appCards.map((label) => (
-            <a key={label} href="/dashboard" className="store-btn">{label}</a>
-          ))}
-        </div>
-      </section>
-
-      <section className="stats-row card">
-        {stats.map((stat) => (
-          <div key={stat.label} className="stat-card">
-            <strong>{stat.value}</strong>
-            <span>{stat.label}</span>
-          </div>
+      <section id="tinh-nang" className="marketing-section-grid">
+        {features.map((feature) => (
+          <article key={feature.title} className="marketing-feature card">
+            <div className="marketing-feature-icon" aria-hidden="true">
+              <FeatureIcon type={feature.type} />
+            </div>
+            <div>
+              <h2>{feature.title}</h2>
+              <p>{feature.description}</p>
+            </div>
+          </article>
         ))}
       </section>
 
-      <footer className="footer card">
+      <section id="truong-hop" className="marketing-strip card">
         <div>
-          <div className="brand">KetKat-EcoFarm</div>
-          <div className="brand-subtitle">Nền tảng quản trị và truy xuất nông trại số</div>
+          <p className="section-eyebrow">Trường hợp sử dụng</p>
+          <h2>Phù hợp cho trang trại cần nhìn tổng thể và thao tác nhanh</h2>
         </div>
-        <div className="footer-links">
-          <a href="/login">Đăng nhập</a>
-          <a href="/register">Đăng ký</a>
-          <a href="/dashboard">Dashboard</a>
-        </div>
-      </footer>
+        <p>
+          Từ việc xem nhanh bản đồ, lọc khu vực, đến quản trị trang trại và tài khoản, giao diện này ưu tiên tốc độ nhận biết và thao tác một tay.
+        </p>
+      </section>
+
+      <section id="pham-vi" className="marketing-grid-two">
+        <article className="marketing-info card">
+          <h3>Phạm vi vận hành</h3>
+          <p>Dashboard, bản đồ, khu vực, dữ liệu và các điểm chạm quản trị cốt lõi.</p>
+        </article>
+        <article className="marketing-info card">
+          <h3>Ứng dụng thực tế</h3>
+          <p>Dùng cho quản lý nội bộ, theo dõi vận hành và làm nền cho mô hình truy xuất.</p>
+        </article>
+      </section>
     </main>
   );
 }

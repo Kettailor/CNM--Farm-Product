@@ -39,43 +39,86 @@ type ZonePayload = {
   resources: Array<{ id: string; type: string; name: string; status: string; lastSeen: string; quantity: number }>;
 };
 
-const toZone = (row: any) => {
-  const b = row.boundary_geojson ?? {};
-  const dbStatus = String(row.status ?? "").toLowerCase();
-  const isCancelled = String(b.status ?? "").toLowerCase() === "cancelled" || (dbStatus === "inactive" && String(b.status ?? "").toLowerCase() !== "active");
+type GeoPoint = { lat?: number | string; lng?: number | string };
+type GeoBounds = { south?: number | string; west?: number | string; north?: number | string; east?: number | string };
+type ZoneRow = {
+  id: string | number;
+  ten_khu_vuc?: string | null;
+  ma_khu_vuc?: string | null;
+  trang_thai?: string | null;
+  dien_tich_ha?: number | string | null;
+  tam_vi_do?: number | string | null;
+  tam_kinh_do?: number | string | null;
+  loai_khu_vuc?: string | null;
+  mo_ta?: string | null;
+  hinh_hoc_geojson?: {
+    geo?: {
+      lat?: number | string;
+      lng?: number | string;
+      latSpan?: number | string;
+      lngSpan?: number | string;
+      polygon?: GeoPoint[];
+      bounds?: GeoBounds;
+    };
+    metadata?: {
+      occupancy?: number | string;
+      coverage?: string;
+      areaHecta?: number | string;
+      usage?: string;
+      soilType?: string;
+      waterSource?: string;
+      manager?: string;
+      plantingStatus?: string;
+      priority?: ZonePayload["metadata"]["priority"];
+      notes?: string;
+      farmType?: ZonePayload["metadata"]["farmType"];
+      shapeRatio?: number | string;
+      rotationDeg?: number | string;
+    };
+    resources?: ZonePayload["resources"];
+  } | null;
+};
+
+const toZone = (row: ZoneRow) => {
+  const b = row.hinh_hoc_geojson ?? {};
+  const dbStatus = String(row.trang_thai ?? "").toLowerCase();
+  const geo = b.geo ?? {};
+  const polygon = Array.isArray(geo.polygon)
+    ? geo.polygon
+        .filter((p): p is GeoPoint => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng)))
+        .map((p) => ({ lat: Number(p.lat), lng: Number(p.lng) }))
+    : [];
   return {
-    id: row.id,
-    name: row.name,
-    code: row.paddock_code,
-    status: (isCancelled ? "cancelled" : (b.status ?? "healthy")) as ZonePayload["status"],
-    occupancy: Number(b.occupancy ?? 0),
-    coverage: String(b.coverage ?? `${Number(row.area_ha ?? 0).toFixed(1)} ha`),
+    id: String(row.id),
+    name: String(row.ten_khu_vuc ?? ""),
+    code: String(row.ma_khu_vuc ?? row.id ?? ""),
+    status: (dbStatus === "inactive" ? "cancelled" : dbStatus === "maintenance" ? "critical" : dbStatus === "draft" ? "warning" : "healthy") as ZonePayload["status"],
+    occupancy: Number(b.metadata?.occupancy ?? 0),
+    coverage: String(b.metadata?.coverage ?? `${Number(row.dien_tich_ha ?? 0).toFixed(1)} ha`),
     geo: {
-      lat: Number(b.geo?.lat ?? 10.8216),
-      lng: Number(b.geo?.lng ?? 106.6295),
-      latSpan: Number(b.geo?.latSpan ?? 0.0015),
-      lngSpan: Number(b.geo?.lngSpan ?? 0.0018),
-      polygon: Array.isArray(b.geo?.polygon)
-        ? b.geo.polygon.filter((p: any) => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng))).map((p: any) => ({ lat: Number(p.lat), lng: Number(p.lng) }))
-        : [],
-      bounds: b.geo?.bounds
+      lat: Number(geo.lat ?? row.tam_vi_do ?? 10.8216),
+      lng: Number(geo.lng ?? row.tam_kinh_do ?? 106.6295),
+      latSpan: Number(geo.latSpan ?? 0.0015),
+      lngSpan: Number(geo.lngSpan ?? 0.0018),
+      polygon,
+      bounds: geo.bounds
         ? {
-            south: Number(b.geo.bounds.south ?? 0),
-            west: Number(b.geo.bounds.west ?? 0),
-            north: Number(b.geo.bounds.north ?? 0),
-            east: Number(b.geo.bounds.east ?? 0),
+            south: Number(geo.bounds.south ?? 0),
+            west: Number(geo.bounds.west ?? 0),
+            north: Number(geo.bounds.north ?? 0),
+            east: Number(geo.bounds.east ?? 0),
           }
         : undefined,
     },
     metadata: {
-      areaHecta: Number(row.area_ha ?? b.metadata?.areaHecta ?? 1),
-      usage: String(b.metadata?.usage ?? row.crop_type ?? ""),
+      areaHecta: Number(row.dien_tich_ha ?? b.metadata?.areaHecta ?? 1),
+      usage: String(b.metadata?.usage ?? row.loai_khu_vuc ?? ""),
       soilType: String(b.metadata?.soilType ?? ""),
       waterSource: String(b.metadata?.waterSource ?? ""),
       manager: String(b.metadata?.manager ?? ""),
-      plantingStatus: String(b.metadata?.plantingStatus ?? row.grazing_status ?? ""),
+      plantingStatus: String(b.metadata?.plantingStatus ?? row.mo_ta ?? ""),
       priority: (b.metadata?.priority ?? "medium") as ZonePayload["metadata"]["priority"],
-      notes: String(b.metadata?.notes ?? row.notes ?? ""),
+      notes: String(b.metadata?.notes ?? row.mo_ta ?? ""),
       farmType: (b.metadata?.farmType ?? "crop") as ZonePayload["metadata"]["farmType"],
       shapeRatio: Number(b.metadata?.shapeRatio ?? 1.4),
       rotationDeg: Number(b.metadata?.rotationDeg ?? 0),
@@ -84,14 +127,6 @@ const toZone = (row: any) => {
   };
 };
 
-const toBoundaryGeojson = (z: ZonePayload) => ({
-  status: z.status,
-  occupancy: z.occupancy,
-  coverage: z.coverage,
-  geo: z.geo,
-  metadata: z.metadata,
-  resources: z.resources,
-});
 
 async function getOwnerFarmId() {
   const ownerId = layOwnerIdTuServerCookie();
@@ -99,8 +134,8 @@ async function getOwnerFarmId() {
 
   const rs = await db.query(
     `select id
-     from du_lieu.nong_trai
-     where owner_id = $1
+     from du_lieu.trang_trai
+     where chu_so_huu_id = $1
      order by created_at desc
      limit 1`,
     [ownerId]
@@ -114,7 +149,7 @@ export async function GET() {
     const farmId = await getOwnerFarmId();
     if (!farmId) return NextResponse.json({ zones: [] });
 
-    const rs = await db.query("select * from du_lieu.dong_chan_tha where farm_id = $1 order by created_at asc", [farmId]);
+    const rs = await db.query("select * from du_lieu.khu_vuc where trang_trai_id = $1 order by created_at asc", [farmId]);
     return NextResponse.json({ zones: rs.rows.map(toZone) });
   } catch (error) {
     return NextResponse.json({ message: "Không thể kết nối dữ liệu map từ PostgreSQL.", error: String(error) }, { status: 500 });
@@ -131,25 +166,22 @@ export async function POST(request: NextRequest) {
     }
 
     const existingName = await db.query(
-      `select id from du_lieu.dong_chan_tha where farm_id = $1 and lower(trim(name)) = lower(trim($2)) limit 1`,
+      `select id from du_lieu.khu_vuc where trang_trai_id = $1 and lower(trim(ten_khu_vuc)) = lower(trim($2)) limit 1`,
       [farmId, zone.name]
     );
     if (existingName.rows[0]?.id) {
       return NextResponse.json({ message: `Tên ô "${zone.name}" đã tồn tại. Vui lòng đặt tên khác.` }, { status: 409 });
     }
 
-    const q = `insert into du_lieu.dong_chan_tha(farm_id,paddock_code,name,area_ha,crop_type,grazing_status,notes,boundary_geojson,status)
-               values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`;
-    const vals = [farmId, zone.code, zone.name, zone.metadata.areaHecta, zone.metadata.usage, zone.metadata.plantingStatus, zone.metadata.notes, toBoundaryGeojson(zone), zone.status === "cancelled" ? "inactive" : (zone.status === "critical" ? "maintenance" : "active")];
+    const q = `insert into du_lieu.khu_vuc(trang_trai_id,ma_khu_vuc,ten_khu_vuc,dien_tich_ha,mo_ta,mau_sac,hinh_hoc_geojson,trang_thai)
+               values($1,$2,$3,$4,$5,$6,$7,$8) returning *`;
+    const vals = [farmId, zone.code, zone.name, zone.metadata.areaHecta, zone.metadata.notes || zone.metadata.usage || null, null, { geo: zone.geo, metadata: zone.metadata, resources: zone.resources }, zone.status === "cancelled" ? "inactive" : (zone.status === "critical" ? "maintenance" : zone.status === "warning" ? "draft" : "active")];
 
     const rs = await db.query(q, vals);
-    return NextResponse.json({ zone: toZone(rs.rows[0]) });
-  } catch (error: any) {
-    if (error?.code === "23505") {
-      return NextResponse.json(
-        { message: `Mã khu ${zone.code} đã tồn tại. Vui lòng thử lại.` },
-        { status: 409 }
-      );
+    return NextResponse.json({ zone: toZone(rs.rows[0] as ZoneRow) });
+  } catch (error: unknown) {
+    if (typeof error === "object" && error && "code" in error && (error as { code?: string }).code === "23505") {
+      return NextResponse.json({ message: `Mã khu ${zone.code} đã tồn tại. Vui lòng thử lại.` }, { status: 409 });
     }
 
     return NextResponse.json({ message: "Không thể tạo khu mới." }, { status: 500 });
@@ -161,11 +193,11 @@ export async function PUT(request: NextRequest) {
   const farmId = await getOwnerFarmId();
   if (!farmId) return NextResponse.json({ message: "Không tìm thấy trang trại của tài khoản hiện tại." }, { status: 404 });
 
-  const q = `update du_lieu.dong_chan_tha
-             set name=$3, area_ha=$4, crop_type=$5, grazing_status=$6, notes=$7, boundary_geojson=$8, status=$9
-             where id=$1 and farm_id=$2
+  const q = `update du_lieu.khu_vuc
+             set ten_khu_vuc=$3, dien_tich_ha=$4, mo_ta=$5, hinh_hoc_geojson=$6, trang_thai=$7
+             where id=$1 and trang_trai_id=$2
              returning *`;
-  const vals = [zone.id, farmId, zone.name, zone.metadata.areaHecta, zone.metadata.usage, zone.metadata.plantingStatus, zone.metadata.notes, toBoundaryGeojson(zone), zone.status === "cancelled" ? "inactive" : (zone.status === "critical" ? "maintenance" : "active")];
+  const vals = [zone.id, farmId, zone.name, zone.metadata.areaHecta, zone.metadata.notes || zone.metadata.usage || null, { geo: zone.geo, metadata: zone.metadata, resources: zone.resources }, zone.status === "cancelled" ? "inactive" : (zone.status === "critical" ? "maintenance" : zone.status === "warning" ? "draft" : "active")];
   const rs = await db.query(q, vals);
   return NextResponse.json({ zone: rs.rows[0] ? toZone(rs.rows[0]) : null });
 }
@@ -175,12 +207,12 @@ export async function DELETE(request: NextRequest) {
   const farmId = await getOwnerFarmId();
   if (!farmId) return NextResponse.json({ message: "Không tìm thấy trang trại của tài khoản hiện tại." }, { status: 404 });
 
-  const rs = await db.query("select boundary_geojson from du_lieu.dong_chan_tha where id = $1 and farm_id = $2 limit 1", [id, farmId]);
-  const currentBoundary = rs.rows[0]?.boundary_geojson ?? {};
+  const rs = await db.query("select hinh_hoc_geojson from du_lieu.khu_vuc where id = $1 and trang_trai_id = $2 limit 1", [id, farmId]);
+  const currentBoundary = rs.rows[0]?.hinh_hoc_geojson ?? {};
   const nextBoundary = { ...currentBoundary, status: "cancelled" };
 
   await db.query(
-    "update du_lieu.dong_chan_tha set status = 'inactive', boundary_geojson = $3 where id = $1 and farm_id = $2",
+    "update du_lieu.khu_vuc set trang_thai = 'inactive', hinh_hoc_geojson = $3 where id = $1 and trang_trai_id = $2",
     [id, farmId, nextBoundary]
   );
   return NextResponse.json({ ok: true, softDeleted: true });

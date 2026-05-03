@@ -26,9 +26,9 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), password }),
       });
-      const data = (await res.json()) as { message?: string };
+      const data = (await res.json()) as { message?: string; nextPath?: string };
       if (!res.ok) return setError(data.message || "Đăng nhập thất bại.");
-      router.push(nextPath);
+      router.push(data.nextPath || nextPath);
       router.refresh();
     } catch {
       setError("Không thể kết nối máy chủ.");

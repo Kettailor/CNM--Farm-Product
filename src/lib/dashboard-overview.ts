@@ -1,10 +1,14 @@
 import { db } from "@/lib/db";
 
 export type DashboardOverview = {
+  farmId: string | null;
   farmName: string;
   locationName: string | null;
   latitude: number;
   longitude: number;
+  isMapShared: boolean;
+  createdAt: string | null;
+  ownerName: string | null;
   metrics: {
     assets: number;
     sensors: number;
@@ -23,59 +27,52 @@ export type DashboardOverview = {
 const DEFAULT_COORD = { latitude: 10.762622, longitude: 106.660172 };
 
 const ZERO_OVERVIEW: DashboardOverview = {
+  farmId: null,
   farmName: "KetKat-EcoFarm",
   locationName: null,
   latitude: DEFAULT_COORD.latitude,
   longitude: DEFAULT_COORD.longitude,
+  isMapShared: false,
+  createdAt: null,
+  ownerName: null,
   metrics: { assets: 0, sensors: 0, livestock: 0, zones: 0, waterSources: 0 },
   latestZones: [],
 };
 
-async function tableExists(schema: string, table: string): Promise<boolean> {
-  try {
-    const rs = await db.query(`select to_regclass($1) is not null as exists`, [`${schema}.${table}`]);
-    return Boolean(rs.rows[0]?.exists);
-  } catch {
-    return false;
-  }
-}
-
 async function getCount(tableSql: string, whereSql = "", params: unknown[] = []) {
-  try {
-    const rs = await db.query(`select count(*)::int as c from ${tableSql} ${whereSql}`, params);
-    return Number(rs.rows[0]?.c ?? 0);
-  } catch {
-    return 0;
-  }
+  const rs = await db.query(`select count(*)::int as c from ${tableSql} ${whereSql}`, params);
+  return Number(rs.rows[0]?.c ?? 0);
 }
 
 async function loadDuLieuOverview(ownerId: string): Promise<DashboardOverview> {
   const farmRs = await db.query(
-    `select n.id, n.name as farm_name, v.latitude, v.longitude, v.location_name
-     from du_lieu.nong_trai n
-     left join du_lieu.vi_tri_nong_trai v on v.farm_id = n.id
-     where n.owner_id = $1
+    `select n.id, n.ten_trang_trai as farm_name, n.created_at, c.ho_ten as owner_name,
+            v.vi_do as latitude, v.kinh_do as longitude, v.ten_dia_diem as location_name
+     from du_lieu.trang_trai n
+     left join du_lieu.nguoi_dung c on c.id = n.chu_so_huu_id
+     left join du_lieu.vi_tri_trang_trai v on v.trang_trai_id = n.id
+     where n.chu_so_huu_id = $1
      order by n.created_at desc
      limit 1`,
     [ownerId]
   );
 
   const farm = farmRs.rows[0] as
-    | { id?: string; farm_name?: string; latitude?: number | null; longitude?: number | null; location_name?: string | null }
+    | { id?: string; farm_name?: string; created_at?: string | Date | null; owner_name?: string | null; latitude?: number | null; longitude?: number | null; location_name?: string | null; is_map_shared?: boolean | null }
     | undefined;
 
   if (!farm?.id) return ZERO_OVERVIEW;
 
   const [assets, sensors, livestock, zones, waterSources, latestZones] = await Promise.all([
-    getCount("du_lieu.tai_nguyen_nong_trai", "where farm_id = $1", [farm.id]),
-    getCount("du_lieu.cam_bien", "where farm_id = $1", [farm.id]),
-    getCount("du_lieu.vat_nuoi", "where farm_id = $1", [farm.id]),
-    getCount("du_lieu.dong_chan_tha", "where farm_id = $1", [farm.id]),
-    getCount("du_lieu.nguon_nuoc", "where farm_id = $1", [farm.id]),
+    getCount("du_lieu.tai_san_rao", "where trang_trai_id = $1", [farm.id]),
+    getCount("du_lieu.cam_bien", "where khu_vuc_id in (select id from du_lieu.khu_vuc where trang_trai_id = $1)", [farm.id]),
+    getCount("du_lieu.vat_nuoi", "where trang_trai_id = $1", [farm.id]),
+    getCount("du_lieu.khu_vuc", "where trang_trai_id = $1", [farm.id]),
+    getCount("du_lieu.nguon_nuoc", "where trang_trai_id = $1", [farm.id]),
     db.query(
-      `select id, coalesce(name, 'Khu vực chưa đặt tên') as name, status, coalesce(area_ha, 0)::float8 as area_ha
-       from du_lieu.dong_chan_tha
-       where farm_id = $1
+      `select id, ten_khu_vuc as name, trang_thai as status, coalesce(dien_tich_ha, 0)::float8 as area_ha
+       from du_lieu.khu_vuc
+       where trang_trai_id = $1
        order by created_at desc nulls last, id desc
        limit 8`,
       [farm.id]
@@ -83,60 +80,14 @@ async function loadDuLieuOverview(ownerId: string): Promise<DashboardOverview> {
   ]);
 
   return {
+    farmId: farm.id ?? null,
     farmName: farm.farm_name || "KetKat-EcoFarm",
     locationName: farm.location_name ?? null,
     latitude: Number(farm.latitude ?? DEFAULT_COORD.latitude),
     longitude: Number(farm.longitude ?? DEFAULT_COORD.longitude),
-    metrics: { assets, sensors, livestock, zones, waterSources },
-    latestZones: latestZones.rows.map((row) => ({
-      id: String(row.id),
-      name: String(row.name ?? "Khu vực chưa đặt tên"),
-      status: row.status ? String(row.status) : null,
-      areaHa: Number(row.area_ha ?? 0),
-    })),
-  };
-}
-
-async function loadFarmOverview(ownerId: string): Promise<DashboardOverview> {
-  const farmRs = await db.query(
-    `select f.id, f.name as farm_name, f.latitude, f.longitude,
-            coalesce(f.address_line1, f.city, f.state, f.country) as location_name
-     from farm.farms f
-     where f.id in (
-       select farm_id from farm.farm_users where id = $1 or email is not null limit 1
-     )
-     order by f.created_at desc
-     limit 1`,
-    [ownerId]
-  );
-
-  const farm = farmRs.rows[0] as
-    | { id?: string; farm_name?: string; latitude?: number | null; longitude?: number | null; location_name?: string | null }
-    | undefined;
-
-  if (!farm?.id) return ZERO_OVERVIEW;
-
-  const [assets, sensors, livestock, zones, waterSources, latestZones] = await Promise.all([
-    getCount("farm.fencing_assets", "where farm_id = $1", [farm.id]),
-    getCount("farm.sensors", "where farm_id = $1", [farm.id]),
-    getCount("farm.animals", "where farm_id = $1 and lifecycle_status = 'active'", [farm.id]),
-    getCount("farm.paddocks", "where farm_id = $1", [farm.id]),
-    getCount("farm.water_assets", "where farm_id = $1", [farm.id]),
-    db.query(
-      `select p.id, p.name, p.status, coalesce(p.area_ha, 0)::float8 as area_ha
-       from farm.paddocks p
-       where p.farm_id = $1
-       order by p.created_at desc
-       limit 8`,
-      [farm.id]
-    ),
-  ]);
-
-  return {
-    farmName: farm.farm_name || "KetKat-EcoFarm",
-    locationName: farm.location_name ?? null,
-    latitude: Number(farm.latitude ?? DEFAULT_COORD.latitude),
-    longitude: Number(farm.longitude ?? DEFAULT_COORD.longitude),
+    isMapShared: Boolean(farm.is_map_shared),
+    createdAt: farm.created_at ? new Date(farm.created_at).toISOString() : null,
+    ownerName: farm.owner_name ?? null,
     metrics: { assets, sensors, livestock, zones, waterSources },
     latestZones: latestZones.rows.map((row) => ({
       id: String(row.id),
@@ -148,11 +99,5 @@ async function loadFarmOverview(ownerId: string): Promise<DashboardOverview> {
 }
 
 export async function getDashboardOverview(ownerId: string): Promise<DashboardOverview> {
-  const duLieuExists = await tableExists("du_lieu", "nong_trai");
-  if (duLieuExists) return loadDuLieuOverview(ownerId);
-
-  const farmExists = await tableExists("farm", "farms");
-  if (farmExists) return loadFarmOverview(ownerId);
-
-  return ZERO_OVERVIEW;
+  return loadDuLieuOverview(ownerId);
 }

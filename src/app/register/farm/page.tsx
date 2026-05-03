@@ -5,19 +5,16 @@ import { useEffect, useState } from "react";
 
 type LastSource = "name" | "link" | "coord";
 type Suggestion = { name: string; lat: string; lng: string };
-type StepKey = 1 | 2 | 3 | 4 | 5 | 6;
+type StepKey = 1 | 2 | 3 | 4 | 5;
 
 const STEPS = [
   "Thông tin nông trại",
   "Vị trí nông trại",
   "Chăn nuôi",
-  "Cây trồng & tài nguyên",
   "Thiết lập",
   "Nguồn biết đến hệ thống",
 ];
 const LIVESTOCK = ["Gia súc", "Cừu", "Dê", "Ngựa", "Lợn", "Gia cầm", "Alpacas", "Khác"];
-const CROPS = ["Đồng cỏ", "Trái cây", "Hạt", "Ngũ cốc", "Rau", "Khác"];
-const RESOURCES = ["Bể chứa nước", "Máng", "Đập", "Máy đo mưa", "Máy bơm", "Máy kéo", "Thiết bị khác"];
 const HEARD = ["Sự kiện", "Báo chí", "Blog hoặc ấn phẩm trực tuyến", "Đề xuất ngang hàng", "Đài phát thanh", "Công cụ tìm kiếm", "Truyền thông xã hội", "Truyền hình", "Biển quảng cáo", "Khác"];
 const isCoordValid = (lat: string, lng: string) => /^[-]?[0-9]+\.[0-9]{4,}$/.test(lat) && /^[-]?[0-9]+\.[0-9]{4,}$/.test(lng);
 
@@ -37,9 +34,6 @@ export default function FarmRegistrationPage() {
     lng: "106.660172",
     lastSource: "coord" as LastSource,
     livestockTypes: [] as string[],
-    cropTypes: [] as string[],
-    resourceTypes: [] as string[],
-    otherActivity: "",
     specialFactors: "",
     annualRainfall: "1000",
     carryingCapacity: "11",
@@ -50,7 +44,7 @@ export default function FarmRegistrationPage() {
 
   const mapEmbed = `https://maps.google.com/maps?q=${encodeURIComponent(`${f.lat},${f.lng}`)}&z=15&output=embed`;
   const hasValidLocation = (!!f.locationName.trim() || /^https?:\/\//i.test(f.mapsLink.trim())) && isCoordValid(f.lat, f.lng);
-  const pick = (k: "livestockTypes" | "cropTypes" | "resourceTypes" | "heardFrom", v: string) => setF((p) => ({ ...p, [k]: p[k].includes(v) ? p[k].filter((x) => x !== v) : [...p[k], v] }));
+  const pick = (k: "livestockTypes" | "heardFrom", v: string) => setF((p) => ({ ...p, [k]: p[k].includes(v) ? p[k].filter((x) => x !== v) : [...p[k], v] }));
 
   useEffect(() => {
     if (step !== 2 || f.lastSource !== "name" || f.locationName.trim().length < 2) return setSuggestions([]);
@@ -82,9 +76,8 @@ export default function FarmRegistrationPage() {
     if (step === 1 && (!f.farmName.trim() || Number(f.farmArea) <= 0)) return setError("Vui lòng nhập tên nông trại và diện tích hợp lệ.");
     if (step === 2 && !hasValidLocation) return setError("Vui lòng nhập vị trí nông trại hợp lệ.");
     if (step === 3 && f.livestockTypes.length === 0) return setError("Vui lòng chọn ít nhất một loại chăn nuôi.");
-    if (step === 4 && f.cropTypes.length === 0 && f.resourceTypes.length === 0 && !f.otherActivity.trim()) return setError("Vui lòng chọn ít nhất một mục cây trồng, tài nguyên hoặc khác.");
-    if (step === 5 && (!f.annualRainfall.trim() || !f.carryingCapacity.trim() || !f.springStart.trim())) return setError("Vui lòng nhập đầy đủ thiết lập.");
-    if (step < 6) setStep((s) => (s + 1) as StepKey);
+    if (step === 4 && (!f.annualRainfall.trim() || !f.carryingCapacity.trim() || !f.springStart.trim())) return setError("Vui lòng nhập đầy đủ thiết lập.");
+    if (step < 5) setStep((s) => (s + 1) as StepKey);
   };
 
   const goBack = () => setStep((s) => (s > 1 ? (s - 1) as StepKey : s));
@@ -103,7 +96,6 @@ export default function FarmRegistrationPage() {
             name: f.farmName.trim(),
             areaHectare: Number(f.farmArea),
             specialFactors: f.specialFactors.trim() || undefined,
-            otherActivity: f.otherActivity.trim() || undefined,
           },
           location: {
             locationName: f.locationName.trim() || undefined,
@@ -113,8 +105,6 @@ export default function FarmRegistrationPage() {
           },
           production: {
             livestock: f.livestockTypes.map((name) => ({ name, quantity: 1 })),
-            crops: f.cropTypes,
-            resources: f.resourceTypes,
           },
           settings: {
             annualRainfall: Number(f.annualRainfall),
@@ -127,9 +117,9 @@ export default function FarmRegistrationPage() {
           },
         }),
       });
-      const data = (await res.json()) as { message?: string };
+      const data = (await res.json()) as { message?: string; nextPath?: string };
       if (!res.ok) return setError(data.message || "Không thể lưu thông tin nông trại.");
-      router.push("/dashboard");
+      router.push(data.nextPath || "/dashboard");
       router.refresh();
     } catch {
       setError("Không thể kết nối máy chủ.");
@@ -138,7 +128,7 @@ export default function FarmRegistrationPage() {
     }
   };
 
-  const rightCta = step === 6 ? (
+  const rightCta = step === 5 ? (
     <button type="button" className="btn btn-primary" onClick={onSaveFarm} disabled={loading}>{loading ? "Đang lưu..." : "Lưu nông trại"}</button>
   ) : (
     <button type="button" className="btn btn-primary" onClick={goNext}>Tiếp tục</button>
@@ -159,9 +149,7 @@ export default function FarmRegistrationPage() {
           </div>
 
           <h1 className="auth-visual-title">Nhập thông tin khởi tạo nông trại theo từng bước rõ ràng.</h1>
-          <p className="auth-visual-text">
-            Điền từng phần để hệ thống lưu cấu hình đầy đủ, mạch lạc và đồng bộ với dashboard.
-          </p>
+          <p className="auth-visual-text">Điền từng phần để hệ thống lưu cấu hình đầy đủ, mạch lạc và đồng bộ với dashboard.</p>
 
           <ol className="register-step-list farm-step-list">
             {STEPS.map((s, i) => (
@@ -176,7 +164,7 @@ export default function FarmRegistrationPage() {
         <div className="auth-panel farm-panel">
           <div className="auth-panel-head">
             <p className="kicker">Khởi tạo farm</p>
-            <div className="register-step-badge">Bước {step} / 6</div>
+            <div className="register-step-badge">Bước {step} / 5</div>
             <h2>Nhập thông tin nông trại</h2>
             <p className="section-subtitle">Điền từng phần để hệ thống lưu cấu hình một cách đầy đủ và chính xác.</p>
           </div>
@@ -192,6 +180,7 @@ export default function FarmRegistrationPage() {
                 <input className="input full" type="number" placeholder="Diện tích (ha) *" value={f.farmArea} onChange={(e) => setF({ ...f, farmArea: e.target.value })} />
               </label>
             </>}
+
             {step === 2 && <>
               <div className="full">
                 <label className="auth-field">
@@ -216,16 +205,10 @@ export default function FarmRegistrationPage() {
               </div>
               <div className="card full"><iframe title="Bản đồ vị trí" src={mapEmbed} loading="lazy" className="register-map" /></div>
             </>}
+
             {step === 3 && <div className="full"><strong>Chăn nuôi</strong><div className="grid-3 check-grid">{LIVESTOCK.map((x) => <label key={x} className="card check-item"><input type="checkbox" checked={f.livestockTypes.includes(x)} onChange={() => pick("livestockTypes", x)} />{x}</label>)}</div></div>}
+
             {step === 4 && <>
-              <div className="full"><strong>Cây trồng</strong><div className="grid-3 check-grid">{CROPS.map((x) => <label key={x} className="card check-item"><input type="checkbox" checked={f.cropTypes.includes(x)} onChange={() => pick("cropTypes", x)} />{x}</label>)}</div></div>
-              <div className="full"><strong>Tài nguyên và thiết bị</strong><div className="grid-3 check-grid">{RESOURCES.map((x) => <label key={x} className="card check-item"><input type="checkbox" checked={f.resourceTypes.includes(x)} onChange={() => pick("resourceTypes", x)} />{x}</label>)}</div></div>
-              <label className="auth-field full">
-                <span>Khác (mô tả)</span>
-                <input className="input full" placeholder="Khác (mô tả)" value={f.otherActivity} onChange={(e) => setF({ ...f, otherActivity: e.target.value })} />
-              </label>
-            </>}
-            {step === 5 && <>
               <label className="auth-field full">
                 <span>Yếu tố đặc biệt</span>
                 <textarea className="textarea full" rows={3} placeholder="Yếu tố đặc biệt" value={f.specialFactors} onChange={(e) => setF({ ...f, specialFactors: e.target.value })} />
@@ -245,8 +228,9 @@ export default function FarmRegistrationPage() {
                 </label>
               </div>
             </>}
-            {step === 6 && <div className="full"><strong>Nguồn biết đến hệ thống</strong><div className="grid-3 check-grid">{HEARD.map((x) => <label key={x} className="card check-item"><input type="checkbox" checked={f.heardFrom.includes(x)} onChange={() => pick("heardFrom", x)} />{x}</label>)}</div></div>}
-            {step === 6 && f.heardFrom.includes("Khác") && <label className="auth-field full"><span>Nguồn khác</span><input className="input full" placeholder="Nguồn khác (ghi rõ)" value={f.heardOther} onChange={(e) => setF({ ...f, heardOther: e.target.value })} /></label>}
+
+            {step === 5 && <div className="full"><strong>Nguồn biết đến hệ thống</strong><div className="grid-3 check-grid">{HEARD.map((x) => <label key={x} className="card check-item"><input type="checkbox" checked={f.heardFrom.includes(x)} onChange={() => pick("heardFrom", x)} />{x}</label>)}</div></div>}
+            {step === 5 && f.heardFrom.includes("Khác") && <label className="auth-field full"><span>Nguồn khác</span><input className="input full" placeholder="Nguồn khác (ghi rõ)" value={f.heardOther} onChange={(e) => setF({ ...f, heardOther: e.target.value })} /></label>}
           </div>
 
           <div className="register-actions auth-actions">

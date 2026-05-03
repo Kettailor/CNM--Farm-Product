@@ -25,7 +25,7 @@ export default function TopbarUserMenu() {
 
       {open && (
         <div className={styles.menu}>
-          <a href="/dashboard/settings" className={styles.item}>
+          <a href="/du-lieu/trang-trai" className={styles.item}>
             ⚙️ Cài đặt
           </a>
           <button type="button" onClick={logout} disabled={loading} className={styles.logout}>
