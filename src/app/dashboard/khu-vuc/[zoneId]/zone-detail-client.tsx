@@ -138,10 +138,25 @@ export default function ZoneDetailClient({ zone, vegetation: initialVegetation }
       <section className={styles.twoColumnGrid}>
         <article className={styles.card}>
           <div className={styles.cardHeader}><h2>Chi tiết khu vực</h2></div>
-          <div className={styles.detailGrid}>
-            {zone.details.map((item) => (
-              <div key={item.label} className={styles.detailItem}><span>{item.label}</span><strong>{item.value}</strong></div>
-            ))}
+          <div className={styles.detailSection}>
+            <h3>Thông tin khu vực</h3>
+            <div className={styles.detailGrid}>
+              {zone.details.map((item) => (
+                <div key={item.label} className={styles.detailItem}><span>{item.label}</span><strong>{item.value}</strong></div>
+              ))}
+            </div>
+          </div>
+          <div className={styles.detailSection}>
+            <h3>Thông tin loại khu vực ({zone.typeLabel})</h3>
+            {zone.typeDetails.length > 0 ? (
+              <div className={styles.detailGrid}>
+                {zone.typeDetails.map((item) => (
+                  <div key={item.label} className={styles.detailItem}><span>{item.label}</span><strong>{item.value}</strong></div>
+                ))}
+              </div>
+            ) : (
+              <p className={styles.emptyState}>Chưa có thông tin chi tiết theo loại khu vực trong schema dữ liệu.</p>
+            )}
           </div>
         </article>
 

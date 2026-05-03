@@ -19,6 +19,7 @@ export type ZoneDetail = {
   center: { lat: number; lng: number };
   metrics: { pointCount: number; livestockCount: number; sensorCount: number; waterAssetCount: number; noteCount: number };
   details: Array<{ label: string; value: string }>;
+  typeDetails: Array<{ label: string; value: string }>;
   livestock: Array<{ label: string; value: string }>;
   sensors: Array<{ label: string; value: string }>;
   notes: Array<{ id: string; type: string; date: string; info: string; user: string }>;
@@ -63,6 +64,17 @@ const normalizeZoneStatus = (raw: unknown) => {
   return { key: "active", label: "Đang hoạt động" };
 };
 
+
+const COMMON_METADATA_KEYS = new Set(["areacolor", "area_color", "description", "notes", "capacity", "perimeterm", "perimeter_m", "updated_from", "last_updated"]);
+const formatMetadataLabel = (key: string) => key
+  .replace(/[_-]+/g, " ")
+  .replace(/\s+/g, " ")
+  .trim()
+  .replace(/\b\w/g, (ch) => ch.toUpperCase());
+const metadataDetails = (metadata: Record<string, unknown>) =>
+  Object.entries(metadata)
+    .filter(([key, value]) => !COMMON_METADATA_KEYS.has(key.toLowerCase()) && value !== null && value !== undefined && String(value).trim() !== "")
+    .map(([key, value]) => ({ label: formatMetadataLabel(key), value: displayText(value) }));
 type ZoneRowDetail = {
   id: string; farm_name?: string | null; name?: string | null; raw_type?: string | null; status?: string | null; area_ha?: number | string | null; perimeter_m?: number | string | null; capacity?: string | null; description?: string | null; created_at?: string | Date | null; updated_at?: string | Date | null; area_color?: string | null; geo?: { polygon?: unknown } | null; boundary_geojson?: { geo?: { polygon?: unknown } | null; polygon?: unknown } | null;
 };
@@ -98,9 +110,11 @@ function buildZoneDetail(row: ZoneRowDetail, linked?: { sensors: Array<{ loai_ca
   const statusInfo = normalizeZoneStatus(row.status);
   const colorHex = /^#[0-9a-f]{6}$/i.test(String(row.area_color ?? "")) ? String(row.area_color) : DEFAULT_COLOR;
   const area = Number(row.area_ha ?? 0);
+  const metadata = (boundary?.metadata ?? {}) as Record<string, unknown>;
+  const typeDetails = metadataDetails(metadata);
   const livestockCount = linked?.counts.livestock_count ?? 0;
   const sensorCount = linked?.counts.sensor_count ?? 0;
   const waterAssetCount = linked?.counts.water_asset_count ?? 0;
   const noteCount = linked?.counts.note_count ?? 0;
-  return { id: String(row.id), farmName: displayText(row.farm_name), name: displayText(row.name), rawType: displayText(row.raw_type), typeLabel: typeInfo.label, status: statusInfo.key, statusLabel: statusInfo.label, areaHa: area, perimeterM: row.perimeter_m != null ? Number(row.perimeter_m) : null, capacity: displayText(row.capacity), description: displayText(row.description), createdAt: safeDate(row.created_at), updatedAt: safeDate(row.updated_at), colorHex, polygon, center, metrics: { pointCount: polygon.length, livestockCount, sensorCount, waterAssetCount, noteCount }, details: [{ label: "Tên khu vực", value: displayText(row.name) }, { label: "Loại", value: typeInfo.label }, { label: "Trạng thái", value: statusInfo.label }, { label: "Diện tích", value: area ? `${area.toFixed(2)} ha` : "" }, { label: "Chu vi", value: row.perimeter_m != null ? `${Number(row.perimeter_m).toFixed(2)} m` : "" }, { label: "Sức chứa", value: displayText(row.capacity) }, { label: "Mô tả", value: displayText(row.description) }, { label: "Tạo lúc", value: safeDate(row.created_at) }, { label: "Cập nhật", value: safeDate(row.updated_at) }], livestock: (linked?.livestock ?? []).map((item) => ({ label: item.the_nhan_dien || item.ma_vat_nuoi || "Vật nuôi", value: [item.trang_thai, item.mo_ta].filter(Boolean).join(" · ") })), sensors: (linked?.sensors ?? []).map((item) => ({ label: item.loai_cam_bien || "Cảm biến", value: [item.don_vi, item.dang_hoat_dong ? "đang hoạt động" : "ngừng hoạt động"].filter(Boolean).join(" · ") })), notes: [], activities: [] };
+  return { id: String(row.id), farmName: displayText(row.farm_name), name: displayText(row.name), rawType: displayText(row.raw_type), typeLabel: typeInfo.label, status: statusInfo.key, statusLabel: statusInfo.label, areaHa: area, perimeterM: row.perimeter_m != null ? Number(row.perimeter_m) : null, capacity: displayText(row.capacity), description: displayText(row.description), createdAt: safeDate(row.created_at), updatedAt: safeDate(row.updated_at), colorHex, polygon, center, metrics: { pointCount: polygon.length, livestockCount, sensorCount, waterAssetCount, noteCount }, details: [{ label: "Tên khu vực", value: displayText(row.name) }, { label: "Loại", value: typeInfo.label }, { label: "Trạng thái", value: statusInfo.label }, { label: "Diện tích", value: area ? `${area.toFixed(2)} ha` : "" }, { label: "Chu vi", value: row.perimeter_m != null ? `${Number(row.perimeter_m).toFixed(2)} m` : "" }, { label: "Sức chứa", value: displayText(row.capacity) }, { label: "Mô tả", value: displayText(row.description) }, { label: "Tạo lúc", value: safeDate(row.created_at) }, { label: "Cập nhật", value: safeDate(row.updated_at) }], typeDetails, livestock: (linked?.livestock ?? []).map((item) => ({ label: item.the_nhan_dien || item.ma_vat_nuoi || "Vật nuôi", value: [item.trang_thai, item.mo_ta].filter(Boolean).join(" · ") })), sensors: (linked?.sensors ?? []).map((item) => ({ label: item.loai_cam_bien || "Cảm biến", value: [item.don_vi, item.dang_hoat_dong ? "đang hoạt động" : "ngừng hoạt động"].filter(Boolean).join(" · ") })), notes: [], activities: [] };
 }

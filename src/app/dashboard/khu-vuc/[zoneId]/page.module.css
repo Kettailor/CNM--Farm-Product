@@ -39,6 +39,10 @@
 .sectionHeader h2 { margin: 0; font-size: 18px; }
 .sectionPill { padding: 7px 12px; border-radius: 999px; background: #edf7ef; color: #1f7a4a; font-size: 12px; font-weight: 700; }
 .sourceLine { margin: 10px 0 0; color: #6b7280; font-size: 13px; }
+.detailSection { margin-top: 14px; }
+.detailSection h3 { margin: 0 0 8px; font-size: 14px; color: #1f2937; }
+.emptyState { margin: 0; padding: 12px 14px; border-radius: 12px; background: #f8fafc; color: #64748b; font-size: 13px; border: 1px dashed rgba(100,116,139,0.35); }
+
 .detailGrid { display: grid; gap: 10px; margin-top: 14px; }
 .detailItem,
 .indexCard,
