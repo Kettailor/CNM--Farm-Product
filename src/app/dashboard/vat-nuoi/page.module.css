@@ -1,0 +1,592 @@
+.page {
+  display: grid;
+  gap: 16px;
+}
+
+.topBar,
+.introPanel,
+.speciesSection,
+.tablePanel,
+.mapPanel {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tools {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.backButton,
+.actionButton {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.backButton {
+  border: 1px solid #5cc30f;
+  background: #fff;
+  color: #45b500;
+}
+
+.actionButton {
+  border: 1px solid #54c900;
+  background: #54c900;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(84, 201, 0, 0.2);
+}
+
+.backButton:hover,
+.actionButton:hover {
+  transform: translateY(-1px);
+}
+
+.buttonIcon,
+.menuIcon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.buttonIcon {
+  width: 15px;
+  height: 15px;
+}
+
+.buttonIcon svg,
+.menuIcon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chevron {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.actionMenu {
+  position: relative;
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 2px;
+  z-index: 50;
+  width: 240px;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.13);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18), 0 2px 10px rgba(15, 23, 42, 0.08);
+}
+
+.dropdownItem {
+  min-height: 46px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 0;
+  color: #3f3f46;
+  font-size: 14px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dropdownItem:last-child {
+  border-bottom: 0;
+}
+
+.dropdownItem:hover {
+  background: #f8fafc;
+}
+
+.menuIcon {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  color: #475467;
+  background: #e5e7eb;
+}
+
+.dropdownItem[data-tone="green"] .menuIcon {
+  color: #48a900;
+  background: #d9f99d;
+}
+
+.dropdownItem[data-tone="amber"] .menuIcon {
+  color: #b45309;
+  background: #fde68a;
+}
+
+.dropdownItem[data-tone="blue"] .menuIcon,
+.dropdownItem[data-tone="sky"] .menuIcon {
+  color: #0284c7;
+  background: #bae6fd;
+}
+
+.titleBlock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.titleIcon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #ecfdf3;
+  color: #1f7a4a;
+  border: 1px solid rgba(31, 122, 74, 0.14);
+}
+
+.titleIcon svg,
+.speciesIcon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.titleBlock h1,
+.introPanel h2,
+.sectionHead h2,
+.speciesHead h3 {
+  margin: 0;
+  color: #101828;
+}
+
+.titleBlock h1 {
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.titleBlock span,
+.introPanel p,
+.introMeta span,
+.introMeta small,
+.statCard p,
+.speciesHead p,
+.speciesMeta,
+.mapNote {
+  color: #667085;
+}
+
+.titleBlock span,
+.introMeta small,
+.statCard p,
+.speciesHead p,
+.speciesMeta,
+.mapNote {
+  font-size: 13px;
+}
+
+.eyebrow {
+  margin: 0 0 5px;
+  color: #1f7a4a;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.introPanel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  gap: 18px;
+  padding: 18px;
+  align-items: center;
+}
+
+.introPanel h2 {
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.introPanel p {
+  margin: 8px 0 0;
+  line-height: 1.6;
+}
+
+.introMeta {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.introMeta strong {
+  font-size: 18px;
+  color: #101828;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.statCard,
+.speciesCard {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.statCard {
+  min-height: 86px;
+  padding: 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.statIcon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.statIcon svg,
+.panelBadge svg,
+.tableDot svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.statCard p {
+  margin: 0 0 4px;
+}
+
+.statCard strong {
+  color: #101828;
+  font-size: 20px;
+}
+
+.speciesSection,
+.tablePanel,
+.mapPanel {
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sectionHead h2 {
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.panelBadge {
+  width: fit-content;
+  padding: 7px 10px;
+  border-radius: 999px;
+  color: #1f7a4a;
+  background: #ecfdf3;
+  border: 1px solid rgba(31, 122, 74, 0.14);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.speciesGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.speciesCard {
+  padding: 14px;
+  overflow: hidden;
+  position: relative;
+}
+
+.speciesCard::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: var(--accent);
+}
+
+.speciesHead {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.speciesIcon {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, white);
+}
+
+.speciesHead h3 {
+  font-size: 15px;
+}
+
+.speciesHead p {
+  margin: 4px 0 0;
+}
+
+.speciesCount {
+  margin-top: 12px;
+  color: #101828;
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.speciesMeta {
+  margin-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.speciesMeta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tableScroll {
+  overflow-x: auto;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+}
+
+.dataTable {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 820px;
+  font-size: 13px;
+}
+
+.dataTable th {
+  background: #f2f4f7;
+  color: #475467;
+  font-size: 12px;
+  text-align: left;
+  font-weight: 800;
+}
+
+.dataTable th,
+.dataTable td {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+  vertical-align: middle;
+}
+
+.dataTable tr:last-child td {
+  border-bottom: 0;
+}
+
+.tableName {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  color: #101828;
+}
+
+.tableDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, white);
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  color: #1f7a4a;
+  background: #ecfdf3;
+  border: 1px solid rgba(31, 122, 74, 0.12);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.emptyState {
+  border: 1px dashed rgba(15, 23, 42, 0.18);
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #667085;
+  padding: 18px;
+  text-align: center;
+}
+
+.mapShell {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.mapFrame {
+  min-height: 520px;
+  border-radius: 0;
+}
+
+.mapFrame :global(.maplibre-map-host) {
+  min-height: 520px;
+}
+
+.mapShell :global(.map-view-switcher) {
+  gap: 10px;
+}
+
+.mapShell :global(.map-view-switcher-tabs) {
+  padding: 12px 12px 0;
+}
+
+.mapShell :global(.map-view-switcher-tabs button) {
+  border-radius: 8px;
+}
+
+.mapShell :global(.map-view-switcher-frame) {
+  min-height: 520px;
+}
+
+.mapShell :global(.map-view-switcher-footer) {
+  padding: 0 12px 12px;
+}
+
+.mapNote {
+  line-height: 1.6;
+}
+
+@media (max-width: 1440px) {
+  .statsGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .speciesGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1080px) {
+  .introPanel,
+  .statsGrid,
+  .speciesGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .topBar,
+  .sectionHead {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .headerActions {
+    width: 100%;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .tools {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .actionMenu {
+    flex: 1;
+  }
+
+  .backButton,
+  .actionButton {
+    width: 100%;
+  }
+
+  .dropdown {
+    left: 0;
+    right: auto;
+    width: min(100%, 280px);
+  }
+
+  .introPanel,
+  .statsGrid,
+  .speciesGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .introMeta,
+  .panelBadge {
+    width: 100%;
+  }
+
+  .mapFrame,
+  .mapFrame :global(.maplibre-map-host),
+  .mapShell :global(.map-view-switcher-frame) {
+    min-height: 380px;
+  }
+}

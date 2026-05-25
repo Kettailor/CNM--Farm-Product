@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import MapViewSwitcher from "@/components/dashboard-map-view-switcher";
-import { toolbarIconMap, toolbarTooltipMap, type ToolbarAction } from "@/components/dashboard-map-tool-icons";
+import type { ToolbarAction } from "@/components/dashboard-map-tool-icons";
 import styles from "./zone-create-wizard.module.css";
 
 type InitialLocation = {
@@ -179,19 +178,19 @@ export default function ZoneCreateWizard({ initialLocation }: Props) {
   const perimeterM = calcPerimeterM(points);
   const canSave = form.name.trim().length > 0 && points.length >= 3;
 
-  const onMapClick = (p: Point) => {
+  const onMapClick = useCallback((p: Point) => {
     if (activeTool !== "add") return;
     setPoints((prev) => [...prev, p]);
-  };
+  }, [activeTool]);
 
-  const onToolbarAction = (action: ToolbarAction) => {
+  const onToolbarAction = useCallback((action: ToolbarAction) => {
     if (action === "add") {
       setActiveTool((prev) => (prev === "add" ? null : "add"));
       return;
     }
     if (action === "undo") setPoints((prev) => prev.slice(0, -1));
     if (action === "clear") setPoints([]);
-  };
+  }, []);
 
   const mapPreview = useMemo(() => (
     <MapViewSwitcher
@@ -208,9 +207,8 @@ export default function ZoneCreateWizard({ initialLocation }: Props) {
       activeTool={activeTool}
       onToolbarAction={onToolbarAction}
       onMapClick={onMapClick}
-      hideToolbarLabels
     />
-  ), [activeTool, form.latitude, form.longitude, form.mapType, form.zoomLevel, points]);
+  ), [activeTool, form.latitude, form.longitude, form.mapType, form.zoomLevel, onMapClick, onToolbarAction, points]);
 
   const onNext = () => {
     setError("");

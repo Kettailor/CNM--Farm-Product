@@ -13,7 +13,6 @@ export default async function DashboardPage() {
   if (!ownerId) redirect("/login?next=/dashboard");
 
   const data = await getDashboardOverview(ownerId);
-  if (!data.farmId) redirect("/register/farm");
 
   return (
     <DashboardShell farmName={data.farmName} activePath="/dashboard">

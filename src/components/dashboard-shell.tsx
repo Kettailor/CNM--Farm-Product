@@ -16,22 +16,15 @@ type MenuIconProps = {
 const MENU_ITEMS = [
   { label: "Tổng quan", href: "/dashboard", icon: "dashboard" },
   { label: "Bản đồ trang trại", href: "/dashboard/map", icon: "map" },
-  { label: "Vật nuôi", href: "#", icon: "livestock" },
-  { label: "Đếm vật nuôi", href: "#", icon: "counter" },
+  { label: "Vật nuôi", href: "/dashboard/vat-nuoi", icon: "livestock" },
+  { label: "Đếm vật nuôi", href: "/dashboard/dem-vat-nuoi", icon: "counter" },
   { label: "Theo dõi vật nuôi", href: "#", icon: "track" },
   { label: "Quản lý khu vực", href: "/dashboard/khu-vuc", icon: "zones" },
-  { label: "Quản lý chăn thả", href: "#", icon: "pasture" },
-  { label: "Nguồn nước", href: "#", icon: "water" },
+  { label: "Nguồn nước", href: "/dashboard/nguon_nuoc", icon: "water" },
   { label: "Kho lạnh", href: "#", icon: "cold" },
-  { label: "Độ ẩm đất", href: "#", icon: "soil" },
-  { label: "Theo dõi phương tiện", href: "#", icon: "vehicle" },
-  { label: "Hàng rào", href: "#", icon: "fence" },
-  { label: "Tiêu thụ năng lượng", href: "#", icon: "energy" },
-  { label: "Cảnh báo & thông báo", href: "#", icon: "alert" },
-  { label: "Nhật ký hóa chất", href: "#", icon: "log" },
-  { label: "Điều kiện phun", href: "#", icon: "weather" },
+  { label: "Dự báo thời tiết", href: "#", icon: "weather" },
   { label: "Lập kế hoạch", href: "#", icon: "plan" },
-  { label: "Quản lý công việc", href: "#", icon: "tasks" },
+  { label: "Quản lý người dùng", href: "#", icon: "users" },
 ];
 
 function MenuIcon({ name }: MenuIconProps) {

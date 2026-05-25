@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import type { PoolClient } from "pg";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { layOwnerIdTuRequest, layOwnerIdTuServerCookie } from "@/lib/auth";
@@ -33,7 +34,7 @@ const normalizeStatus = (value?: string): ZoneState => {
   return "đang hoạt động";
 };
 
-const createZoneDetail = async (client: Awaited<ReturnType<typeof db.connect>>, zoneId: string, kind: ZoneKind, payload: Payload, areaHa: number | null) => {
+const createZoneDetail = async (client: PoolClient, zoneId: string, kind: ZoneKind, payload: Payload, areaHa: number | null) => {
   const extra = payload.extra ?? {};
   if (kind === "cropping") {
     await client.query(

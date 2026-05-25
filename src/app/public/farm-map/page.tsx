@@ -1,6 +1,8 @@
 import { getPublicFarmMapItems } from "@/lib/public-farm-map";
 import { PublicFarmMapClient } from "@/components/public-farm-map-client";
 
+export const dynamic = "force-dynamic";
+
 export default async function PublicFarmMapPage() {
   const farms = await getPublicFarmMapItems();
 

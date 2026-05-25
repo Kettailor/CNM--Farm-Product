@@ -93,7 +93,7 @@ export function PublicFarmMapClient({ farms }: Props) {
       await import("leaflet/dist/leaflet.css");
       if (cancelled || !mapNodeRef.current) return;
 
-      const L = leafletModule.default ?? leafletModule;
+      const L = leafletModule;
       const map = L.map(mapNodeRef.current, { zoomControl: true });
 
       const streets = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -130,7 +130,7 @@ export function PublicFarmMapClient({ farms }: Props) {
 
       const leafletModule = (await import("leaflet")) as LeafletModule;
       if (cancelled) return;
-      const L = leafletModule.default ?? leafletModule;
+      const L = leafletModule;
 
       markerLayer.clearLayers();
 

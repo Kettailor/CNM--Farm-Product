@@ -10,10 +10,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: sh -c "npm ci && npm run dev"
+    command: sh -c "npm ci && mkdir -p .next && rm -rf .next/* .next/.[!.]* .next/..?* && npm run dev"
     volumes:
       - .:/app
       - app_node_modules:/app/node_modules
+      - app_next_cache:/app/.next
     environment:
       NODE_ENV: development
       HOSTNAME: 0.0.0.0
@@ -65,7 +66,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/FarmHub_schema.sql:/docker-entrypoint-initdb.d/00_FarmHub_schema.sql:ro
-      - ./scripts/hop_nhat_toan_he_thong_vao_du_lieu.sql:/docker-entrypoint-initdb.d/01_hop_nhat_toan_he_thong_vao_du_lieu.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U farmhub -d farmhub"]
       interval: 15s
@@ -103,3 +103,4 @@ services:
 volumes:
   postgres_data:
   app_node_modules:
+  app_next_cache:
