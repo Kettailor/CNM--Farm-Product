@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { db } from "@/lib/db";
+import { layOwnerIdTuServerCookie } from "@/lib/auth";
 
 const toNumberOrNull = (v: unknown) => {
   if (v === null || v === undefined || v === "") return null;
@@ -10,13 +10,14 @@ const toNumberOrNull = (v: unknown) => {
 
 export async function GET() {
   try {
-    const ownerId = cookies().get("ownerId")?.value;
+    const ownerId = layOwnerIdTuServerCookie();
     if (!ownerId) return NextResponse.json({ message: "Chưa đăng nhập." }, { status: 401 });
 
     const rs = await db.query(
       `select c.id as owner_id, c.full_name, c.email,
               n.id as farm_id, n.name as farm_name, n.farm_area_hectare,
               n.special_factors, n.other_activity, n.annual_rainfall, n.carrying_capacity, n.spring_start,
+              coalesce(n.is_map_shared, false) as is_map_shared,
               v.location_name, v.maps_link, v.latitude, v.longitude
        from du_lieu.chu_so_huu c
        left join du_lieu.nong_trai n on n.owner_id = c.id
@@ -36,7 +37,7 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   const client = await db.connect();
   try {
-    const ownerId = cookies().get("ownerId")?.value;
+    const ownerId = layOwnerIdTuServerCookie();
     if (!ownerId) return NextResponse.json({ message: "Chưa đăng nhập." }, { status: 401 });
 
     const body = await request.json();
@@ -60,19 +61,20 @@ export async function PUT(request: NextRequest) {
     let farmId = body.farm_id as string | null;
     if (!farmId) {
       const created = await client.query(
-        `insert into du_lieu.nong_trai(id, owner_id, name, farm_area_hectare, special_factors, other_activity, annual_rainfall, carrying_capacity, spring_start)
-         values (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8)
+        `insert into du_lieu.nong_trai(id, owner_id, name, farm_area_hectare, special_factors, other_activity, annual_rainfall, carrying_capacity, spring_start, is_map_shared)
+         values (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, coalesce($9, false))
          returning id`,
-        [ownerId, body.farm_name?.trim() || "Nông trại", body.farm_area_hectare ?? null, body.special_factors ?? null, body.other_activity ?? null, body.annual_rainfall ?? null, body.carrying_capacity ?? null, body.spring_start ?? null]
+        [ownerId, body.farm_name?.trim() || "Nông trại", body.farm_area_hectare ?? null, body.special_factors ?? null, body.other_activity ?? null, body.annual_rainfall ?? null, body.carrying_capacity ?? null, body.spring_start ?? null, typeof body.is_map_shared === "boolean" ? body.is_map_shared : null]
       );
       farmId = created.rows[0].id;
     } else {
       await client.query(
         `update du_lieu.nong_trai
          set name = $2, farm_area_hectare = $3, special_factors = $4, other_activity = $5,
-             annual_rainfall = $6, carrying_capacity = $7, spring_start = $8
-         where id = $1 and owner_id = $9`,
-        [farmId, body.farm_name?.trim(), body.farm_area_hectare ?? null, body.special_factors ?? null, body.other_activity ?? null, body.annual_rainfall ?? null, body.carrying_capacity ?? null, body.spring_start ?? null, ownerId]
+             annual_rainfall = $6, carrying_capacity = $7, spring_start = $8,
+             is_map_shared = coalesce($9, is_map_shared)
+         where id = $1 and owner_id = $10`,
+        [farmId, body.farm_name?.trim(), body.farm_area_hectare ?? null, body.special_factors ?? null, body.other_activity ?? null, body.annual_rainfall ?? null, body.carrying_capacity ?? null, body.spring_start ?? null, typeof body.is_map_shared === "boolean" ? body.is_map_shared : null, ownerId]
       );
     }
 

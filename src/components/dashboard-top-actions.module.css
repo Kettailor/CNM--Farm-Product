@@ -1,0 +1,39 @@
+.topActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.actionButton {
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(18, 44, 28, 0.1);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--brand);
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.actionButton:hover {
+  background: rgba(42, 138, 73, 0.08);
+  transform: translateY(-1px);
+}
+
+.actionIcon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+}
+
+.actionIcon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
