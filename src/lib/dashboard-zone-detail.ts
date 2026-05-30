@@ -1,11 +1,19 @@
 import { db } from "@/lib/db";
+import { ensureLivestockSchema } from "@/lib/livestock-schema";
+import { ensureZoneSchema } from "@/lib/zone-schema";
+import { getZoneTypeInfo, normalizeText, normalizeWarehouseTypeValues, ZONE_TYPE_FORM_CONFIGS, type ZoneTypeKey } from "@/lib/zone-type-utils";
 
 export type ZoneDetail = {
   id: string;
   farmName: string;
   name: string;
   rawType: string;
+  typeKey: ZoneTypeKey;
+  typeSlug: string;
   typeLabel: string;
+  typeSpecific: Record<string, string>;
+  warehouseTypes: string[];
+  isVegetationRelevant: boolean;
   status: string;
   statusLabel: string;
   areaHa: number;
@@ -17,10 +25,9 @@ export type ZoneDetail = {
   colorHex: string;
   polygon: Array<{ lat: number; lng: number }>;
   center: { lat: number; lng: number };
-  metrics: { pointCount: number; livestockCount: number; sensorCount: number; waterAssetCount: number; noteCount: number };
+  metrics: { pointCount: number; livestockCount: number; waterAssetCount: number; noteCount: number };
   details: Array<{ label: string; value: string }>;
   livestock: Array<{ label: string; value: string }>;
-  sensors: Array<{ label: string; value: string }>;
   notes: Array<{ id: string; type: string; date: string; info: string; user: string }>;
   activities: Array<{ id: string; date: string; action: string; details: string; actor: string }>;
 };
@@ -50,34 +57,27 @@ const centroid = (points: Point[]) => {
 };
 const displayText = (value: unknown) => (value === null || value === undefined || value === "" ? "" : String(value));
 const safeDate = (value: unknown) => (value ? new Date(String(value)).toLocaleString("vi-VN") : "");
-const normalizeZoneType = (raw: string) => {
-  const value = raw.toLowerCase();
-  if (value.includes("cropping") || value.includes("trong trot") || value.includes("cay trong")) return { key: "cropping", label: "Trồng trọt" };
-  if (value.includes("grazing") || value.includes("chan tha")) return { key: "grazing", label: "Chăn thả" };
-  if (value.includes("hay") || value.includes("co kho")) return { key: "hay", label: "Cỏ khô" };
-  if (value.includes("resting") || value.includes("nghi dat")) return { key: "resting", label: "Nghỉ đất" };
-  if (value.includes("nguon nuoc") || value.includes("water")) return { key: "nguon_nuoc", label: "Nguồn nước" };
-  if (value.includes("phuong tien") || value.includes("vehicle")) return { key: "phuong_tien", label: "Phương tiện" };
-  if (value.includes("chan nuoi") || value.includes("vat nuoi") || value.includes("cattle") || value.includes("livestock")) return { key: "chan_nuoi", label: "Chăn nuôi" };
-  if (value.includes("dung cu") || value.includes("tool")) return { key: "dung_cu", label: "Dụng cụ" };
-  if (value.includes("nha kho") || value.includes("warehouse")) return { key: "nha_kho", label: "Nhà kho" };
-  return { key: "cropping", label: "Trồng trọt" };
-};
+const normalizeZoneType = (raw: string, warehouseTypes?: unknown) => getZoneTypeInfo(raw, warehouseTypes);
 const normalizeZoneStatus = (raw: unknown) => {
-  const value = String(raw ?? "").toLowerCase();
+  const value = normalizeText(raw);
   if (value.includes("cancel") || value.includes("huy")) return { key: "cancelled", label: "Đã hủy" };
   if (value.includes("inactive") || value.includes("off") || value.includes("ngung")) return { key: "inactive", label: "Ngừng hoạt động" };
-  if (value.includes("planned") || value.includes("draft") || value.includes("lap")) return { key: "planned", label: "Dự kiến" };
+  if (value.includes("maintenance") || value.includes("bao tri")) return { key: "maintenance", label: "Bảo trì" };
+  if (value.includes("planned") || value.includes("draft") || value.includes("lap") || value.includes("du kien")) return { key: "planned", label: "Dự kiến" };
   return { key: "active", label: "Đang hoạt động" };
 };
 
 type ZoneRowDetail = {
-  id: string; farm_name?: string | null; name?: string | null; raw_type?: string | null; status?: string | null; area_ha?: number | string | null; perimeter_m?: number | string | null; capacity?: string | null; description?: string | null; created_at?: string | Date | null; updated_at?: string | Date | null; area_color?: string | null; geo?: { polygon?: unknown } | null; boundary_geojson?: { geo?: { polygon?: unknown } | null; polygon?: unknown } | null;
+  id: string; farm_name?: string | null; name?: string | null; raw_type?: string | null; warehouse_types?: unknown; metadata_extra?: Record<string, unknown> | null; status?: string | null; area_ha?: number | string | null; perimeter_m?: number | string | null; capacity?: string | null; description?: string | null; created_at?: string | Date | null; updated_at?: string | Date | null; area_color?: string | null; geo?: { polygon?: unknown } | null; boundary_geojson?: { geo?: { polygon?: unknown } | null; polygon?: unknown } | null;
 };
-type SensorRow = { loai_cam_bien?: string | null; don_vi?: string | null; dang_hoat_dong?: boolean | null };
-type LivestockRow = { ma_vat_nuoi?: string | null; the_nhan_dien?: string | null; trang_thai?: string | null; mo_ta?: string | null };
-type CountRow = { livestock_count?: number; sensor_count?: number; water_asset_count?: number; note_count?: number };
-type LinkedZoneData = { sensors: SensorRow[]; livestock: LivestockRow[]; counts: CountRow };
+type LivestockRow = { ma_vat_nuoi?: string | null; ma_qr?: string | null; trang_thai?: string | null; mo_ta?: string | null };
+type CountRow = { livestock_count?: number; water_asset_count?: number; note_count?: number };
+type CropDetailRow = { cay_trong?: string | null; ph_do_dat?: number | string | null; do_am_dat?: number | string | null; so_gio_nang?: number | string | null };
+type PastureDetailRow = { so_ngay_nghi_co?: number | string | null; dse_load?: number | string | null; ty_le_chan_tha?: number | string | null; thuc_an_san_co?: number | string | null; so_ngay_chan_tha_con_lai?: number | string | null; toc_do_moc_co?: number | string | null; trang_thai_co?: string | null; loai_co?: string | null; dien_tich_canh_tac_ha?: number | string | null };
+type StorageDetailRow = { suc_chua?: number | string | null; loai_luu_tru?: string | null; nhiet_do?: number | string | null };
+type ParkingDetailRow = { suc_chua?: number | string | null; loai_bai_do_xe?: string | null; nhiet_do?: number | string | null };
+type ZoneTypeSpecificData = { crop?: CropDetailRow | null; pasture?: PastureDetailRow | null; storage?: StorageDetailRow | null; parking?: ParkingDetailRow | null };
+type LinkedZoneData = { livestock: LivestockRow[]; counts: CountRow; typeSpecific: ZoneTypeSpecificData };
 
 async function queryRows<T>(sql: string, values: unknown[]): Promise<QueryRows<T>> {
   try {
@@ -89,20 +89,53 @@ async function queryRows<T>(sql: string, values: unknown[]): Promise<QueryRows<T
 }
 
 async function fetchZoneRow(zoneId: string, ownerId?: string | null) {
-  const sql = `select k.id::text as id, coalesce(t.ten_trang_trai::text, '') as farm_name, coalesce(nullif(k.ten_khu_vuc::text, ''), '') as name, coalesce(nullif(loai.ten::text, ''), nullif(k.mo_ta::text, ''), '') as raw_type, coalesce(nullif(k.trang_thai::text, ''), '') as status, coalesce(k.dien_tich_ha::float8, 0)::float8 as area_ha, coalesce(k.chu_vi_m::float8, (k.hinh_hoc_geojson->'metadata'->>'perimeterM')::float8, null) as perimeter_m, nullif(coalesce(k.suc_chua::text, k.hinh_hoc_geojson->'metadata'->>'capacity', k.hinh_hoc_geojson->'metadata'->>'suc_chua'), '') as capacity, nullif(coalesce(k.mo_ta::text, k.hinh_hoc_geojson->'metadata'->>'description', k.hinh_hoc_geojson->'metadata'->>'notes'), '') as description, k.created_at, k.updated_at, k.hinh_hoc_geojson::jsonb as boundary_geojson, coalesce(k.mau_sac, k.hinh_hoc_geojson->'metadata'->>'areaColor', k.hinh_hoc_geojson->'metadata'->>'area_color') as area_color, coalesce(k.hinh_hoc_geojson->'geo', k.hinh_hoc_geojson) as geo from du_lieu.khu_vuc k join du_lieu.trang_trai t on t.id = k.trang_trai_id left join du_lieu.danh_muc_loai_khu_vuc loai on loai.id = k.loai_khu_vuc_id where (k.id::text = $1 or k.ma_khu_vuc::text = $1) ${ownerId ? "and t.chu_so_huu_id::text = $2" : ""} limit 1`;
+  await ensureZoneSchema();
+  const sql = `select k.id::text as id, coalesce(t.ten_trang_trai::text, '') as farm_name, coalesce(nullif(k.ten_khu_vuc::text, ''), '') as name, coalesce(nullif(k.loai_khu_vuc::text, ''), nullif(k.hinh_hoc_geojson->'metadata'->>'kind', ''), nullif(k.hinh_hoc_geojson->'metadata'->>'areaType', ''), nullif(k.hinh_hoc_geojson->'metadata'->>'usage', ''), nullif(loai.ten::text, ''), nullif(k.nguon_tao::text, ''), nullif(k.mo_ta::text, ''), nullif(k.hinh_hoc_geojson->'metadata'->>'farmType', ''), '') as raw_type, case when cardinality(coalesce(k.nhom_luu_tru_kho, '{}'::text[])) > 0 then to_jsonb(k.nhom_luu_tru_kho) else coalesce(k.hinh_hoc_geojson->'metadata'->'warehouseTypes', k.hinh_hoc_geojson->'metadata'->'extra'->'warehouseTypes', '[]'::jsonb) end as warehouse_types, coalesce(k.hinh_hoc_geojson->'metadata'->'extra', '{}'::jsonb) || coalesce(k.thong_tin_loai, '{}'::jsonb) as metadata_extra, coalesce(nullif(k.trang_thai::text, ''), '') as status, coalesce(k.dien_tich_ha::float8, 0)::float8 as area_ha, coalesce(k.chu_vi_m::float8, (k.hinh_hoc_geojson->'metadata'->>'perimeterM')::float8, null) as perimeter_m, nullif(coalesce(k.suc_chua::text, k.hinh_hoc_geojson->'metadata'->>'capacity', k.hinh_hoc_geojson->'metadata'->>'suc_chua'), '') as capacity, nullif(coalesce(k.mo_ta::text, k.hinh_hoc_geojson->'metadata'->>'description', k.hinh_hoc_geojson->'metadata'->>'notes'), '') as description, k.created_at, k.updated_at, k.hinh_hoc_geojson::jsonb as boundary_geojson, coalesce(k.mau_sac, k.hinh_hoc_geojson->'metadata'->>'areaColor', k.hinh_hoc_geojson->'metadata'->>'area_color') as area_color, coalesce(k.hinh_hoc_geojson->'geo', k.hinh_hoc_geojson) as geo from du_lieu.khu_vuc k join du_lieu.trang_trai t on t.id = k.trang_trai_id left join du_lieu.danh_muc_loai_khu_vuc loai on loai.id = k.loai_khu_vuc_id where (k.id::text = $1 or k.ma_khu_vuc::text = $1) ${ownerId ? "and t.chu_so_huu_id::text = $2" : ""} limit 1`;
   return queryRows<ZoneRowDetail>(sql, ownerId ? [zoneId, ownerId] : [zoneId]);
 }
 
+async function fetchZoneTypeSpecificData(zoneId: string): Promise<ZoneTypeSpecificData> {
+  const [cropRs, pastureRs, storageFoodRs, storageToolRs, parkingRs] = await Promise.all([
+    queryRows<CropDetailRow>(
+      `select cay_trong, ph_do_dat, do_am_dat, so_gio_nang from du_lieu.khu_vuc_trong_trot where khu_vuc_id::text = $1 order by created_at desc limit 1`,
+      [zoneId]
+    ),
+    queryRows<PastureDetailRow>(
+      `select so_ngay_nghi_co, dse_load, ty_le_chan_tha, thuc_an_san_co, so_ngay_chan_tha_con_lai, toc_do_moc_co, trang_thai_co, loai_co, dien_tich_canh_tac_ha from du_lieu.khu_vuc_dong_co where khu_vuc_id::text = $1 order by created_at desc limit 1`,
+      [zoneId]
+    ),
+    queryRows<StorageDetailRow>(
+      `select suc_chua, loai_luu_tru, nhiet_do from du_lieu.khu_vuc_kho_luong_thuc where khu_vuc_id::text = $1 order by created_at desc limit 1`,
+      [zoneId]
+    ),
+    queryRows<StorageDetailRow>(
+      `select suc_chua, loai_luu_tru, nhiet_do from du_lieu.khu_vuc_kho_dung_cu where khu_vuc_id::text = $1 order by created_at desc limit 1`,
+      [zoneId]
+    ),
+    queryRows<ParkingDetailRow>(
+      `select suc_chua, loai_bai_do_xe, nhiet_do from du_lieu.khu_vuc_bai_do_xe where khu_vuc_id::text = $1 order by created_at desc limit 1`,
+      [zoneId]
+    ),
+  ]);
+
+  return {
+    crop: cropRs.rows[0] ?? null,
+    pasture: pastureRs.rows[0] ?? null,
+    storage: storageFoodRs.rows[0] ?? storageToolRs.rows[0] ?? null,
+    parking: parkingRs.rows[0] ?? null,
+  };
+}
+
 async function fetchLinkedZoneData(zoneId: string, ownerId?: string | null) {
+  await ensureLivestockSchema();
   const zoneRs = await fetchZoneRow(zoneId, ownerId);
   const zone = zoneRs.rows[0] as ZoneRowDetail | undefined;
   if (!zone) return null;
   const ownerFilter = ownerId ? "and t.chu_so_huu_id::text = $2" : "";
-  const sensorSql = `select c.id::text, c.loai_cam_bien, c.don_vi, c.dang_hoat_dong from du_lieu.cam_bien c join du_lieu.khu_vuc k on k.id = c.khu_vuc_id join du_lieu.trang_trai t on t.id = k.trang_trai_id where k.id::text = $1 ${ownerFilter} order by c.created_at desc limit 6`;
-  const livestockSql = `select v.id::text, v.ma_vat_nuoi, v.the_nhan_dien, v.trang_thai, v.mo_ta from du_lieu.vat_nuoi v join du_lieu.trang_trai t on t.id = v.trang_trai_id where t.id = (select trang_trai_id from du_lieu.khu_vuc where id::text = $1 limit 1) ${ownerId ? "and t.chu_so_huu_id::text = $2" : ""} order by v.created_at desc limit 6`;
-  const countSql = `select coalesce((select count(*) from du_lieu.dem_dong_vat d where d.khu_vuc_id = k.id), 0)::int as livestock_count, coalesce((select count(*) from du_lieu.cam_bien c where c.khu_vuc_id = k.id), 0)::int as sensor_count, 0::int as water_asset_count, coalesce((select count(*) from du_lieu.canh_bao w where w.khu_vuc_id = k.id), 0)::int as note_count from du_lieu.khu_vuc k where k.id::text = $1 limit 1`;
-  const [sensorRs, livestockRs, countRs] = await Promise.all([queryRows<SensorRow>(sensorSql, ownerId ? [zoneId, ownerId] : [zoneId]), queryRows<LivestockRow>(livestockSql, ownerId ? [zoneId, ownerId] : [zoneId]), queryRows<CountRow>(countSql, [zoneId])]);
-  return { zone, sensors: sensorRs.rows, livestock: livestockRs.rows, counts: countRs.rows[0] ?? {} };
+  const livestockSql = `select v.id::text, v.ma_vat_nuoi, v.ma_qr, v.trang_thai, v.mo_ta from du_lieu.vat_nuoi v join du_lieu.khu_vuc k on k.id = v.khu_vuc_id join du_lieu.trang_trai t on t.id = k.trang_trai_id where k.id::text = $1 ${ownerFilter} order by v.created_at desc limit 6`;
+  const countSql = `select coalesce((select count(*) from du_lieu.vat_nuoi v where v.khu_vuc_id = k.id), 0)::int as livestock_count, 0::int as water_asset_count, coalesce((select count(*) from du_lieu.canh_bao w where w.khu_vuc_id = k.id), 0)::int as note_count from du_lieu.khu_vuc k where k.id::text = $1 limit 1`;
+  const [livestockRs, countRs, typeSpecific] = await Promise.all([queryRows<LivestockRow>(livestockSql, ownerId ? [zoneId, ownerId] : [zoneId]), queryRows<CountRow>(countSql, [zoneId]), fetchZoneTypeSpecificData(zone.id)]);
+  return { zone, livestock: livestockRs.rows, counts: countRs.rows[0] ?? {}, typeSpecific };
 }
 
 export async function getZoneDetail(ownerId: string | null, zoneId: string): Promise<ZoneDetail | null> {
@@ -111,17 +144,77 @@ export async function getZoneDetail(ownerId: string | null, zoneId: string): Pro
   return buildZoneDetail(linked.zone as ZoneRowDetail, linked);
 }
 
+const WAREHOUSE_DETAIL_LABELS: Record<string, string> = {
+  cong_cu: "Công cụ",
+  hoa_chat: "Hóa chất",
+  thuc_an: "Thức ăn",
+  thanh_pham_vat_nuoi: "Thành phẩm vật nuôi",
+};
+
+function assignValue(target: Record<string, string>, key: string, value: unknown) {
+  const text = displayText(value);
+  if (text) target[key] = text;
+}
+
+function buildTypeSpecificValues(typeKey: ZoneTypeKey, data: ZoneTypeSpecificData | undefined, extra: Record<string, unknown> | null | undefined) {
+  const values: Record<string, string> = {};
+
+  assignValue(values, "cropType", data?.crop?.cay_trong);
+  assignValue(values, "soilPh", data?.crop?.ph_do_dat);
+  assignValue(values, "soilMoisture", data?.crop?.do_am_dat);
+  assignValue(values, "sunHours", data?.crop?.so_gio_nang);
+
+  assignValue(values, "daysEmpty", data?.pasture?.so_ngay_nghi_co);
+  assignValue(values, "dseLoad", data?.pasture?.dse_load);
+  assignValue(values, "stockingRate", data?.pasture?.ty_le_chan_tha);
+  assignValue(values, "feedOnOffer", data?.pasture?.thuc_an_san_co);
+  assignValue(values, "grazingDaysRemaining", data?.pasture?.so_ngay_chan_tha_con_lai);
+  assignValue(values, "pastureGrowthRate", data?.pasture?.toc_do_moc_co);
+  assignValue(values, "pastureState", data?.pasture?.trang_thai_co);
+  assignValue(values, "pastureType", data?.pasture?.loai_co);
+
+  assignValue(values, "capacity", data?.storage?.suc_chua ?? data?.parking?.suc_chua);
+  assignValue(values, "temperature", data?.storage?.nhiet_do ?? data?.parking?.nhiet_do);
+  assignValue(values, "parkingType", data?.parking?.loai_bai_do_xe);
+
+  Object.entries(extra ?? {}).forEach(([key, value]) => {
+    if (Array.isArray(value) || value === null || typeof value === "object") return;
+    assignValue(values, key, value);
+  });
+
+  return values;
+}
+
+function buildTypeSpecificDetails(typeKey: ZoneTypeKey, values: Record<string, string>, warehouseTypes: string[]) {
+  const details: Array<{ label: string; value: string }> = [];
+  if (typeKey === "storage") {
+    const typeLabels = warehouseTypes.map((type) => WAREHOUSE_DETAIL_LABELS[type] ?? type);
+    if (typeLabels.length > 0) details.push({ label: "Nhóm lưu trữ", value: typeLabels.join(", ") });
+  }
+
+  ZONE_TYPE_FORM_CONFIGS[typeKey].fields.forEach((field) => {
+    const value = values[field.key];
+    if (!value) return;
+    details.push({ label: field.label, value });
+  });
+
+  return details;
+}
+
 function buildZoneDetail(row: ZoneRowDetail, linked?: LinkedZoneData): ZoneDetail {
   const boundary = row.boundary_geojson ?? {};
   const polygon = normalizePoints(row.geo?.polygon ?? boundary?.geo?.polygon ?? boundary?.polygon);
   const center = centroid(polygon);
-  const typeInfo = normalizeZoneType(String(row.raw_type ?? ""));
+  const typeInfo = normalizeZoneType(String(row.raw_type ?? ""), row.warehouse_types);
   const statusInfo = normalizeZoneStatus(row.status);
   const colorHex = /^#[0-9a-f]{6}$/i.test(String(row.area_color ?? "")) ? String(row.area_color) : DEFAULT_COLOR;
   const area = Number(row.area_ha ?? 0);
   const livestockCount = linked?.counts.livestock_count ?? 0;
-  const sensorCount = linked?.counts.sensor_count ?? 0;
   const waterAssetCount = linked?.counts.water_asset_count ?? 0;
   const noteCount = linked?.counts.note_count ?? 0;
-  return { id: String(row.id), farmName: displayText(row.farm_name), name: displayText(row.name), rawType: displayText(row.raw_type), typeLabel: typeInfo.label, status: statusInfo.key, statusLabel: statusInfo.label, areaHa: area, perimeterM: row.perimeter_m != null ? Number(row.perimeter_m) : null, capacity: displayText(row.capacity), description: displayText(row.description), createdAt: safeDate(row.created_at), updatedAt: safeDate(row.updated_at), colorHex, polygon, center, metrics: { pointCount: polygon.length, livestockCount, sensorCount, waterAssetCount, noteCount }, details: [{ label: "Tên khu vực", value: displayText(row.name) }, { label: "Loại", value: typeInfo.label }, { label: "Trạng thái", value: statusInfo.label }, { label: "Diện tích", value: area ? `${area.toFixed(2)} ha` : "" }, { label: "Chu vi", value: row.perimeter_m != null ? `${Number(row.perimeter_m).toFixed(2)} m` : "" }, { label: "Sức chứa", value: displayText(row.capacity) }, { label: "Mô tả", value: displayText(row.description) }, { label: "Tạo lúc", value: safeDate(row.created_at) }, { label: "Cập nhật", value: safeDate(row.updated_at) }], livestock: (linked?.livestock ?? []).map((item) => ({ label: item.the_nhan_dien || item.ma_vat_nuoi || "Vật nuôi", value: [item.trang_thai, item.mo_ta].filter(Boolean).join(" · ") })), sensors: (linked?.sensors ?? []).map((item) => ({ label: item.loai_cam_bien || "Cảm biến", value: [item.don_vi, item.dang_hoat_dong ? "đang hoạt động" : "ngừng hoạt động"].filter(Boolean).join(" · ") })), notes: [], activities: [] };
+  const typeSpecific = buildTypeSpecificValues(typeInfo.key, linked?.typeSpecific, row.metadata_extra);
+  const warehouseTypes = normalizeWarehouseTypeValues(row.warehouse_types);
+  const derivedCapacity = displayText(row.capacity) || typeSpecific.capacity || typeSpecific.herdCapacity;
+  const typeDetails = buildTypeSpecificDetails(typeInfo.key, typeSpecific, warehouseTypes);
+  return { id: String(row.id), farmName: displayText(row.farm_name), name: displayText(row.name), rawType: displayText(row.raw_type), typeKey: typeInfo.key, typeSlug: typeInfo.slug, typeLabel: typeInfo.label, typeSpecific, warehouseTypes, isVegetationRelevant: typeInfo.isVegetationRelevant, status: statusInfo.key, statusLabel: statusInfo.label, areaHa: area, perimeterM: row.perimeter_m != null ? Number(row.perimeter_m) : null, capacity: derivedCapacity, description: displayText(row.description), createdAt: safeDate(row.created_at), updatedAt: safeDate(row.updated_at), colorHex, polygon, center, metrics: { pointCount: polygon.length, livestockCount, waterAssetCount, noteCount }, details: [{ label: "Tên khu vực", value: displayText(row.name) }, { label: "Loại", value: typeInfo.label }, { label: "Trạng thái", value: statusInfo.label }, { label: "Diện tích", value: area ? `${area.toFixed(2)} ha` : "" }, { label: "Chu vi", value: row.perimeter_m != null ? `${Number(row.perimeter_m).toFixed(2)} m` : "" }, { label: "Sức chứa", value: derivedCapacity }, { label: "Mô tả", value: displayText(row.description) }, { label: "Tạo lúc", value: safeDate(row.created_at) }, { label: "Cập nhật", value: safeDate(row.updated_at) }, ...typeDetails], livestock: (linked?.livestock ?? []).map((item) => ({ label: item.ma_vat_nuoi || item.ma_qr || "Vật nuôi", value: [item.trang_thai, item.mo_ta].filter(Boolean).join(" · ") })), notes: [], activities: [] };
 }

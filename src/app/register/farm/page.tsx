@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import CowLoading from "@/components/cow-loading";
 
 type LastSource = "name" | "link" | "coord";
 type Suggestion = { name: string; lat: string; lng: string };
@@ -104,7 +105,7 @@ export default function FarmRegistrationPage() {
             lng: f.lng,
           },
           production: {
-            livestock: f.livestockTypes.map((name) => ({ name, quantity: 1 })),
+            livestock: f.livestockTypes.map((name) => ({ name })),
           },
           settings: {
             annualRainfall: Number(f.annualRainfall),
@@ -129,7 +130,7 @@ export default function FarmRegistrationPage() {
   };
 
   const rightCta = step === 5 ? (
-    <button type="button" className="btn btn-primary" onClick={onSaveFarm} disabled={loading}>{loading ? "Đang lưu..." : "Lưu nông trại"}</button>
+    <button type="button" className="btn btn-primary" onClick={onSaveFarm} disabled={loading}>{loading ? <CowLoading label="Đang tải..." /> : "Lưu nông trại"}</button>
   ) : (
     <button type="button" className="btn btn-primary" onClick={goNext}>Tiếp tục</button>
   );

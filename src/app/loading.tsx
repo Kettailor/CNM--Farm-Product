@@ -10,7 +10,7 @@ export default function Loading() {
             <span />
           </div>
           <div className="farm-loading-path">
-            <div className="farm-loading-cow">🐄</div>
+            <img src="/assets/img/con_bo.svg" alt="" className="farm-loading-cow" />
           </div>
         </div>
 

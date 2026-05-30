@@ -1,0 +1,323 @@
+.page {
+  display: grid;
+  gap: 16px;
+}
+
+.topBar,
+.detailCard,
+.recordPanel,
+.mapPanel {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+}
+
+.titleBlock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.titleIcon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  border-radius: 8px;
+  background: #ecfdf3;
+  color: #1f7a4a;
+  border: 1px solid rgba(31, 122, 74, 0.14);
+}
+
+.titleIcon svg,
+.actions svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.titleIcon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.eyebrow {
+  margin: 0 0 5px;
+  color: #1f7a4a;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.topBar h1,
+.detailsPanel h2,
+.usagePanel h2,
+.sectionHead h2 {
+  margin: 0;
+  color: #101828;
+}
+
+.topBar h1 {
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.topBar span,
+.detailsPanel dt,
+.usagePanel dt,
+.progressHead span {
+  color: #667085;
+  font-size: 13px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.actionButton,
+.secondaryButton {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.actionButton {
+  border: 1px solid #1f7a4a;
+  background: #1f7a4a;
+  color: #fff;
+}
+
+.secondaryButton {
+  border: 1px solid rgba(31, 122, 74, 0.28);
+  background: #fff;
+  color: #1f7a4a;
+}
+
+.detailCard {
+  display: grid;
+  grid-template-columns: minmax(0, 0.52fr) minmax(0, 0.48fr);
+}
+
+.detailsPanel,
+.usagePanel {
+  padding: 16px 28px;
+}
+
+.detailsPanel {
+  border-right: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.detailsPanel dl,
+.usagePanel dl {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+}
+
+.detailsPanel div,
+.usagePanel div {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.detailsPanel dt,
+.usagePanel dt {
+  font-weight: 700;
+}
+
+.detailsPanel dd,
+.usagePanel dd {
+  margin: 0;
+  color: #101828;
+  font-weight: 800;
+}
+
+.progressHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.progressHead strong {
+  color: #101828;
+  font-size: 13px;
+}
+
+.progressTrack {
+  height: 5px;
+  margin: 10px 0 14px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.progressTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2fbf71;
+}
+
+.recordPanel,
+.mapPanel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tableScroll {
+  overflow: auto;
+}
+
+.dataTable {
+  width: 100%;
+  min-width: 1180px;
+  border-collapse: collapse;
+}
+
+.dataTable th,
+.dataTable td {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 11px 12px;
+  text-align: left;
+  vertical-align: middle;
+  color: #344054;
+  font-size: 13px;
+}
+
+.dataTable th {
+  color: #475467;
+  background: #f8fafc;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.statusDot {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+  margin-right: 8px;
+  border-radius: 999px;
+  background: #20895a;
+}
+
+.emptyState {
+  padding: 14px;
+  border: 1px dashed rgba(15, 23, 42, 0.16);
+  border-radius: 8px;
+  color: #667085;
+  background: #f8fafc;
+  font-weight: 700;
+}
+
+.mapShell {
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+}
+
+.mapShell :global(.map-view-switcher) {
+  display: grid;
+  gap: 10px;
+}
+
+.mapShell :global(.map-view-switcher-tabs) {
+  position: relative;
+  z-index: 2;
+  padding: 12px 12px 0;
+}
+
+.mapShell :global(.map-view-switcher-tabs button) {
+  border-radius: 8px;
+}
+
+.mapShell :global(.map-view-switcher-frame) {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  min-height: 520px;
+}
+
+.mapShell :global(.maplibre-map-host) {
+  min-height: 520px;
+  border-radius: 0;
+}
+
+.mapShell :global(.map-view-switcher-footer) {
+  padding: 0 12px 12px;
+}
+
+@media (max-width: 1100px) {
+  .detailCard {
+    grid-template-columns: 1fr;
+  }
+
+  .detailsPanel {
+    border-right: 0;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  }
+}
+
+@media (max-width: 760px) {
+  .topBar,
+  .actions,
+  .sectionHead {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .actionButton,
+  .secondaryButton {
+    width: 100%;
+  }
+
+  .detailsPanel,
+  .usagePanel {
+    padding: 16px;
+  }
+
+  .detailsPanel div,
+  .usagePanel div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .mapShell :global(.map-view-switcher-frame),
+  .mapShell :global(.maplibre-map-host) {
+    min-height: 380px;
+  }
+}

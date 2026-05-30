@@ -1,19 +1,14 @@
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
+import type { PoolClient } from "pg";
 import { layOwnerIdTuRequest } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ensureLivestockSchema } from "@/lib/livestock-schema";
 
 export const dynamic = "force-dynamic";
 
-type TagPayload = {
-  type?: unknown;
-  label?: unknown;
-  color?: unknown;
-  location?: unknown;
-};
-
 type GroupPayload = {
+  groupId?: unknown;
   species?: unknown;
   groupName?: unknown;
   description?: unknown;
@@ -44,7 +39,6 @@ type GroupPayload = {
   bodyConditionScore?: unknown;
   traitNotes?: unknown;
   primaryIdentification?: unknown;
-  tags?: TagPayload[];
   reproductiveState?: unknown;
   reproductiveAvailability?: unknown;
   lifetimeAdg?: unknown;
@@ -96,17 +90,53 @@ function makeGroupCode(species: string) {
   return `NVN-${prefix}-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${randomUUID().slice(0, 6).toUpperCase()}`;
 }
 
-function normalizeTags(tags: TagPayload[] | undefined) {
-  if (!Array.isArray(tags)) return [];
-  return tags
-    .slice(0, 12)
-    .map((tag) => ({
-      type: cleanString(tag?.type, 80),
-      label: cleanString(tag?.label, 120),
-      color: cleanString(tag?.color, 60),
-      location: cleanString(tag?.location, 80),
-    }))
-    .filter((tag) => tag.type || tag.label || tag.color || tag.location);
+function makeAnimalQrCode() {
+  return `QR-VN-${randomUUID().replace(/-/g, "").slice(0, 18).toUpperCase()}`;
+}
+
+async function findExistingQrCodes(client: PoolClient, codes: string[]) {
+  if (codes.length === 0) return new Set<string>();
+
+  const animalRs = await client.query<{ code: string }>(
+    `select ma_qr as code
+     from du_lieu.vat_nuoi
+     where ma_qr = any($1::text[])`,
+    [codes]
+  );
+
+  const existing = new Set(animalRs.rows.map((row) => row.code));
+  const traceTableRs = await client.query<{ exists: boolean }>(
+    `select to_regclass('du_lieu.truy_xuat_san_pham_chuoi_khoi') is not null as exists`
+  );
+
+  if (traceTableRs.rows[0]?.exists) {
+    const traceRs = await client.query<{ code: string }>(
+      `select ma_truy_xuat as code
+       from du_lieu.truy_xuat_san_pham_chuoi_khoi
+       where ma_truy_xuat = any($1::text[])`,
+      [codes]
+    );
+    for (const row of traceRs.rows) existing.add(row.code);
+  }
+
+  return existing;
+}
+
+async function makeUniqueAnimalQrCodes(client: PoolClient, count: number) {
+  const codes = new Set<string>();
+
+  for (let attempt = 0; codes.size < count && attempt < 8; attempt += 1) {
+    while (codes.size < count) codes.add(makeAnimalQrCode());
+
+    const existing = await findExistingQrCodes(client, Array.from(codes));
+    for (const code of existing) codes.delete(code);
+  }
+
+  if (codes.size < count) {
+    throw new Error("QR_CODE_GENERATION_FAILED");
+  }
+
+  return Array.from(codes).slice(0, count);
 }
 
 export async function POST(request: NextRequest) {
@@ -153,7 +183,11 @@ export async function POST(request: NextRequest) {
     const locationId = cleanString(body.locationId, 80);
     if (locationId) {
       const zoneRs = await db.query(
-        `select id from du_lieu.khu_vuc where id::text = $1 and trang_trai_id = $2 limit 1`,
+        `select id from du_lieu.khu_vuc
+         where id::text = $1
+           and trang_trai_id = $2
+           and coalesce(lower(trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')
+         limit 1`,
         [locationId, farmId]
       );
       if (zoneRs.rowCount === 0) {
@@ -161,20 +195,53 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const tags = normalizeTags(body.tags);
     const groupId = randomUUID();
     const groupCode = makeGroupCode(species);
     const healthStatus = cleanString(body.healthStatus, 80) ?? "Đang hoạt động";
+    const gender = cleanString(body.gender, 80);
+    const lifeStage = cleanString(body.lifeStage, 80);
+    const purpose = cleanString(body.purpose, 120);
+    const origin = cleanString(body.origin, 120);
+    const birthDate = dateOrNull(body.birthDate);
+    const maternityId = cleanString(body.maternityId, 120);
+    const paternityId = cleanString(body.paternityId, 120);
+    const colouring = cleanString(body.colouring, 2000);
+    const reproductiveState = cleanString(body.reproductiveState, 120);
+    const primaryIdentification = cleanString(body.primaryIdentification, 120) ?? "Mã QR cá thể";
     const animalStatus = healthStatus === "Đang theo dõi" ? "Đang hoạt động" : healthStatus;
     const animalDescription = [
       `Nhóm: ${groupName}`,
       `Loài: ${species}`,
       `Giống: ${breed}`,
-      cleanString(body.purpose, 120) ? `Mục đích: ${cleanString(body.purpose, 120)}` : null,
-      cleanString(body.lifeStage, 80) ? `Giai đoạn: ${cleanString(body.lifeStage, 80)}` : null,
+      purpose ? `Mục đích: ${purpose}` : null,
+      lifeStage ? `Giai đoạn: ${lifeStage}` : null,
+      "Quản lý bằng mã QR cá thể",
     ]
       .filter(Boolean)
       .join("; ");
+    const animalMetadata = JSON.stringify({
+      source: "new-group-wizard",
+      individualTracking: true,
+      groupSnapshot: {
+        groupId,
+        groupCode,
+        groupName,
+        species,
+        breed,
+        gender,
+        lifeStage,
+        healthStatus,
+        purpose,
+        locationId,
+        origin,
+        birthDate,
+        maternityId,
+        paternityId,
+        primaryIdentification,
+        targetLiveWeight: parseNumber(body.targetLiveWeight),
+        targetWeightDate: dateOrNull(body.targetWeightDate),
+      },
+    });
 
     const client = await db.connect();
     try {
@@ -212,54 +279,74 @@ export async function POST(request: NextRequest) {
           cleanString(body.createFrom, 120),
           breed,
           headCount,
-          cleanString(body.gender, 80),
-          cleanString(body.lifeStage, 80),
+          gender,
+          lifeStage,
           healthStatus,
-          cleanString(body.purpose, 120),
+          purpose,
           cleanString(body.herdNotes, 2000),
-          cleanString(body.origin, 120),
+          origin,
           parseNumber(body.price),
           cleanString(body.expenseAccount, 120),
-          dateOrNull(body.birthDate),
+          birthDate,
           cleanString(body.conceptionType, 120),
           parseNumber(body.averageBirthWeight),
           cleanString(body.birthNotes, 2000),
           cleanString(body.healthIssues, 2000),
-          cleanString(body.maternityId, 120),
-          cleanString(body.paternityId, 120),
-          cleanString(body.colouring, 2000),
+          maternityId,
+          paternityId,
+          colouring,
           cleanString(body.eyeColor, 80),
           cleanString(body.earType, 80),
           cleanString(body.hornType, 80),
           cleanString(body.mouth, 80),
           parseNumber(body.bodyConditionScore),
           cleanString(body.traitNotes, 2000),
-          cleanString(body.primaryIdentification, 120),
-          cleanString(body.reproductiveState, 120),
+          primaryIdentification,
+          reproductiveState,
           cleanString(body.reproductiveAvailability, 120),
           parseNumber(body.lifetimeAdg),
           parseNumber(body.lifetimeMjDay),
           parseNumber(body.targetLiveWeight),
           dateOrNull(body.targetWeightDate),
-          JSON.stringify({ form: body, tags }),
+          JSON.stringify({ form: body, qrMode: "per-animal" }),
         ]
       );
 
-      for (const [index, tag] of tags.entries()) {
-        await client.query(
-          `insert into du_lieu.nhan_dien_nhom_vat_nuoi
-             (nhom_vat_nuoi_id, loai_the, ma_nhan_dien, mau_sac, vi_tri, la_chinh)
-           values ($1,$2,$3,$4,$5,$6)`,
-          [groupId, tag.type, tag.label, tag.color, tag.location, index === 0]
-        );
-      }
+      const animalCodes = Array.from({ length: headCount }, (_, index) => `${groupCode}-${String(index + 1).padStart(3, "0")}`);
+      const qrCodes = await makeUniqueAnimalQrCodes(client, headCount);
 
       await client.query(
         `insert into du_lieu.vat_nuoi
-           (trang_trai_id, khu_vuc_id, nhom_vat_nuoi_id, ma_vat_nuoi, the_nhan_dien, trang_thai, mo_ta)
-         select $1::uuid, $2::uuid, $3::uuid, concat($4::text, '-', lpad(seq::text, 3, '0')), $5::text, $6::text, $7::text
-         from generate_series(1, $8::int) as seq`,
-        [farmId, locationId, groupId, groupCode, `${species} - ${groupName}`, animalStatus, animalDescription, headCount]
+           (
+             trang_trai_id, khu_vuc_id, nhom_vat_nuoi_id, ma_vat_nuoi, ma_qr, the_nhan_dien,
+             trang_thai, mo_ta, loai_vat_nuoi, giong, gioi_tinh, giai_doan_sinh_truong,
+             ngay_sinh, nguon_goc, ma_me, ma_bo, mau_long, trang_thai_sinh_san, metadata_json
+           )
+         select
+           $1::uuid, $2::uuid, $3::uuid, animal.ma_vat_nuoi, animal.ma_qr, animal.ma_qr,
+           $6::text, $7::text, $8::text, $9::text, $10::text, $11::text,
+           $12::date, $13::text, $14::text, $15::text, $16::text, $17::text, $18::jsonb
+         from unnest($4::text[], $5::text[]) as animal(ma_vat_nuoi, ma_qr)`,
+        [
+          farmId,
+          locationId,
+          groupId,
+          animalCodes,
+          qrCodes,
+          animalStatus,
+          animalDescription,
+          species,
+          breed,
+          gender,
+          lifeStage,
+          birthDate,
+          origin,
+          maternityId,
+          paternityId,
+          colouring,
+          reproductiveState,
+          animalMetadata,
+        ]
       );
 
       if (locationId) {
@@ -278,6 +365,7 @@ export async function POST(request: NextRequest) {
         groupId,
         groupCode,
         insertedAnimals: headCount,
+        createdQrCodes: qrCodes.length,
       });
     } catch (error) {
       await client.query("rollback");
@@ -287,5 +375,209 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     return NextResponse.json({ message: "Không thể lưu nhóm vật nuôi.", error: String(error) }, { status: 500 });
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const ownerId = layOwnerIdTuRequest(request);
+    if (!ownerId) {
+      return NextResponse.json({ message: "Phiên đăng nhập không hợp lệ." }, { status: 401 });
+    }
+
+    await ensureLivestockSchema();
+
+    const body = (await request.json()) as GroupPayload;
+    const groupId = cleanString(body.groupId, 80);
+    const groupName = cleanString(body.groupName, 160);
+    const breed = cleanString(body.breed, 120);
+
+    if (!groupId) {
+      return NextResponse.json({ message: "Thiếu nhóm vật nuôi cần chỉnh sửa." }, { status: 400 });
+    }
+    if (!groupName) {
+      return NextResponse.json({ message: "Vui lòng nhập tên nhóm vật nuôi." }, { status: 400 });
+    }
+    if (!breed) {
+      return NextResponse.json({ message: "Vui lòng nhập giống vật nuôi." }, { status: 400 });
+    }
+
+    const currentRs = await db.query(
+      `select n.id, n.trang_trai_id, n.khu_vuc_id, n.ma_nhom, n.ten_nhom, n.loai_vat_nuoi,
+              n.giong, n.gioi_tinh, n.giai_doan_sinh_truong, n.trang_thai_suc_khoe,
+              n.muc_dich_san_xuat, n.nguon_goc, n.ngay_sinh, n.ma_me, n.ma_bo,
+              n.mau_long, n.trang_thai_sinh_san
+       from du_lieu.nhom_vat_nuoi n
+       join du_lieu.trang_trai t on t.id = n.trang_trai_id
+       where n.id::text = $1 and t.chu_so_huu_id = $2
+       limit 1`,
+      [groupId, ownerId]
+    );
+
+    const current = currentRs.rows[0];
+    if (!current) {
+      return NextResponse.json({ message: "Không tìm thấy nhóm vật nuôi trong trang trại hiện tại." }, { status: 404 });
+    }
+
+    const description = cleanString(body.description, 2000);
+    const healthStatus = cleanString(body.healthStatus, 80) ?? cleanString(current.trang_thai_suc_khoe, 80);
+    const gender = cleanString(body.gender, 80);
+    const lifeStage = cleanString(body.lifeStage, 80);
+    const purpose = cleanString(body.purpose, 120);
+    const herdNotes = cleanString(body.herdNotes, 2000);
+    const origin = cleanString(body.origin, 120);
+    const birthDate = dateOrNull(body.birthDate);
+    const maternityId = cleanString(body.maternityId, 120);
+    const paternityId = cleanString(body.paternityId, 120);
+    const colouring = cleanString(body.colouring, 2000);
+    const reproductiveState = cleanString(body.reproductiveState, 120);
+
+    const groupSnapshot = JSON.stringify({
+      groupId: String(current.id),
+      groupCode: cleanString(current.ma_nhom) ?? String(current.id),
+      groupName,
+      species: cleanString(current.loai_vat_nuoi) ?? "Vật nuôi",
+      breed,
+      gender,
+      lifeStage,
+      healthStatus,
+      purpose,
+      locationId: current.khu_vuc_id ? String(current.khu_vuc_id) : null,
+      origin,
+      birthDate,
+      maternityId,
+      paternityId,
+      primaryIdentification: "Mã QR cá thể",
+      targetLiveWeight: parseNumber(body.targetLiveWeight),
+      targetWeightDate: dateOrNull(body.targetWeightDate),
+    });
+
+    const client = await db.connect();
+    try {
+      await client.query("begin");
+
+      await client.query(
+        `update du_lieu.nhom_vat_nuoi
+            set ten_nhom = $2,
+                mo_ta = $3,
+                giong = $4,
+                gioi_tinh = $5,
+                giai_doan_sinh_truong = $6,
+                trang_thai_suc_khoe = $7,
+                muc_dich_san_xuat = $8,
+                ghi_chu_dan = $9,
+                nguon_goc = $10,
+                gia_tri_mua = $11,
+                tai_khoan_chi_phi = $12,
+                ngay_sinh = $13,
+                kieu_thu_thai = $14,
+                trong_luong_so_sinh_kg = $15,
+                ghi_chu_sinh = $16,
+                van_de_suc_khoe = $17,
+                ma_me = $18,
+                ma_bo = $19,
+                mau_long = $20,
+                mau_mat = $21,
+                kieu_tai = $22,
+                kieu_sung = $23,
+                tinh_trang_mieng = $24,
+                diem_the_trang = $25,
+                ghi_chu_dac_diem = $26,
+                trang_thai_sinh_san = $27,
+                kha_nang_sinh_san = $28,
+                tang_trong_binh_quan_ngay = $29,
+                nang_luong_megajoule_ngay = $30,
+                trong_luong_muc_tieu_kg = $31,
+                ngay_can_muc_tieu = $32,
+                updated_at = now()
+          where id = $1`,
+        [
+          current.id,
+          groupName,
+          description,
+          breed,
+          gender,
+          lifeStage,
+          healthStatus,
+          purpose,
+          herdNotes,
+          origin,
+          parseNumber(body.price),
+          cleanString(body.expenseAccount, 120),
+          birthDate,
+          cleanString(body.conceptionType, 120),
+          parseNumber(body.averageBirthWeight),
+          cleanString(body.birthNotes, 2000),
+          cleanString(body.healthIssues, 2000),
+          maternityId,
+          paternityId,
+          colouring,
+          cleanString(body.eyeColor, 80),
+          cleanString(body.earType, 80),
+          cleanString(body.hornType, 80),
+          cleanString(body.mouth, 80),
+          parseNumber(body.bodyConditionScore),
+          cleanString(body.traitNotes, 2000),
+          reproductiveState,
+          cleanString(body.reproductiveAvailability, 120),
+          parseNumber(body.lifetimeAdg),
+          parseNumber(body.lifetimeMjDay),
+          parseNumber(body.targetLiveWeight),
+          dateOrNull(body.targetWeightDate),
+        ]
+      );
+
+      await client.query(
+        `update du_lieu.vat_nuoi
+            set giong = case when giong is null or giong = $3 then $4 else giong end,
+                gioi_tinh = case when gioi_tinh is null or gioi_tinh = $5 then $6 else gioi_tinh end,
+                giai_doan_sinh_truong = case when giai_doan_sinh_truong is null or giai_doan_sinh_truong = $7 then $8 else giai_doan_sinh_truong end,
+                trang_thai = case when trang_thai is null or trang_thai = $9 then $10 else trang_thai end,
+                ngay_sinh = case when ngay_sinh is null or ngay_sinh = $11 then $12 else ngay_sinh end,
+                nguon_goc = case when nguon_goc is null or nguon_goc = $13 then $14 else nguon_goc end,
+                ma_me = case when ma_me is null or ma_me = $15 then $16 else ma_me end,
+                ma_bo = case when ma_bo is null or ma_bo = $17 then $18 else ma_bo end,
+                mau_long = case when mau_long is null or mau_long = $19 then $20 else mau_long end,
+                trang_thai_sinh_san = case when trang_thai_sinh_san is null or trang_thai_sinh_san = $21 then $22 else trang_thai_sinh_san end,
+                metadata_json = jsonb_set(coalesce(metadata_json, '{}'::jsonb), '{groupSnapshot}', $23::jsonb, true),
+                updated_at = now()
+          where nhom_vat_nuoi_id = $1 and trang_trai_id = $2`,
+        [
+          current.id,
+          current.trang_trai_id,
+          cleanString(current.giong, 120),
+          breed,
+          cleanString(current.gioi_tinh, 80),
+          gender,
+          cleanString(current.giai_doan_sinh_truong, 80),
+          lifeStage,
+          cleanString(current.trang_thai_suc_khoe, 80),
+          healthStatus,
+          current.ngay_sinh,
+          birthDate,
+          cleanString(current.nguon_goc, 120),
+          origin,
+          cleanString(current.ma_me, 120),
+          maternityId,
+          cleanString(current.ma_bo, 120),
+          paternityId,
+          cleanString(current.mau_long, 2000),
+          colouring,
+          cleanString(current.trang_thai_sinh_san, 120),
+          reproductiveState,
+          groupSnapshot,
+        ]
+      );
+
+      await client.query("commit");
+      return NextResponse.json({ message: "Đã cập nhật nhóm vật nuôi.", groupId });
+    } catch (error) {
+      await client.query("rollback");
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    return NextResponse.json({ message: "Không thể cập nhật nhóm vật nuôi.", error: String(error) }, { status: 500 });
   }
 }

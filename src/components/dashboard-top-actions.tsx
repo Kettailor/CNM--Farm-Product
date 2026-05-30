@@ -44,7 +44,10 @@ export default function DashboardTopActions() {
           aria-label={action.label}
           title={action.label}
           onClick={() => {
-            if (action.href) router.push(action.href);
+            if (action.href) {
+              window.dispatchEvent(new Event("farm:navigation-loading"));
+              router.push(action.href);
+            }
           }}
         >
           <span className={styles.actionIcon}><ActionIcon id={action.id} /></span>

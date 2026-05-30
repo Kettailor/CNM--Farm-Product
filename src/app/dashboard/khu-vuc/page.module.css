@@ -276,6 +276,110 @@
   min-height: 540px;
 }
 
+.settingsBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  border: 0;
+  background: rgba(15, 23, 42, 0.28);
+  cursor: default;
+}
+
+.settingsDrawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 90;
+  width: min(380px, 100vw);
+  height: 100vh;
+  padding: 20px;
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  background: #ffffff;
+  border-left: 1px solid rgba(17, 24, 39, 0.1);
+  box-shadow: -18px 0 42px rgba(15, 23, 42, 0.16);
+  transform: translateX(100%);
+  transition: transform 180ms ease;
+}
+
+.settingsDrawerOpen {
+  transform: translateX(0);
+}
+
+.settingsPanelHeader,
+.settingsOption {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.settingsPanelHeader h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.settingsClose {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.settingsOption {
+  padding: 16px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+}
+
+.settingsOption strong,
+.settingsMeta {
+  display: block;
+}
+
+.settingsMeta {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.switch {
+  position: relative;
+  width: 52px;
+  height: 30px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  background: #cbd5e1;
+  transition: background 160ms ease;
+}
+
+.switch span {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.2);
+  transition: transform 160ms ease;
+}
+
+.switchActive {
+  background: #2f855a;
+}
+
+.switchActive span {
+  transform: translateX(22px);
+}
+
 @media (max-width: 1200px) {
   .gridCards {
     grid-template-columns: repeat(2, minmax(0, 1fr));

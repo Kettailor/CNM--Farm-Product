@@ -1,10 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import CowLoading from "@/components/cow-loading";
+import ZoneActionMenu from "@/components/dashboard-zone-actions";
 import MapViewSwitcher from "@/components/dashboard-map-view-switcher";
+import { WAREHOUSE_TYPE_OPTIONS, isWarehouseType, type WarehouseType } from "@/lib/warehouse-types";
 import styles from "./page.module.css";
 import type { ZoneDetail } from "@/lib/dashboard-zone-detail";
+import { ZONE_TYPE_FORM_CONFIGS, ZONE_TYPE_INFO, ZONE_TYPE_OPTIONS, type ZoneTypeKey } from "@/lib/zone-type-utils";
 
 type Props = {
   zone: ZoneDetail;
@@ -13,39 +17,27 @@ type Props = {
 
 const ZONE_STATES = ["đang hoạt động", "bản nháp", "ngừng hoạt động", "bảo trì", "đã ngừng", "dự kiến", "hoàn thành", "đã hủy"] as const;
 const MAP_TYPES = ["vệ tinh", "đường", "địa hình"] as const;
-const TYPE_FIELD_TITLES = {
-  cropping: "Thông tin trồng trọt",
-  grazing: "Thông tin chăn thả",
-  hay: "Thông tin cỏ khô",
-  resting: "Thông tin nghỉ đất",
-  nguon_nuoc: "Thông tin nguồn nước",
-  phuong_tien: "Thông tin phương tiện",
-  chan_nuoi: "Thông tin chăn nuôi",
-  dung_cu: "Thông tin dụng cụ",
-  nha_kho: "Thông tin nhà kho",
-} as const;
+type ZoneStateValue = (typeof ZONE_STATES)[number];
 
-
-function inferZoneTypeKey(rawType: string) {
-  const value = rawType.toLowerCase();
-  if (value.includes("grazing") || value.includes("chan tha")) return "grazing";
-  if (value.includes("hay") || value.includes("co kho")) return "hay";
-  if (value.includes("resting") || value.includes("nghi dat")) return "resting";
-  if (value.includes("nguon nuoc") || value.includes("water")) return "nguon_nuoc";
-  if (value.includes("phuong tien") || value.includes("vehicle")) return "phuong_tien";
-  if (value.includes("chan nuoi") || value.includes("vat nuoi") || value.includes("cattle") || value.includes("livestock")) return "chan_nuoi";
-  if (value.includes("dung cu") || value.includes("tool")) return "dung_cu";
-  if (value.includes("nha kho") || value.includes("warehouse")) return "nha_kho";
-  return "cropping";
+function zoneStatusValueFromKey(status: string): ZoneStateValue {
+  if (status === "inactive") return "ngừng hoạt động";
+  if (status === "maintenance") return "bảo trì";
+  if (status === "planned") return "dự kiến";
+  if (status === "cancelled") return "đã hủy";
+  return "đang hoạt động";
 }
 
 export default function EditZoneClient({ zone }: Props) {
   const [loading, setLoading] = useState(false);
+  const savingRef = useRef(false);
   const [error, setError] = useState("");
-  const zoneTypeKey = inferZoneTypeKey(zone.rawType);
+  const [zoneTypeKey, setZoneTypeKey] = useState<ZoneTypeKey>(zone.typeKey);
+  const typeFields = ZONE_TYPE_FORM_CONFIGS[zoneTypeKey].fields;
+  const [typeSpecific, setTypeSpecific] = useState<Record<string, string>>(zone.typeSpecific);
+  const [warehouseTypes, setWarehouseTypes] = useState<WarehouseType[]>(zone.warehouseTypes.filter(isWarehouseType));
   const [form, setForm] = useState({
     name: zone.name,
-    status: zone.status,
+    status: zoneStatusValueFromKey(zone.status),
     description: zone.description,
     color: zone.colorHex,
     latitude: String(zone.center.lat),
@@ -55,11 +47,13 @@ export default function EditZoneClient({ zone }: Props) {
     capacity: zone.capacity,
     mapType: "vệ tinh",
     zoomLevel: "17",
-    notes: zone.details.find((item) => item.label === "Mô tả")?.value || "",
   });
 
   const [points] = useState(zone.polygon);
-  const canSave = form.name.trim().length > 0;
+  const canSave = form.name.trim().length > 0 && (zoneTypeKey !== "storage" || warehouseTypes.length > 0);
+  const toggleWarehouseType = (type: WarehouseType) => {
+    setWarehouseTypes((current) => current.includes(type) ? current.filter((item) => item !== type) : [...current, type]);
+  };
 
   const mapPreview = useMemo(
     () => (
@@ -81,9 +75,14 @@ export default function EditZoneClient({ zone }: Props) {
   );
 
   const onSave = async () => {
+    if (savingRef.current || loading) return;
+    if (!canSave) return setError("Vui lòng nhập đầy đủ thông tin bắt buộc.");
+    savingRef.current = true;
     setLoading(true);
     setError("");
     try {
+      const nextWarehouseTypes = zoneTypeKey === "storage" ? warehouseTypes : [];
+      const capacityValue = typeSpecific.capacity ?? typeSpecific.herdCapacity ?? form.capacity;
       const before = {
         name: zone.name,
         status: zone.statusLabel,
@@ -92,8 +91,8 @@ export default function EditZoneClient({ zone }: Props) {
         areaHa: zone.areaHa,
         perimeterM: zone.perimeterM,
         capacity: zone.capacity,
-        notes: zone.details.find((item) => item.label === "Mô tả")?.value ?? "",
-        zoneTypeKey,
+        typeSpecific: zone.typeSpecific,
+        zoneTypeKey: zone.typeKey,
         polygon: zone.polygon,
       };
       const after = {
@@ -103,8 +102,8 @@ export default function EditZoneClient({ zone }: Props) {
         color: form.color,
         areaHa: form.areaHa,
         perimeterM: form.perimeterM,
-        capacity: form.capacity,
-        notes: form.notes,
+        capacity: capacityValue,
+        typeSpecific: { ...typeSpecific, zoneTypeKey, warehouseTypes: nextWarehouseTypes },
         zoneTypeKey,
         polygon: points,
       };
@@ -120,10 +119,11 @@ export default function EditZoneClient({ zone }: Props) {
           points,
           areaHa: form.areaHa,
           perimeterM: form.perimeterM,
-          capacity: form.capacity,
+          capacity: capacityValue,
           typeSpecific: {
+            ...typeSpecific,
             zoneTypeKey,
-            notes: form.notes,
+            warehouseTypes: nextWarehouseTypes,
           },
           before,
           after,
@@ -131,11 +131,12 @@ export default function EditZoneClient({ zone }: Props) {
       });
       const payload = (await response.json()) as { message?: string };
       if (!response.ok) throw new Error(payload.message || "Không thể lưu khu vực.");
+      window.dispatchEvent(new Event("farm:navigation-loading"));
       window.location.href = `/dashboard/khu-vuc/${zone.id}`;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể lưu khu vực.");
-    } finally {
+      savingRef.current = false;
       setLoading(false);
+      setError(err instanceof Error ? err.message : "Không thể lưu khu vực.");
     }
   };
 
@@ -146,6 +147,7 @@ export default function EditZoneClient({ zone }: Props) {
           <span className={styles.kicker}>Chỉnh sửa khu vực</span>
           <h1>{zone.name}</h1>
         </div>
+        <ZoneActionMenu context="edit" zoneId={zone.id} zoneStatus={zone.status} backHref={`/dashboard/khu-vuc/${zone.id}`} />
       </header>
 
       <div className={styles.body}>
@@ -164,7 +166,7 @@ export default function EditZoneClient({ zone }: Props) {
                   </div>
                   <div className={styles.field}>
                     <label htmlFor="zone-status">Trạng thái</label>
-                    <select id="zone-status" className={styles.select} value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}>
+                    <select id="zone-status" className={styles.select} value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as ZoneStateValue }))}>
                       {ZONE_STATES.map((state) => (
                         <option key={state} value={state}>
                           {state}
@@ -172,6 +174,16 @@ export default function EditZoneClient({ zone }: Props) {
                       ))}
                     </select>
                   </div>
+                </div>
+                <div className={styles.field}>
+                  <label htmlFor="zone-type">Loại khu vực</label>
+                  <select id="zone-type" className={styles.select} value={zoneTypeKey} onChange={(e) => setZoneTypeKey(e.target.value as ZoneTypeKey)}>
+                    {ZONE_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className={styles.field}>
                   <label htmlFor="zone-description">Mô tả</label>
@@ -261,39 +273,53 @@ export default function EditZoneClient({ zone }: Props) {
 
             <section className={styles.sectionBlock}>
               <div className={styles.sectionHeaderSmall}>
-                <h3>{TYPE_FIELD_TITLES[zoneTypeKey]}</h3>
+                <h3>{ZONE_TYPE_INFO[zoneTypeKey].detailTitle}</h3>
                 <p>
                   Tùy theo loại khu vực, biểu mẫu chỉnh sửa sẽ ưu tiên các thông tin phù hợp với cách vận hành thực tế.
                 </p>
               </div>
               <div className={styles.formGrid}>
-                <div className={styles.field}>
-                  <label htmlFor="zone-type-note">Ghi chú theo loại khu vực</label>
-                  <textarea
-                    id="zone-type-note"
-                    className={styles.textarea}
-                    value={form.notes}
-                    onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-                    placeholder="Nhập mô tả chi tiết hơn cho loại khu vực này"
-                  />
+                <div className={styles.twoCols}>
+                  {typeFields.map((field) => (
+                    <div key={field.key} className={styles.field}>
+                      <label htmlFor={`zone-type-${field.key}`}>{field.label}</label>
+                      <input
+                        id={`zone-type-${field.key}`}
+                        className={styles.input}
+                        type={field.type ?? "text"}
+                        step={field.step}
+                        value={typeSpecific[field.key] ?? ""}
+                        onChange={(e) => setTypeSpecific((current) => ({ ...current, [field.key]: e.target.value }))}
+                        placeholder={field.placeholder}
+                      />
+                    </div>
+                  ))}
                 </div>
-                {(zoneTypeKey === "chan_nuoi" || zoneTypeKey === "nha_kho" || zoneTypeKey === "phuong_tien" || zoneTypeKey === "dung_cu") && (
+                {zoneTypeKey === "storage" && (
                   <div className={styles.field}>
-                    <label htmlFor="zone-capacity">Sức chứa / năng lực</label>
-                    <input
-                      id="zone-capacity"
-                      className={styles.input}
-                      value={form.capacity}
-                      onChange={(e) => setForm((p) => ({ ...p, capacity: e.target.value }))}
-                      placeholder="Ví dụ: 120 con, 300 m², 15 tấn..."
-                    />
+                    <label>Nhóm lưu trữ trong kho</label>
+                    <div className={styles.warehouseTypeChecklist}>
+                      {WAREHOUSE_TYPE_OPTIONS.map((option) => (
+                        <label key={option.value} className={styles.warehouseTypeOption}>
+                          <input
+                            type="checkbox"
+                            checked={warehouseTypes.includes(option.value)}
+                            onChange={() => toggleWarehouseType(option.value)}
+                          />
+                          <span>
+                            <strong>{option.shortLabel}</strong>
+                            <small>{option.purpose}</small>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 )}
-                {(zoneTypeKey === "grazing" || zoneTypeKey === "chan_nuoi") && (
+                {(zoneTypeKey === "grazing" || zoneTypeKey === "livestock") && (
                   <div className={styles.typeHint}>
                     <strong>Số liệu liên quan</strong>
                     <span>
-                      Hiện có {zone.metrics.livestockCount} vật nuôi, {zone.metrics.sensorCount} cảm biến và {zone.metrics.noteCount} ghi chú liên quan.
+                      Hiện có {zone.metrics.livestockCount} vật nuôi và {zone.metrics.noteCount} ghi chú liên quan.
                     </span>
                   </div>
                 )}
@@ -346,14 +372,26 @@ export default function EditZoneClient({ zone }: Props) {
 
       <footer className={styles.footer}>
         <div className={styles.buttonBar}>
-          <Link href={`/dashboard/khu-vuc/${zone.id}`} className={styles.secondary}>
+          <Link
+            href={`/dashboard/khu-vuc/${zone.id}`}
+            className={styles.secondary}
+            aria-disabled={loading}
+            onClick={(event) => {
+              if (loading) event.preventDefault();
+            }}
+          >
             Hủy
           </Link>
           <button type="button" className={styles.primary} onClick={onSave} disabled={!canSave || loading}>
-            {loading ? "Đang lưu..." : "Lưu thay đổi"}
+            {loading ? <CowLoading label="Đang tải..." /> : "Lưu thay đổi"}
           </button>
         </div>
       </footer>
+      {loading && (
+        <div className={styles.savingOverlay} aria-live="polite" aria-label="Đang lưu thay đổi khu vực">
+          <CowLoading label="Đang lưu thay đổi..." />
+        </div>
+      )}
     </section>
   );
 }

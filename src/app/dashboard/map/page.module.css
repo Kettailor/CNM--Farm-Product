@@ -1,0 +1,634 @@
+.farmMapPage {
+  display: grid;
+  gap: 16px;
+  color: #26312a;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0 14px;
+}
+
+.titleWrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.titleIcon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #58b800;
+  box-shadow: 0 8px 20px rgba(30, 45, 35, 0.12);
+}
+
+.titleIcon svg,
+.tools svg,
+.summaryLabel svg,
+.dropdown svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.eyebrow {
+  margin: 0 0 2px;
+  color: #6c756d;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.pageHeader h1 {
+  margin: 0;
+  color: #39423c;
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.tools {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.backButton,
+.actionButton {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.backButton {
+  border: 1px solid rgba(31, 122, 74, 0.24);
+  background: #ffffff;
+  color: #1f7a4a;
+}
+
+.actionButton {
+  border: 1px solid #1f7a4a;
+  background: #1f7a4a;
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(31, 122, 74, 0.2);
+}
+
+.backButton:hover,
+.actionButton:hover {
+  transform: translateY(-1px);
+}
+
+.buttonIcon,
+.menuIcon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.buttonIcon {
+  width: 15px;
+  height: 15px;
+}
+
+.buttonIcon svg,
+.menuIcon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chevron {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.actionMenu {
+  position: relative;
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 0;
+  z-index: 80;
+  width: 252px;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.13);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18), 0 2px 10px rgba(15, 23, 42, 0.08);
+}
+
+.dropdownItem {
+  min-height: 40px;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border: 0;
+  background: #ffffff;
+  color: #344054;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dropdownItem:hover {
+  background: #f8fafc;
+}
+
+.menuIcon {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  color: #667085;
+  background: #e5e7eb;
+}
+
+.dropdownItem[data-tone="green"] .menuIcon {
+  color: #1f7a4a;
+  background: #ecfdf3;
+}
+
+.dropdownItem[data-tone="amber"] .menuIcon {
+  color: #b45309;
+  background: #fde68a;
+}
+
+.dropdownItem[data-tone="blue"] .menuIcon {
+  color: #0284c7;
+  background: #bae6fd;
+}
+
+.dropdownItem[data-tone="red"] .menuIcon {
+  color: #ef4444;
+  background: #fee2e2;
+}
+
+.noticeCard,
+.summaryCard,
+.mapCard,
+.tableCard {
+  position: relative;
+  border: 1px solid #e9ede8;
+  border-radius: 7px;
+  background: #ffffff;
+  box-shadow: 0 10px 26px rgba(25, 35, 29, 0.09);
+}
+
+.noticeCard {
+  padding: 16px 38px 18px 14px;
+}
+
+.noticeCard h2 {
+  margin: 0 0 14px;
+  color: #26312a;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.noticeCard h2::before {
+  content: "!";
+  display: inline-grid;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  place-items: center;
+  border-radius: 2px;
+  background: #b7e77f;
+  color: #3f8f00;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.noticeCard p {
+  margin: 0 0 12px;
+  color: #2f3b33;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.noticeCard p:last-child {
+  margin-bottom: 0;
+}
+
+.closeButton {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: #d7deda;
+  color: #ffffff;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.summaryCard {
+  min-height: 92px;
+  padding: 14px;
+  text-align: center;
+}
+
+.summaryLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #26312a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.summaryLabel svg {
+  color: #34403a;
+}
+
+.summaryCard strong {
+  display: block;
+  margin-top: 4px;
+  color: #2f3a34;
+  font-size: 34px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.summaryCard small {
+  color: #717b73;
+  font-size: 11px;
+}
+
+.mapCard {
+  padding: 14px;
+}
+
+.sectionHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.sectionHead h2,
+.tableHeader h2 {
+  margin: 0;
+  color: #555f58;
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.sectionHead p {
+  margin: 3px 0 0;
+  color: #7a847d;
+  font-size: 12px;
+}
+
+.mapCanvas {
+  min-height: 430px;
+  border-radius: 7px;
+}
+
+.mapCard :global(.map-view-switcher) {
+  gap: 8px;
+}
+
+.mapCard :global(.map-view-switcher-footer) {
+  padding: 0 2px;
+  font-size: 11px;
+}
+
+.mapNotes {
+  margin-top: 14px;
+  color: #6b746d;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.mapNotes strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #4f5a53;
+  font-weight: 600;
+}
+
+.mapNotes ol {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.tableCard {
+  padding: 14px;
+}
+
+.tableHeader {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tableTools {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) repeat(3, 128px);
+  gap: 8px;
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  border: 1px solid #dde3df;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 0 10px;
+  color: #7a837d;
+}
+
+.searchBox input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: #303a34;
+  font-size: 12px;
+}
+
+.tableTools select,
+.tableFooter select {
+  min-height: 30px;
+  border: 1px solid #dde3df;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #4e5852;
+  font-size: 12px;
+  padding: 0 10px;
+}
+
+.tableScroller {
+  overflow: auto;
+  border: 1px solid #edf0ed;
+  border-radius: 6px;
+}
+
+.assetTable {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.assetTable th {
+  background: #f0f1f0;
+  color: #29322d;
+  font-weight: 800;
+  text-align: left;
+}
+
+.assetTable th,
+.assetTable td {
+  border-bottom: 1px solid #edf0ed;
+  padding: 10px 14px;
+  vertical-align: middle;
+}
+
+.assetTable td {
+  color: #667069;
+}
+
+.colorDot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 8px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 0 3px rgba(51, 65, 55, 0.12);
+}
+
+.groupRow td {
+  background: #f7faf5;
+  color: #3f8f00;
+  font-weight: 800;
+}
+
+.emptyCell {
+  height: 96px;
+  text-align: center;
+}
+
+.tableFooter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  color: #5b655f;
+  font-size: 12px;
+}
+
+.tableFooter strong {
+  display: grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 4px;
+  background: #58b800;
+  color: #ffffff;
+  font-size: 11px;
+}
+
+.settingsLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+}
+
+.settingsBackdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.48);
+  cursor: default;
+}
+
+.settingsPanel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(100vw, 250px);
+  height: 100%;
+  overflow: auto;
+  background: #f7f7fb;
+  box-shadow: -18px 0 36px rgba(0, 0, 0, 0.18);
+  padding: 12px 0 24px;
+}
+
+.settingsClose {
+  position: absolute;
+  top: 9px;
+  right: 4px;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: #9bdc5d;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.settingsPanel h2 {
+  margin: 0;
+  padding: 0 14px 14px;
+  color: #202820;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.settingSection {
+  display: grid;
+  gap: 7px;
+  padding: 0 14px 18px;
+}
+
+.settingSection h3 {
+  margin: 0 0 2px;
+  color: #202820;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.settingSection p {
+  margin: 2px 0 0;
+  color: #858d86;
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.toggleRow {
+  position: relative;
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #eef0ee;
+  border-radius: 3px;
+  background: #ffffff;
+  padding: 0 4px 0 8px;
+  color: #3f4942;
+  font-size: 12px;
+}
+
+.toggleRow input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggleTrack {
+  position: relative;
+  width: 29px;
+  height: 16px;
+  border-radius: 999px;
+  background: #c6cdc8;
+  transition: background 0.16s ease;
+}
+
+.toggleTrack::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
+  transition: transform 0.16s ease;
+}
+
+.toggleRow input:checked + .toggleTrack {
+  background: #51a800;
+}
+
+.toggleRow input:checked + .toggleTrack::after {
+  transform: translateX(13px);
+}
+
+@media (max-width: 1100px) {
+  .summaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tableTools {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .pageHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tools {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .actionMenu {
+    flex: 1;
+  }
+
+  .backButton,
+  .actionButton {
+    width: 100%;
+  }
+
+  .dropdown {
+    left: 0;
+    right: auto;
+    width: min(100%, 280px);
+  }
+
+  .summaryGrid,
+  .tableTools {
+    grid-template-columns: 1fr;
+  }
+}

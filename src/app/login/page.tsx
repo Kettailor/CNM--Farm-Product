@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import CowLoading from "@/components/cow-loading";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -89,7 +90,7 @@ export default function LoginPage() {
           </div>
 
           <button className="btn btn-primary auth-submit" onClick={onLogin} disabled={loading}>
-            {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+            {loading ? <CowLoading label="Đang tải..." /> : "Đăng nhập"}
           </button>
 
           {error && <p className="error-text auth-error">{error}</p>}

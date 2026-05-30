@@ -1,6 +1,7 @@
 import DashboardShell from "@/components/dashboard-shell";
 import DashboardTopActions from "@/components/dashboard-top-actions";
 import MapViewSwitcher from "@/components/dashboard-map-view-switcher";
+import Link from "next/link";
 import LivestockPageTools from "./livestock-page-tools";
 import { layOwnerIdTuServerCookie } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -15,6 +16,7 @@ type SpeciesIcon = "cow" | "goat" | "sheep" | "pig" | "chicken" | "duck" | "buff
 type AnimalRow = {
   id: string;
   code: string | null;
+  qrCode: string | null;
   identity: string | null;
   status: string | null;
   description: string | null;
@@ -65,6 +67,7 @@ type AlertSummary = {
 
 type AnimalGroup = {
   key: string;
+  href?: string;
   label: string;
   icon: SpeciesIcon;
   color: string;
@@ -129,6 +132,10 @@ function statusLabel(status: string | null) {
   if (normalized.includes("theo doi") || normalized.includes("canh bao") || normalized.includes("benh")) return "Cần chú ý";
   if (normalized.includes("ngung") || normalized.includes("inactive")) return "Ngừng theo dõi";
   return raw;
+}
+
+function searchValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }
 
 function isActiveStatus(status: string | null) {
@@ -261,6 +268,7 @@ function buildAnimalGroups(animals: AnimalRow[] = [], savedGroups: AnimalGroupRo
     const count = group.linkedCount || group.headCount;
     return {
       key: `nhom-${group.id}`,
+      href: `/dashboard/vat-nuoi/${group.id}`,
       label: group.name,
       icon: species.icon,
       color: species.color,
@@ -280,13 +288,13 @@ function buildAnimalGroups(animals: AnimalRow[] = [], savedGroups: AnimalGroupRo
 async function loadLivestockData(farmId: string) {
   await ensureLivestockSchema();
 
-  const [animalRs, groupRs, zoneRs, countRs, alertRs, sensorRs] = await Promise.all([
+  const [animalRs, groupRs, zoneRs, countRs, alertRs] = await Promise.all([
     db.query(
-      `select v.id::text, v.ma_vat_nuoi, v.the_nhan_dien, v.trang_thai, v.mo_ta,
+      `select v.id::text, v.ma_vat_nuoi, v.ma_qr, v.the_nhan_dien, v.trang_thai, v.mo_ta,
               v.nhom_vat_nuoi_id::text,
               v.khu_vuc_id::text, v.created_at, v.updated_at, k.ten_khu_vuc
        from du_lieu.vat_nuoi v
-       left join du_lieu.khu_vuc k on k.id = v.khu_vuc_id
+       left join du_lieu.khu_vuc k on k.id = v.khu_vuc_id and coalesce(lower(k.trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')
        where v.trang_trai_id = $1
        order by v.updated_at desc nulls last, v.created_at desc nulls last, v.id desc`,
       [farmId]
@@ -296,7 +304,7 @@ async function loadLivestockData(farmId: string) {
               n.trang_thai_suc_khoe, n.created_at, n.updated_at, k.ten_khu_vuc,
               (select count(*)::int from du_lieu.vat_nuoi v where v.nhom_vat_nuoi_id = n.id) as linked_count
        from du_lieu.nhom_vat_nuoi n
-       left join du_lieu.khu_vuc k on k.id = n.khu_vuc_id
+       left join du_lieu.khu_vuc k on k.id = n.khu_vuc_id and coalesce(lower(k.trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')
        where n.trang_trai_id = $1
        order by n.updated_at desc nulls last, n.created_at desc nulls last, n.id desc`,
       [farmId]
@@ -309,6 +317,7 @@ async function loadLivestockData(farmId: string) {
               (select d.created_at from du_lieu.dem_dong_vat d where d.khu_vuc_id = k.id order by d.created_at desc limit 1) as latest_count_at
        from du_lieu.khu_vuc k
        where k.trang_trai_id = $1
+         and coalesce(lower(k.trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')
        order by animal_count desc, k.created_at desc nulls last, k.id desc`,
       [farmId]
     ),
@@ -319,12 +328,14 @@ async function loadLivestockData(farmId: string) {
               (select count(*)::int
                from du_lieu.dem_dong_vat d
                join du_lieu.khu_vuc k on k.id = d.khu_vuc_id
-               where k.trang_trai_id = $1) as records
+               where k.trang_trai_id = $1
+                 and coalesce(lower(k.trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')) as records
        from (
          select distinct on (d.khu_vuc_id) d.khu_vuc_id, d.so_luong, d.created_at
          from du_lieu.dem_dong_vat d
          join du_lieu.khu_vuc k on k.id = d.khu_vuc_id
          where k.trang_trai_id = $1
+           and coalesce(lower(k.trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')
          order by d.khu_vuc_id, d.created_at desc
        ) latest`,
       [farmId]
@@ -335,14 +346,11 @@ async function loadLivestockData(farmId: string) {
                 where coalesce(lower(trang_thai), '') not in ('da xu ly', 'đã xử lý', 'closed', 'done', 'resolved')
               )::int as open
        from du_lieu.canh_bao
-       where khu_vuc_id in (select id from du_lieu.khu_vuc where trang_trai_id = $1)`,
-      [farmId]
-    ),
-    db.query(
-      `select count(*) filter (where dang_hoat_dong)::int as active,
-              count(*)::int as total
-       from du_lieu.cam_bien
-       where khu_vuc_id in (select id from du_lieu.khu_vuc where trang_trai_id = $1)`,
+       where khu_vuc_id in (
+         select id from du_lieu.khu_vuc
+         where trang_trai_id = $1
+           and coalesce(lower(trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')
+       )`,
       [farmId]
     ),
   ]);
@@ -350,6 +358,7 @@ async function loadLivestockData(farmId: string) {
   const animals: AnimalRow[] = animalRs.rows.map((row) => ({
     id: String(row.id),
     code: cleanText(row.ma_vat_nuoi),
+    qrCode: cleanText(row.ma_qr),
     identity: cleanText(row.the_nhan_dien),
     status: cleanText(row.trang_thai),
     description: cleanText(row.mo_ta),
@@ -401,12 +410,7 @@ async function loadLivestockData(farmId: string) {
     open: Number(alertRs.rows[0]?.open ?? 0),
   };
 
-  const sensorSummary = {
-    active: Number(sensorRs.rows[0]?.active ?? 0),
-    total: Number(sensorRs.rows[0]?.total ?? 0),
-  };
-
-  return { animals, savedGroups, zones, countSummary, alertSummary, sensorSummary };
+  return { animals, savedGroups, zones, countSummary, alertSummary };
 }
 
 function AnimalIcon({ type }: { type: SpeciesIcon }) {
@@ -493,14 +497,12 @@ function AnimalIcon({ type }: { type: SpeciesIcon }) {
   }
 }
 
-function SmallIcon({ name }: { name: "list" | "map" | "alert" | "sensor" | "count" | "stable" }) {
+function SmallIcon({ name }: { name: "list" | "map" | "alert" | "count" | "stable" }) {
   switch (name) {
     case "map":
       return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 6-2 6 2 6-2v14l-6 2-6-2-6 2V6Z" /><path d="M9 4v14M15 6v14" /></svg>;
     case "alert":
       return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 3 20h18L12 4Z" /><path d="M12 9v5M12 17h.01" /></svg>;
-    case "sensor":
-      return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12a4 4 0 1 0 8 0 4 4 0 0 0-8 0Z" /><path d="M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14" /></svg>;
     case "count":
       return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M7 6v12m10-12v12M5 18h14" /><path d="M9 10h6M9 14h4" /></svg>;
     case "stable":
@@ -510,14 +512,16 @@ function SmallIcon({ name }: { name: "list" | "map" | "alert" | "sensor" | "coun
   }
 }
 
-export default async function VatNuoiPage() {
+export default async function VatNuoiPage({ searchParams }: { searchParams?: { [key: string]: string | string[] | undefined } }) {
   const ownerId = layOwnerIdTuServerCookie();
   if (!ownerId) redirect("/login?next=/dashboard/vat-nuoi");
 
   const data = await getDashboardOverview(ownerId);
   if (!data.farmId) redirect("/register/farm");
+  if (searchValue(searchParams?.["hanh-dong"]) === "dieu-tri") redirect("/dashboard/vat-nuoi/dieu-tri");
+  if (searchValue(searchParams?.["hanh-dong"]) === "ghi-nhan-su-kien") redirect("/dashboard/vat-nuoi/su-kien");
 
-  const { animals, savedGroups, zones, countSummary, alertSummary, sensorSummary } = await loadLivestockData(data.farmId);
+  const { animals, savedGroups, zones, countSummary, alertSummary } = await loadLivestockData(data.farmId);
   const groups = buildAnimalGroups(animals, savedGroups);
   const activeAnimals = animals.filter((animal) => isActiveStatus(animal.status)).length;
   const linkedAnimals = animals.filter((animal) => animal.zoneId).length;
@@ -560,22 +564,6 @@ export default async function VatNuoiPage() {
           </div>
         </section>
 
-        <section className={styles.introPanel}>
-          <div>
-            <p className={styles.eyebrow}>Dữ liệu vận hành</p>
-            <h2>Theo dõi đàn vật nuôi theo nhóm, trạng thái và khu vực thực tế.</h2>
-            <p>
-              Các chỉ số trên trang được đọc từ dữ liệu hiện có của trang trại, gồm hồ sơ vật nuôi,
-              khu vực, bản ghi đếm, cảnh báo và cảm biến.
-            </p>
-          </div>
-          <div className={styles.introMeta}>
-            <span>Cập nhật đếm</span>
-            <strong>{formatDate(countSummary.latestCountedAt)}</strong>
-            <small>{formatNumber(countSummary.records)} bản ghi đếm</small>
-          </div>
-        </section>
-
         <section className={styles.statsGrid} aria-label="Chỉ số vật nuôi">
           {statCards.map((item) => (
             <article key={item.label} className={styles.statCard}>
@@ -599,7 +587,7 @@ export default async function VatNuoiPage() {
           {groups.length > 0 ? (
             <div className={styles.speciesGrid}>
               {groups.map((group) => (
-                <article key={group.key} className={styles.speciesCard} style={accentStyle(group.color)}>
+                <Link key={group.key} href={group.href ?? "/dashboard/vat-nuoi"} className={`${styles.speciesCard} ${styles.speciesCardLink}`} style={accentStyle(group.color)}>
                   <div className={styles.speciesHead}>
                     <span className={styles.speciesIcon}><AnimalIcon type={group.icon} /></span>
                     <div>
@@ -612,7 +600,7 @@ export default async function VatNuoiPage() {
                     <span>{formatNumber(group.activeCount)} đang theo dõi</span>
                     <span>{group.zones.length > 1 ? `${group.zones.length} khu vực` : group.zones[0]}</span>
                   </div>
-                </article>
+                </Link>
               ))}
             </div>
           ) : (
@@ -626,7 +614,6 @@ export default async function VatNuoiPage() {
               <p className={styles.eyebrow}>Bảng quản lý</p>
               <h2>Nhóm vật nuôi đang ghi nhận</h2>
             </div>
-            <div className={styles.panelBadge}>{formatNumber(sensorSummary.active)}/{formatNumber(sensorSummary.total)} cảm biến hoạt động</div>
           </div>
 
           {groups.length > 0 ? (
@@ -646,10 +633,10 @@ export default async function VatNuoiPage() {
                   {groups.map((group) => (
                     <tr key={group.key}>
                       <td>
-                        <span className={styles.tableName} style={accentStyle(group.color)}>
+                        <Link href={group.href ?? "/dashboard/vat-nuoi"} className={styles.tableName} style={accentStyle(group.color)}>
                           <span className={styles.tableDot} />
                           {group.label}
-                        </span>
+                        </Link>
                       </td>
                       <td>{formatNumber(group.count)}</td>
                       <td>{formatNumber(group.activeCount)}</td>

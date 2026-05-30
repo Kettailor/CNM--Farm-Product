@@ -86,8 +86,8 @@ export default function LivestockPageTools({ zones }: { zones: LivestockZoneOpti
   const tools: ToolItem[] = [
     { label: "Trang tổng quan", tone: "neutral", icon: "dashboard", href: "/dashboard/vat-nuoi" },
     { label: "Nhóm mới", tone: "green", icon: "add", onClick: () => setNewGroupOpen(true) },
-    { label: "Điều trị", tone: "amber", icon: "treatment", href: "/dashboard/vat-nuoi?hanh-dong=dieu-tri" },
-    { label: "Ghi nhận sự kiện", tone: "blue", icon: "record", href: "/dashboard/vat-nuoi?hanh-dong=ghi-nhan-su-kien" },
+    { label: "Điều trị", tone: "amber", icon: "treatment", href: "/dashboard/vat-nuoi/dieu-tri" },
+    { label: "Sự kiện", tone: "blue", icon: "record", href: "/dashboard/vat-nuoi/su-kien" },
     { label: "Đặt lại", tone: "sky", icon: "reset", href: "/dashboard/vat-nuoi" },
     { label: "Cài đặt", tone: "sky", icon: "settings", href: "/dashboard/settings" },
   ];
@@ -125,7 +125,10 @@ export default function LivestockPageTools({ zones }: { zones: LivestockZoneOpti
                     tool.onClick();
                     return;
                   }
-                  if (tool.href) router.push(tool.href);
+                  if (tool.href) {
+                    window.dispatchEvent(new Event("farm:navigation-loading"));
+                    router.push(tool.href);
+                  }
                 }}
               >
                 <span className={styles.menuIcon}><ToolIcon name={tool.icon} /></span>
