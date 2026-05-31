@@ -13,7 +13,10 @@
   },
   "dependencies": {
     "@types/maplibre-gl": "^1.13.2",
+    "@zxing/browser": "^0.2.0",
+    "@zxing/library": "^0.22.0",
     "bootstrap": "^5.3.3",
+    "jsqr": "^1.4.0",
     "leaflet": "^1.9.4",
     "maplibre-gl": "^5.24.0",
     "next": "14.2.15",

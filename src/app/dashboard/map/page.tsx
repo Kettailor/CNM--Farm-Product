@@ -1,21 +1,82 @@
-import { db } from "@/lib/db";
-import MapViewSwitcher from "@/components/dashboard-map-view-switcher";
 import DashboardShell from "@/components/dashboard-shell";
 import { layOwnerIdTuServerCookie } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { getZoneTypeInfo, normalizeText } from "@/lib/zone-type-utils";
 import { redirect } from "next/navigation";
+import FarmMapDashboardClient, {
+  type FarmMapAssetRow,
+  type FarmMapObject,
+  type FarmMapStats,
+  type FarmMapZone,
+} from "./farm-map-dashboard-client";
 
 const isHexColor = (value: unknown) => /^#[0-9a-f]{6}$/i.test(String(value ?? "").trim());
-const normalizeText = (v: unknown) => String(v ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const ACTIVE_ZONE_SQL =
+  "coalesce(lower(kv.trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')";
 
-type KhuLoai = "cropping" | "grazing" | "hay" | "resting" | "nguon_nuoc" | "phuong_tien" | "chan_nuoi" | "dung_cu" | "nha_kho";
+type KhuLoai =
+  | "cropping"
+  | "grazing"
+  | "hay"
+  | "resting"
+  | "nguon_nuoc"
+  | "phuong_tien"
+  | "chan_nuoi"
+  | "dung_cu"
+  | "nha_kho";
 
-type KhuVucBanDo = { id: string; ten: string; loai: string; nhom: KhuLoai; mau: string; tom_tat: string; cap_nhat: string; polygon: Array<{ lat: number; lng: number }> };
-type BanDoThongKe = { tai_san: number; cam_bien: number; vat_nuoi: number; khu_vuc: number };
-type FarmMapInfo = { farm_name: string; latitude: number; longitude: number; location_name: string | null };
-type MapObjectRow = { id: string | number; ten_doi_tuong?: string | null; loai_doi_tuong?: string | null; hinh_hoc_geojson?: { lat?: number | string; lng?: number | string; coordinates?: [number, number] | number[]; geo?: { lat?: number | string; lng?: number | string; coordinates?: [number, number] | number[] } } | null };
-type KhuVucRow = { id: string | number; ten_khu_vuc?: string | null; crop_type?: string | null; status?: string | null; created_at?: string | Date | null; hinh_hoc_geojson?: { metadata?: { areaType?: string; usage?: string; notes?: string; farmType?: string; areaColor?: string; area_color?: string }; geo?: { polygon?: Array<{ lat?: number | string; lng?: number | string }> } } | null };
+type FarmMapInfo = {
+  farm_name: string;
+  latitude: number;
+  longitude: number;
+  location_name: string | null;
+};
 
-const mauMacDinhTheoLoai: Record<KhuLoai, string> = {
+type MapObjectRow = {
+  id: string | number;
+  ten_doi_tuong?: string | null;
+  loai_doi_tuong?: string | null;
+  hinh_hoc_geojson?: {
+    lat?: number | string;
+    lng?: number | string;
+    coordinates?: [number, number] | number[];
+    geo?: {
+      lat?: number | string;
+      lng?: number | string;
+      coordinates?: [number, number] | number[];
+    };
+  } | null;
+};
+
+type KhuVucRow = {
+  id: string | number;
+  ten_khu_vuc?: string | null;
+  crop_type?: string | null;
+  status?: string | null;
+  created_at?: string | Date | null;
+  hinh_hoc_geojson?: {
+    metadata?: {
+      kind?: string;
+      areaType?: string;
+      usage?: string;
+      notes?: string;
+      farmType?: string;
+      areaColor?: string;
+      area_color?: string;
+      warehouseTypes?: unknown;
+      storageGroups?: unknown;
+      extra?: {
+        warehouseTypes?: unknown;
+      };
+    };
+    geo?: {
+      polygon?: Array<{ lat?: number | string; lng?: number | string }>;
+    };
+  } | null;
+};
+type KhuVucMetadata = NonNullable<NonNullable<KhuVucRow["hinh_hoc_geojson"]>["metadata"]>;
+
+const defaultColorByType: Record<KhuLoai, string> = {
   cropping: "#2e7d32",
   grazing: "#43a047",
   hay: "#c48a00",
@@ -27,17 +88,65 @@ const mauMacDinhTheoLoai: Record<KhuLoai, string> = {
   nha_kho: "#6d4c41",
 };
 
+const typeLabelByKey: Record<KhuLoai, string> = {
+  cropping: "Trồng trọt",
+  grazing: "Chăn thả",
+  hay: "Cỏ khô",
+  resting: "Nghỉ đất",
+  nguon_nuoc: "Nguồn nước",
+  phuong_tien: "Phương tiện",
+  chan_nuoi: "Chăn nuôi",
+  dung_cu: "Dụng cụ",
+  nha_kho: "Nhà kho",
+};
+
 const detectAreaType = (raw: string): KhuLoai => {
   if (raw.includes("cropping") || raw.includes("trong trot") || raw.includes("cay trong")) return "cropping";
-  if (raw.includes("grazing") || raw.includes("chan tha")) return "grazing";
+  if (raw.includes("grazing") || raw.includes("pasture") || raw.includes("dong co") || raw.includes("chan tha")) return "grazing";
   if (raw.includes("hay") || raw.includes("co kho")) return "hay";
   if (raw.includes("resting") || raw.includes("nghi dat")) return "resting";
   if (raw.includes("nguon nuoc") || raw.includes("water")) return "nguon_nuoc";
-  if (raw.includes("phuong tien") || raw.includes("vehicle")) return "phuong_tien";
+  if (raw.includes("parking") || raw.includes("bai do xe") || raw.includes("phuong tien") || raw.includes("vehicle")) return "phuong_tien";
   if (raw.includes("chan nuoi") || raw.includes("vat nuoi") || raw.includes("cattle") || raw.includes("livestock")) return "chan_nuoi";
   if (raw.includes("dung cu") || raw.includes("tool")) return "dung_cu";
-  if (raw.includes("nha kho") || raw.includes("warehouse")) return "nha_kho";
+  if (raw.includes("storage") || raw.includes("nha kho") || raw.includes("warehouse") || raw.includes("kho")) return "nha_kho";
   return "cropping";
+};
+
+const warehouseTypesFromMetadata = (metadata?: KhuVucMetadata) =>
+  metadata?.warehouseTypes ?? metadata?.storageGroups ?? metadata?.extra?.warehouseTypes;
+
+const displayTypeLabel = (kind: KhuLoai, canonicalLabel: string) =>
+  kind === "hay" || kind === "resting" || kind === "dung_cu" || kind === "nha_kho" || kind === "phuong_tien"
+    ? typeLabelByKey[kind]
+    : canonicalLabel;
+
+const isInternalTypeText = (value: unknown) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return false;
+  const normalized = normalizeText(raw);
+  return [
+    "parking",
+    "storage",
+    "cropping",
+    "crop",
+    "livestock",
+    "cattle",
+    "grazing",
+    "pasture",
+    "water",
+    "warehouse",
+    "vehicle",
+    "tool",
+    "hay",
+    "resting",
+  ].includes(normalized);
+};
+
+const displayTypeFromRaw = (rawType: unknown, kind: KhuLoai, canonicalLabel: string) => {
+  const raw = String(rawType ?? "").trim();
+  if (raw && !isInternalTypeText(raw)) return raw;
+  return displayTypeLabel(kind, canonicalLabel);
 };
 
 async function getLatestFarmMap(ownerId: string): Promise<FarmMapInfo | null> {
@@ -57,146 +166,195 @@ async function getLatestFarmMap(ownerId: string): Promise<FarmMapInfo | null> {
   }
 }
 
-async function getBanDoThongKe(ownerId: string): Promise<BanDoThongKe> {
+async function getFarmMapStats(ownerId: string): Promise<FarmMapStats> {
   try {
-    const [taiSanRs, camBienRs, vatNuoiRs, khuVucRs] = await Promise.all([
-      db.query(`select count(*)::int as c from du_lieu.tai_san_rao ts join du_lieu.trang_trai t on t.id = ts.trang_trai_id where t.chu_so_huu_id = $1`, [ownerId]),
-      db.query(`select count(*)::int as c from du_lieu.doi_tuong_ban_do dt join du_lieu.trang_trai t on t.id = dt.trang_trai_id where t.chu_so_huu_id = $1 and dt.loai_doi_tuong = 'sensor'`, [ownerId]),
-      db.query(`select count(*)::int as c from du_lieu.vat_nuoi vn join du_lieu.trang_trai t on t.id = vn.trang_trai_id where t.chu_so_huu_id = $1`, [ownerId]),
-      db.query(`select count(*)::int as c from du_lieu.khu_vuc kv join du_lieu.trang_trai t on t.id = kv.trang_trai_id where t.chu_so_huu_id = $1`, [ownerId]),
+    const [employeeRows, livestockRows, zoneRows, grazingPlanRows] = await Promise.all([
+      db.query(
+        `select count(*)::int as c
+         from du_lieu.thanh_vien_trang_trai tv
+         join du_lieu.trang_trai t on t.id = tv.trang_trai_id
+         where t.chu_so_huu_id = $1
+           and coalesce(lower(tv.trang_thai), '') not in ('inactive', 'da_huy', 'da huy', 'đã hủy', 'cancelled')`,
+        [ownerId]
+      ),
+      db.query(
+        `select count(*)::int as c
+         from du_lieu.vat_nuoi vn
+         join du_lieu.trang_trai t on t.id = vn.trang_trai_id
+         where t.chu_so_huu_id = $1`,
+        [ownerId]
+      ),
+      db.query(
+        `select count(*)::int as c
+         from du_lieu.khu_vuc kv
+         join du_lieu.trang_trai t on t.id = kv.trang_trai_id
+         where t.chu_so_huu_id = $1 and ${ACTIVE_ZONE_SQL}`,
+        [ownerId]
+      ),
+      db.query(
+        `select count(*)::int as c
+         from du_lieu.ke_hoach_chan_tha kh
+         join du_lieu.trang_trai t on t.id = kh.trang_trai_id
+         where t.chu_so_huu_id = $1
+           and coalesce(lower(kh.trang_thai), '') not in ('cancelled', 'da_huy', 'da huy', 'đã hủy')`,
+        [ownerId]
+      ),
     ]);
-    return { tai_san: taiSanRs.rows[0]?.c ?? 0, cam_bien: camBienRs.rows[0]?.c ?? 0, vat_nuoi: vatNuoiRs.rows[0]?.c ?? 0, khu_vuc: khuVucRs.rows[0]?.c ?? 0 };
+
+    return {
+      employees: employeeRows.rows[0]?.c ?? 0,
+      livestock: livestockRows.rows[0]?.c ?? 0,
+      paddocks: zoneRows.rows[0]?.c ?? 0,
+      grazingPlans: grazingPlanRows.rows[0]?.c ?? 0,
+    };
   } catch {
-    return { tai_san: 0, cam_bien: 0, vat_nuoi: 0, khu_vuc: 0 };
+    return { employees: 0, livestock: 0, paddocks: 0, grazingPlans: 0 };
   }
 }
 
-async function getMapObjects(ownerId: string) {
+async function getMapObjects(ownerId: string): Promise<{ mapObjects: FarmMapObject[]; rows: FarmMapAssetRow[] }> {
   try {
-    const rs = await db.query(
-      `select dt.id, dt.ten_doi_tuong, dt.loai_doi_tuong, dt.hinh_hoc_geojson, dt.metadata_json
+    const result = await db.query(
+      `select dt.id, dt.ten_doi_tuong, dt.loai_doi_tuong, dt.hinh_hoc_geojson
        from du_lieu.doi_tuong_ban_do dt
        join du_lieu.trang_trai t on t.id = dt.trang_trai_id
        where t.chu_so_huu_id = $1
+         and coalesce(dt.loai_doi_tuong, '') <> 'sensor'
        order by dt.created_at desc
        limit 200`,
       [ownerId]
     );
-    return rs.rows.flatMap((r: MapObjectRow) => {
-      const geo = r.hinh_hoc_geojson ?? {};
-      const point = Array.isArray(geo.coordinates) ? geo.coordinates : Array.isArray(geo.geo?.coordinates) ? geo.geo.coordinates : null;
-      const lat = Number(geo.lat ?? geo.geo?.lat ?? point?.[1] ?? NaN);
-      const lng = Number(geo.lng ?? geo.geo?.lng ?? point?.[0] ?? NaN);
-      const isPoint = Number.isFinite(lat) && Number.isFinite(lng);
-      return isPoint
-        ? [{ id: String(r.id), label: String(r.ten_doi_tuong ?? r.loai_doi_tuong), color: "#2563eb", kind: String(r.loai_doi_tuong), geometry: { type: "Point" as const, coordinates: [lng, lat] as [number, number] } }]
-        : [];
-    });
+
+    const rows = result.rows as MapObjectRow[];
+    return {
+      mapObjects: rows.flatMap((row) => {
+        const geo = row.hinh_hoc_geojson ?? {};
+        const point = Array.isArray(geo.coordinates)
+          ? geo.coordinates
+          : Array.isArray(geo.geo?.coordinates)
+            ? geo.geo.coordinates
+            : null;
+        const lat = Number(geo.lat ?? geo.geo?.lat ?? point?.[1] ?? NaN);
+        const lng = Number(geo.lng ?? geo.geo?.lng ?? point?.[0] ?? NaN);
+
+        return Number.isFinite(lat) && Number.isFinite(lng)
+          ? [
+              {
+                id: String(row.id),
+                label: String(row.ten_doi_tuong ?? row.loai_doi_tuong ?? "Đối tượng"),
+                color: "#2563eb",
+                kind: String(row.loai_doi_tuong ?? "doi_tuong_ban_do"),
+                geometry: { type: "Point" as const, coordinates: [lng, lat] as [number, number] },
+              },
+            ]
+          : [];
+      }),
+      rows: rows.map((row) => ({
+        id: String(row.id),
+        farm: "Trang trại",
+        name: row.ten_doi_tuong ?? "Đối tượng chưa đặt tên",
+        category: "Tài sản",
+        type: row.loai_doi_tuong ?? "Đối tượng bản đồ",
+        description: "Đối tượng được ghi nhận trên bản đồ trang trại.",
+        color: "#2563eb",
+      })),
+    };
   } catch {
-    return [];
+    return { mapObjects: [], rows: [] };
   }
 }
 
-async function getDanhSachKhuVuc(ownerId: string): Promise<KhuVucBanDo[]> {
+async function getZones(ownerId: string): Promise<{ zones: FarmMapZone[]; rows: FarmMapAssetRow[] }> {
   try {
-    const rs = await db.query(
-      `select kv.id, kv.ten_khu_vuc as name, loai.ten as crop_type, kv.trang_thai as status, kv.created_at, kv.hinh_hoc_geojson
+    const result = await db.query(
+      `select kv.id, kv.ten_khu_vuc, coalesce(kv.loai_khu_vuc, loai.ten) as crop_type, kv.trang_thai as status, kv.created_at, kv.hinh_hoc_geojson
        from du_lieu.khu_vuc kv
        join du_lieu.trang_trai t on t.id = kv.trang_trai_id
        left join du_lieu.danh_muc_loai_khu_vuc loai on loai.id = kv.loai_khu_vuc_id
        where t.chu_so_huu_id = $1
+         and ${ACTIVE_ZONE_SQL}
        order by kv.created_at desc
        limit 100`,
       [ownerId]
     );
-    return rs.rows.map((r: KhuVucRow) => {
-      const b = r.hinh_hoc_geojson ?? {};
-      const rawType = normalizeText(b?.metadata?.areaType);
-      const kindText = normalizeText([r.crop_type, b?.metadata?.usage, b?.metadata?.notes, b?.metadata?.farmType].join(" "));
-      const nhom: KhuLoai = rawType ? detectAreaType(rawType) : detectAreaType(kindText);
-      const mau = isHexColor(b?.metadata?.areaColor ?? b?.metadata?.area_color) ? String(b?.metadata?.areaColor ?? b?.metadata?.area_color) : mauMacDinhTheoLoai[nhom];
-      const polygon = Array.isArray(b?.geo?.polygon) ? b.geo.polygon.filter((p): p is { lat?: number | string; lng?: number | string } => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng))).map((p) => ({ lat: Number(p.lat), lng: Number(p.lng) })) : [];
-      return { id: String(r.id), ten: r.ten_khu_vuc ?? "Khu vực chưa đặt tên", loai: r.crop_type ?? "Chưa phân loại", nhom, mau, polygon, tom_tat: r.status ? `Trạng thái: ${r.status}` : "Chưa có trạng thái", cap_nhat: r.created_at ? new Date(r.created_at).toLocaleString("vi-VN") : "-" };
+
+    const rows = (result.rows as KhuVucRow[]).map((row) => {
+      const geoJson = row.hinh_hoc_geojson ?? {};
+      const rawType = normalizeText(geoJson.metadata?.areaType);
+      const kindText = normalizeText(
+        [row.crop_type, geoJson.metadata?.kind, geoJson.metadata?.usage, geoJson.metadata?.notes, geoJson.metadata?.farmType].join(" ")
+      );
+      const kind = rawType ? detectAreaType(rawType) : detectAreaType(kindText);
+      const typeInfo = getZoneTypeInfo(
+        row.crop_type ?? geoJson.metadata?.kind ?? geoJson.metadata?.areaType ?? geoJson.metadata?.usage ?? kind,
+        warehouseTypesFromMetadata(geoJson.metadata)
+      );
+      const typeLabel = displayTypeFromRaw(row.crop_type ?? geoJson.metadata?.areaType ?? geoJson.metadata?.kind ?? geoJson.metadata?.usage, kind, typeInfo.label);
+      const color = isHexColor(geoJson.metadata?.areaColor ?? geoJson.metadata?.area_color)
+        ? String(geoJson.metadata?.areaColor ?? geoJson.metadata?.area_color)
+        : defaultColorByType[kind];
+      const polygon = Array.isArray(geoJson.geo?.polygon)
+        ? geoJson.geo.polygon
+            .filter((point): point is { lat?: number | string; lng?: number | string } => Number.isFinite(Number(point?.lat)) && Number.isFinite(Number(point?.lng)))
+            .map((point) => ({ lat: Number(point.lat), lng: Number(point.lng) }))
+        : [];
+
+      return {
+        id: String(row.id),
+        name: row.ten_khu_vuc ?? "Khu vực chưa đặt tên",
+        type: typeLabel,
+        status: row.status ?? "Chưa có trạng thái",
+        updatedAt: row.created_at ? new Date(row.created_at).toLocaleString("vi-VN") : "-",
+        kind,
+        color,
+        polygon,
+      };
     });
+
+    return {
+      zones: rows,
+      rows: rows.map((row) => ({
+        id: row.id,
+        farm: "Trang trại",
+        name: row.name,
+        category: row.kind === "grazing" ? "Chăn nuôi" : "Khu vực",
+        type: row.type,
+        description: `${row.status}. Cập nhật: ${row.updatedAt}`,
+        color: row.color,
+      })),
+    };
   } catch {
-    return [];
+    return { zones: [], rows: [] };
   }
 }
 
-export default async function DashboardMapPage({ searchParams }: { searchParams?: { layer?: string } }) {
+export default async function DashboardMapPage() {
   const ownerId = layOwnerIdTuServerCookie();
   if (!ownerId) redirect("/login?next=/dashboard/map");
 
-  const mapData = await getLatestFarmMap(ownerId);
-  const [thongKe, khuVuc, mapObjects] = ownerId ? await Promise.all([getBanDoThongKe(ownerId), getDanhSachKhuVuc(ownerId), getMapObjects(ownerId)]) : [{ tai_san: 0, cam_bien: 0, vat_nuoi: 0, khu_vuc: 0 }, [], []];
+  const [mapData, stats, zoneData, objectData] = await Promise.all([
+    getLatestFarmMap(ownerId),
+    getFarmMapStats(ownerId),
+    getZones(ownerId),
+    getMapObjects(ownerId),
+  ]);
+
   const farmName = mapData?.farm_name || "Trang trại";
   const lat = mapData?.latitude ?? 10.762622;
   const lng = mapData?.longitude ?? 106.660172;
-  const layer = searchParams?.layer ?? "all";
-  const activeLayer: "all" | KhuLoai = ["all", "cropping", "grazing", "hay", "resting", "nguon_nuoc", "phuong_tien", "chan_nuoi", "dung_cu", "nha_kho"].includes(layer ?? "") ? (layer as "all" | KhuLoai) : "all";
-  const filteredKhuVuc = activeLayer === "all" ? khuVuc : khuVuc.filter((item) => item.nhom === activeLayer);
-  const zoneOverlays = filteredKhuVuc.filter((item) => item.polygon.length >= 3).map((item) => ({ id: item.id, label: item.ten, color: item.mau, polygon: item.polygon, kind: item.nhom }));
-  const filters = [
-    ["all", "Tất cả khu vực"], ["cropping", "Trồng trọt"], ["grazing", "Chăn thả"], ["hay", "Cỏ khô"], ["resting", "Nghỉ đất"], ["nguon_nuoc", "Nguồn nước"], ["phuong_tien", "Phương tiện"], ["chan_nuoi", "Chăn nuôi"], ["dung_cu", "Dụng cụ"], ["nha_kho", "Nhà kho"],
-  ] as const;
 
   return (
     <DashboardShell farmName={farmName} activePath="/dashboard/map">
-      <div className="page-shell" style={{ padding: 0 }}>
-        <section className="card" style={{ padding: 24, display: "grid", gap: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "end" }}>
-            <div>
-              <p className="kicker">Bản đồ vận hành</p>
-              <h1 className="section-title">Tổ chức lại bản đồ thành một màn hình điều hành rõ ràng.</h1>
-              <p className="section-subtitle">Dữ liệu khu vực, lớp lọc và các chỉ số đã được gom vào một bố cục thống nhất để dễ đọc, dễ thao tác hơn.</p>
-            </div>
-            <a href="/dashboard/khu-vuc" className="btn btn-secondary">Quản lý khu vực</a>
-          </div>
-
-          <section className="grid-4">
-            <article className="card" style={{ padding: 18 }}><span className="muted">Tài sản</span><strong>{thongKe.tai_san}</strong></article>
-            <article className="card" style={{ padding: 18 }}><span className="muted">Cảm biến</span><strong>{thongKe.cam_bien}</strong></article>
-            <article className="card" style={{ padding: 18 }}><span className="muted">Vật nuôi</span><strong>{thongKe.vat_nuoi}</strong></article>
-            <article className="card" style={{ padding: 18 }}><span className="muted">Khu vực</span><strong>{thongKe.khu_vuc}</strong></article>
-          </section>
-
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {filters.map(([value, label]) => (
-              <a key={value} href={`/dashboard/map?layer=${value}`} className={`btn ${activeLayer === value ? "btn-primary" : "btn-secondary"}`}>
-                {label}
-              </a>
-            ))}
-            <span className="muted" style={{ alignSelf: "center", marginLeft: "auto" }}>{mapData?.location_name || `${lat}, ${lng}`}</span>
-          </div>
-
-          <div className="card" style={{ padding: 16 }}>
-            <MapViewSwitcher
-              lat={lat}
-              lng={lng}
-              zoom={17}
-              title="Bản đồ khu vực trang trại"
-              frameClassName="farm-map-canvas"
-              zones={zoneOverlays}
-              objects={mapObjects}
-              fitToPolygon={zoneOverlays.length > 0 || mapObjects.length > 0}
-            />
-          </div>
-        </section>
-
-        <section className="card" style={{ marginTop: 18, padding: 24 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
-            <div>
-              <h2 className="section-title" style={{ fontSize: 24 }}>Danh sách khu vực</h2>
-              <p className="section-subtitle" style={{ marginTop: 6 }}>Đồng bộ theo dữ liệu hiện tại trong hệ thống.</p>
-            </div>
-          </div>
-          <div style={{ display: "grid", gap: 12 }}>
-            <div className="grid-4 muted" style={{ fontSize: 13, fontWeight: 700 }}><span>Tên khu vực</span><span>Loại</span><span>Tóm tắt</span><span>Cập nhật</span></div>
-            {filteredKhuVuc.map((item) => <div key={item.id} className="card" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12, padding: 16, alignItems: "center", borderLeft: `4px solid ${item.mau}` }}><span>{item.ten}</span><span>{item.loai}</span><span className="muted">{item.tom_tat}</span><span className="muted">{item.cap_nhat}</span></div>)}
-            {filteredKhuVuc.length === 0 && <p className="muted">Chưa có dữ liệu cho bộ lọc hiện tại.</p>}
-          </div>
-        </section>
-      </div>
+      <FarmMapDashboardClient
+        farmName={farmName}
+        locationName={mapData?.location_name || `${lat}, ${lng}`}
+        lat={lat}
+        lng={lng}
+        stats={stats}
+        zones={zoneData.zones}
+        objects={objectData.mapObjects}
+        assetRows={[...zoneData.rows, ...objectData.rows]}
+      />
     </DashboardShell>
   );
 }

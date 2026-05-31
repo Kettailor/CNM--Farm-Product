@@ -11,7 +11,6 @@ export type DashboardOverview = {
   ownerName: string | null;
   metrics: {
     assets: number;
-    sensors: number;
     livestock: number;
     zones: number;
     waterSources: number;
@@ -25,6 +24,7 @@ export type DashboardOverview = {
 };
 
 const DEFAULT_COORD = { latitude: 10.762622, longitude: 106.660172 };
+const ACTIVE_ZONE_SQL = "coalesce(lower(trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')";
 
 const ZERO_OVERVIEW: DashboardOverview = {
   farmId: null,
@@ -35,7 +35,7 @@ const ZERO_OVERVIEW: DashboardOverview = {
   isMapShared: false,
   createdAt: null,
   ownerName: null,
-  metrics: { assets: 0, sensors: 0, livestock: 0, zones: 0, waterSources: 0 },
+  metrics: { assets: 0, livestock: 0, zones: 0, waterSources: 0 },
   latestZones: [],
 };
 
@@ -63,16 +63,26 @@ async function loadDuLieuOverview(ownerId: string): Promise<DashboardOverview> {
 
   if (!farm?.id) return ZERO_OVERVIEW;
 
-  const [assets, sensors, livestock, zones, waterSources, latestZones] = await Promise.all([
+  const [assets, livestock, zones, waterSources, latestZones] = await Promise.all([
     getCount("du_lieu.tai_san_rao", "where trang_trai_id = $1", [farm.id]),
-    getCount("du_lieu.cam_bien", "where khu_vuc_id in (select id from du_lieu.khu_vuc where trang_trai_id = $1)", [farm.id]),
     getCount("du_lieu.vat_nuoi", "where trang_trai_id = $1", [farm.id]),
-    getCount("du_lieu.khu_vuc", "where trang_trai_id = $1", [farm.id]),
-    getCount("du_lieu.nguon_nuoc", "where trang_trai_id = $1", [farm.id]),
+    getCount("du_lieu.khu_vuc", `where trang_trai_id = $1 and ${ACTIVE_ZONE_SQL}`, [farm.id]),
+    getCount(
+      "du_lieu.khu_vuc",
+      `where trang_trai_id = $1
+         and ${ACTIVE_ZONE_SQL}
+         and (
+           lower(coalesce(loai_khu_vuc, '')) in ('water', 'nguon_nuoc')
+           or lower(coalesce(hinh_hoc_geojson->'metadata'->>'kind', '')) in ('water', 'nguon_nuoc')
+           or lower(coalesce(hinh_hoc_geojson->'metadata'->>'areaType', '')) in ('water', 'nguon_nuoc')
+         )`,
+      [farm.id]
+    ),
     db.query(
       `select id, ten_khu_vuc as name, trang_thai as status, coalesce(dien_tich_ha, 0)::float8 as area_ha
        from du_lieu.khu_vuc
        where trang_trai_id = $1
+         and ${ACTIVE_ZONE_SQL}
        order by created_at desc nulls last, id desc
        limit 8`,
       [farm.id]
@@ -88,7 +98,7 @@ async function loadDuLieuOverview(ownerId: string): Promise<DashboardOverview> {
     isMapShared: Boolean(farm.is_map_shared),
     createdAt: farm.created_at ? new Date(farm.created_at).toISOString() : null,
     ownerName: farm.owner_name ?? null,
-    metrics: { assets, sensors, livestock, zones, waterSources },
+    metrics: { assets, livestock, zones, waterSources },
     latestZones: latestZones.rows.map((row) => ({
       id: String(row.id),
       name: String(row.name ?? "Khu vực chưa đặt tên"),

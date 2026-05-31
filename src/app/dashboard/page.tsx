@@ -37,7 +37,6 @@ export default async function DashboardPage() {
               <div className={styles.heroStat}><span>Tài sản</span><strong>{formatNumber(data.metrics.assets || 0)}</strong></div>
               <div className={styles.heroStat}><span>Thiết bị di động</span><strong>0</strong></div>
               <div className={styles.heroStat}><span>Khu vực</span><strong>{formatNumber(data.metrics.zones || 0)}</strong></div>
-              <div className={styles.heroStat}><span>Cảm biến</span><strong>{formatNumber(data.metrics.sensors || 0)}</strong></div>
             </div>
           </div>
 
@@ -96,29 +95,6 @@ export default async function DashboardPage() {
             </div>
           </article>
 
-          <article className={styles.moduleCard}>
-            <div className={styles.moduleHead}>
-              <div className={styles.moduleIcon}>◌</div>
-              <div><h3>Cảm biến</h3></div>
-            </div>
-            <div className={styles.moduleBody}>
-              <div className={styles.moduleRow}><span className={styles.moduleDot} /><span>Tổng số</span><strong>{formatNumber(data.metrics.sensors || 0)}</strong></div>
-              <div className={styles.moduleRow}><span className={styles.moduleDot} /><span>Hoạt động</span><strong>{formatNumber(data.metrics.sensors || 0)}</strong></div>
-              <div className={styles.moduleRow}><span className={styles.moduleDot} /><span>Cảnh báo</span><strong>0</strong></div>
-            </div>
-          </article>
-
-          <article className={styles.moduleCard}>
-            <div className={styles.moduleHead}>
-              <div className={styles.moduleIcon}>◌</div>
-              <div><h3>Nguồn nước</h3></div>
-            </div>
-            <div className={styles.moduleBody}>
-              <div className={styles.moduleRow}><span className={styles.moduleDot} /><span>Tổng số</span><strong>{formatNumber(data.metrics.waterSources || 0)}</strong></div>
-              <div className={styles.moduleRow}><span className={styles.moduleDot} /><span>Đang hoạt động</span><strong>{formatNumber(data.metrics.waterSources || 0)}</strong></div>
-              <div className={styles.moduleRow}><span className={styles.moduleDot} /><span>Thiếu dữ liệu</span><strong>0</strong></div>
-            </div>
-          </article>
         </section>
 
         <section className={styles.bottomGrid}>
@@ -135,7 +111,6 @@ export default async function DashboardPage() {
             <h3>Trạng thái hệ thống</h3>
             <div className={styles.tinyList}>
               <div className={styles.tinyRow}><span>Tài sản</span><strong>{formatNumber(data.metrics.assets || 0)}</strong></div>
-              <div className={styles.tinyRow}><span>Cảm biến</span><strong>{formatNumber(data.metrics.sensors || 0)}</strong></div>
               <div className={styles.tinyRow}><span>Khu vực</span><strong>{formatNumber(data.metrics.zones || 0)}</strong></div>
               <div className={styles.tinyRow}><span>Nguồn nước</span><strong>{formatNumber(data.metrics.waterSources || 0)}</strong></div>
             </div>

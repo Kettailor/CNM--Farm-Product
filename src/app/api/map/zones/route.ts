@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { layOwnerIdTuServerCookie } from "@/lib/auth";
+import { getZoneTypeInfo, normalizeText, type ZoneTypeKey } from "@/lib/zone-type-utils";
 
 type ZonePayload = {
   id?: string;
@@ -19,6 +20,8 @@ type ZonePayload = {
   };
   metadata: {
     areaHecta: number;
+    kind?: string;
+    areaType?: string;
     usage: string;
     soilType: string;
     waterSource: string;
@@ -35,6 +38,11 @@ type ZonePayload = {
     NDWI?: number;
     SAVI?: number;
     NDSI?: number;
+    warehouseTypes?: unknown;
+    storageGroups?: unknown;
+    extra?: {
+      warehouseTypes?: unknown;
+    };
   };
   resources: Array<{ id: string; type: string; name: string; status: string; lastSeen: string; quantity: number }>;
 };
@@ -64,6 +72,8 @@ type ZoneRow = {
       occupancy?: number | string;
       coverage?: string;
       areaHecta?: number | string;
+      kind?: string;
+      areaType?: string;
       usage?: string;
       soilType?: string;
       waterSource?: string;
@@ -74,15 +84,41 @@ type ZoneRow = {
       farmType?: ZonePayload["metadata"]["farmType"];
       shapeRatio?: number | string;
       rotationDeg?: number | string;
+      warehouseTypes?: unknown;
+      storageGroups?: unknown;
+      extra?: {
+        warehouseTypes?: unknown;
+      };
     };
     resources?: ZonePayload["resources"];
   } | null;
+};
+
+const zoneKindForDb = (value: unknown): ZoneTypeKey | null => {
+  const raw = normalizeText(value);
+  if (raw.includes("parking") || raw.includes("bai do xe") || raw.includes("phuong tien") || raw.includes("vehicle")) return "parking";
+  if (raw.includes("storage") || raw.includes("warehouse") || raw.includes("nha kho") || raw.includes("kho") || raw.includes("dung cu") || raw.includes("cong cu") || raw.includes("tool")) return "storage";
+  if (raw.includes("livestock") || raw.includes("chan nuoi") || raw.includes("vat nuoi") || raw.includes("cattle")) return "livestock";
+  if (raw.includes("pasture") || raw.includes("grazing") || raw.includes("dong co") || raw.includes("chan tha") || raw.includes("hay") || raw.includes("co kho")) return "grazing";
+  if (raw.includes("water") || raw.includes("nguon nuoc") || raw.includes("nguon_nuoc")) return "water";
+  if (raw.includes("cropping") || raw.includes("crop") || raw.includes("trong trot") || raw.includes("cay trong") || raw.includes("resting") || raw.includes("nghi dat")) return "cropping";
+  return null;
+};
+
+const warehouseTypesFromMetadata = (metadata?: NonNullable<ZoneRow["hinh_hoc_geojson"]>["metadata"]) =>
+  metadata?.warehouseTypes ?? metadata?.storageGroups ?? metadata?.extra?.warehouseTypes;
+
+const zoneTypeLabel = (metadata: NonNullable<ZoneRow["hinh_hoc_geojson"]>["metadata"] | undefined, dbType: unknown) => {
+  const raw = dbType ?? metadata?.kind ?? metadata?.areaType ?? metadata?.usage ?? metadata?.farmType;
+  const kind = zoneKindForDb(raw);
+  return kind ? getZoneTypeInfo(kind, warehouseTypesFromMetadata(metadata)).label : String(raw ?? "");
 };
 
 const toZone = (row: ZoneRow) => {
   const b = row.hinh_hoc_geojson ?? {};
   const dbStatus = String(row.trang_thai ?? "").toLowerCase();
   const geo = b.geo ?? {};
+  const usageLabel = zoneTypeLabel(b.metadata, row.loai_khu_vuc);
   const polygon = Array.isArray(geo.polygon)
     ? geo.polygon
         .filter((p): p is GeoPoint => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng)))
@@ -112,7 +148,7 @@ const toZone = (row: ZoneRow) => {
     },
     metadata: {
       areaHecta: Number(row.dien_tich_ha ?? b.metadata?.areaHecta ?? 1),
-      usage: String(b.metadata?.usage ?? row.loai_khu_vuc ?? ""),
+      usage: usageLabel,
       soilType: String(b.metadata?.soilType ?? ""),
       waterSource: String(b.metadata?.waterSource ?? ""),
       manager: String(b.metadata?.manager ?? ""),
@@ -149,7 +185,10 @@ export async function GET() {
     const farmId = await getOwnerFarmId();
     if (!farmId) return NextResponse.json({ zones: [] });
 
-    const rs = await db.query("select * from du_lieu.khu_vuc where trang_trai_id = $1 order by created_at asc", [farmId]);
+    const rs = await db.query(
+      "select * from du_lieu.khu_vuc where trang_trai_id = $1 and coalesce(lower(trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled') order by created_at asc",
+      [farmId]
+    );
     return NextResponse.json({ zones: rs.rows.map(toZone) });
   } catch (error) {
     return NextResponse.json({ message: "Không thể kết nối dữ liệu map từ PostgreSQL.", error: String(error) }, { status: 500 });
@@ -173,9 +212,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: `Tên ô "${zone.name}" đã tồn tại. Vui lòng đặt tên khác.` }, { status: 409 });
     }
 
-    const q = `insert into du_lieu.khu_vuc(trang_trai_id,ma_khu_vuc,ten_khu_vuc,dien_tich_ha,mo_ta,mau_sac,hinh_hoc_geojson,trang_thai)
-               values($1,$2,$3,$4,$5,$6,$7,$8) returning *`;
-    const vals = [farmId, zone.code, zone.name, zone.metadata.areaHecta, zone.metadata.notes || zone.metadata.usage || null, null, { geo: zone.geo, metadata: zone.metadata, resources: zone.resources }, zone.status === "cancelled" ? "inactive" : (zone.status === "critical" ? "maintenance" : zone.status === "warning" ? "draft" : "active")];
+    const zoneKind = zoneKindForDb(zone.metadata.usage ?? zone.metadata.farmType);
+    const boundary = {
+      geo: zone.geo,
+      metadata: { ...zone.metadata, kind: zoneKind ?? zone.metadata.kind },
+      resources: zone.resources,
+    };
+    const q = `insert into du_lieu.khu_vuc(trang_trai_id,ma_khu_vuc,ten_khu_vuc,dien_tich_ha,mo_ta,mau_sac,hinh_hoc_geojson,trang_thai,loai_khu_vuc)
+               values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`;
+    const vals = [farmId, zone.code, zone.name, zone.metadata.areaHecta, zone.metadata.notes || zone.metadata.usage || null, null, boundary, zone.status === "cancelled" ? "inactive" : (zone.status === "critical" ? "maintenance" : zone.status === "warning" ? "draft" : "active"), zoneKind];
 
     const rs = await db.query(q, vals);
     return NextResponse.json({ zone: toZone(rs.rows[0] as ZoneRow) });
@@ -193,11 +238,17 @@ export async function PUT(request: NextRequest) {
   const farmId = await getOwnerFarmId();
   if (!farmId) return NextResponse.json({ message: "Không tìm thấy trang trại của tài khoản hiện tại." }, { status: 404 });
 
+  const zoneKind = zoneKindForDb(zone.metadata.usage ?? zone.metadata.farmType);
+  const boundary = {
+    geo: zone.geo,
+    metadata: { ...zone.metadata, kind: zoneKind ?? zone.metadata.kind },
+    resources: zone.resources,
+  };
   const q = `update du_lieu.khu_vuc
-             set ten_khu_vuc=$3, dien_tich_ha=$4, mo_ta=$5, hinh_hoc_geojson=$6, trang_thai=$7
+             set ten_khu_vuc=$3, dien_tich_ha=$4, mo_ta=$5, hinh_hoc_geojson=$6, trang_thai=$7, loai_khu_vuc=coalesce($8::text, loai_khu_vuc)
              where id=$1 and trang_trai_id=$2
              returning *`;
-  const vals = [zone.id, farmId, zone.name, zone.metadata.areaHecta, zone.metadata.notes || zone.metadata.usage || null, { geo: zone.geo, metadata: zone.metadata, resources: zone.resources }, zone.status === "cancelled" ? "inactive" : (zone.status === "critical" ? "maintenance" : zone.status === "warning" ? "draft" : "active")];
+  const vals = [zone.id, farmId, zone.name, zone.metadata.areaHecta, zone.metadata.notes || zone.metadata.usage || null, boundary, zone.status === "cancelled" ? "inactive" : (zone.status === "critical" ? "maintenance" : zone.status === "warning" ? "draft" : "active"), zoneKind];
   const rs = await db.query(q, vals);
   return NextResponse.json({ zone: rs.rows[0] ? toZone(rs.rows[0]) : null });
 }

@@ -199,8 +199,11 @@
   position: absolute;
   left: 14%;
   top: 22%;
-  font-size: clamp(40px, 6vw, 72px);
+  width: clamp(52px, 7vw, 92px);
+  height: clamp(52px, 7vw, 92px);
+  object-fit: contain;
   animation: farm-bob 2.2s ease-in-out infinite;
+  filter: drop-shadow(0 18px 22px rgba(0,0,0,0.18));
 }
 
 .farm-404-panel, .farm-error-panel, .farm-loading-panel {
@@ -343,6 +346,59 @@ body { min-height: 100vh; }
 
 a { color: inherit; text-decoration: none; }
 button, input, textarea { font: inherit; }
+
+.cow-loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1;
+}
+
+.cow-loading img {
+  display: block;
+  width: 1.35em;
+  height: 1.35em;
+  object-fit: contain;
+  animation: cow-loading-trot 0.82s ease-in-out infinite;
+  filter: drop-shadow(0 4px 8px rgba(16, 32, 22, 0.16));
+}
+
+.cow-loading-sm { font-size: 14px; }
+.cow-loading-md { font-size: 16px; }
+.cow-loading-lg { font-size: 18px; }
+
+.cow-loading-overlay {
+  min-width: 210px;
+  padding: 16px 20px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--text);
+  font-weight: 800;
+  border: 1px solid rgba(16, 32, 22, 0.1);
+  box-shadow: 0 22px 70px rgba(16, 32, 22, 0.2);
+}
+
+.cow-loading-overlay img {
+  width: 38px;
+  height: 38px;
+}
+
+.cow-loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  background: rgba(238, 244, 240, 0.58);
+  backdrop-filter: blur(4px);
+}
+
+@keyframes cow-loading-trot {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  35% { transform: translateY(-4px) rotate(3deg); }
+  65% { transform: translateY(1px) rotate(-1deg); }
+}
 
 .card {
   background: var(--surface);

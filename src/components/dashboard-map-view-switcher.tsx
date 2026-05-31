@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import maplibregl, { type LngLatLike, type Map as MapLibreMap, type NavigationControl, type StyleSpecification } from "maplibre-gl";
+import CowLoading from "./cow-loading";
 import MapDrawOverlay from "./dashboard-map-draw-overlay";
 import {
   toolbarButtonStyle,
@@ -262,7 +263,7 @@ export default function MapViewSwitcher({ lat, lng, zoom = 16, title, initialMod
         <div ref={hostRef} aria-label={title} className={`${frameClassName ?? ""} maplibre-map-host`} />
         <MapDrawOverlay mapRef={mapRef} active={activeTool === "add"} />
         {frameOverlay}
-        {isLoading && <div className="map-eco-loading">Đang tải bản đồ...</div>}
+        {isLoading && <div className="map-eco-loading"><CowLoading label="Đang tải..." /></div>}
         {!hideEcoNote && <div className="map-view-switcher-note">Hiển thị lớp nền nhanh, hỗ trợ vệ tinh, địa hình, thảm thực vật và thao tác trực quan hơn.</div>}
       </div>
       <div className="map-view-switcher-footer"><span>{formatLngLat(lat, lng)}</span><span>Kéo để di chuyển bản đồ · Bấm icon để bật/tắt ghim điểm</span></div>

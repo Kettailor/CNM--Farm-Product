@@ -1,20 +1,13 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import CowLoading from "@/components/cow-loading";
 import styles from "./new-group-wizard.module.css";
 
 export type LivestockZoneOption = {
   id: string;
   name: string;
-};
-
-type TagItem = {
-  id: string;
-  type: string;
-  label: string;
-  color: string;
-  location: string;
 };
 
 type FormState = {
@@ -48,7 +41,6 @@ type FormState = {
   bodyConditionScore: string;
   traitNotes: string;
   primaryIdentification: string;
-  tags: TagItem[];
   reproductiveState: string;
   reproductiveAvailability: string;
   lifetimeAdg: string;
@@ -70,8 +62,6 @@ type SpeciesProfile = {
   earTypes: string[];
   hornTypes: string[];
   mouths: string[];
-  tagTypes: string[];
-  tagLocations: string[];
   defaults: Pick<
     FormState,
     | "breed"
@@ -111,11 +101,9 @@ const speciesProfiles: SpeciesProfile[] = [
     origins: ["Sinh tại trang trại", "Mua nhập đàn", "Chuyển từ nhóm khác"],
     conceptionTypes: ["Phối giống tự nhiên", "Thụ tinh nhân tạo", "Không áp dụng"],
     eyeColors: ["Nâu", "Đen", "Hổ phách"],
-    earTypes: ["Bình thường", "Tai cụp", "Có thẻ tai"],
+    earTypes: ["Bình thường", "Tai cụp", "Cần theo dõi"],
     hornTypes: ["Không sừng", "Có sừng", "Cắt sừng"],
     mouths: ["Bình thường", "Cần kiểm tra răng", "Tổn thương nhẹ"],
-    tagTypes: ["RFID", "Thẻ tai trực quan", "Vòng cổ", "Số quản lý"],
-    tagLocations: ["Tai trái", "Tai phải", "Cổ", "Hồ sơ nhóm"],
     defaults: {
       breed: "Bò lai Sind",
       headCount: "10",
@@ -134,7 +122,7 @@ const speciesProfiles: SpeciesProfile[] = [
       hornType: "Không sừng",
       mouth: "Bình thường",
       bodyConditionScore: "3",
-      primaryIdentification: "RFID",
+      primaryIdentification: "Mã QR cá thể",
       reproductiveState: "Chưa xác định",
       reproductiveAvailability: "Chưa xác định",
       lifetimeAdg: "0,75",
@@ -152,11 +140,9 @@ const speciesProfiles: SpeciesProfile[] = [
     origins: ["Sinh tại trang trại", "Mua nhập đàn", "Chuyển từ nhóm khác"],
     conceptionTypes: ["Phối giống tự nhiên", "Thụ tinh nhân tạo", "Không áp dụng"],
     eyeColors: ["Đen", "Nâu"],
-    earTypes: ["Bình thường", "Tai cụp", "Có thẻ tai"],
+    earTypes: ["Bình thường", "Tai cụp", "Cần theo dõi"],
     hornTypes: ["Có sừng", "Cắt sừng"],
     mouths: ["Bình thường", "Cần kiểm tra răng"],
-    tagTypes: ["RFID", "Thẻ tai trực quan", "Vòng cổ", "Số quản lý"],
-    tagLocations: ["Tai trái", "Tai phải", "Cổ", "Hồ sơ nhóm"],
     defaults: {
       breed: "Trâu nội",
       headCount: "8",
@@ -175,7 +161,7 @@ const speciesProfiles: SpeciesProfile[] = [
       hornType: "Có sừng",
       mouth: "Bình thường",
       bodyConditionScore: "3",
-      primaryIdentification: "RFID",
+      primaryIdentification: "Mã QR cá thể",
       reproductiveState: "Chưa xác định",
       reproductiveAvailability: "Chưa xác định",
       lifetimeAdg: "0,65",
@@ -196,8 +182,6 @@ const speciesProfiles: SpeciesProfile[] = [
     earTypes: ["Bình thường", "Tai dài", "Tai cụp"],
     hornTypes: ["Có sừng", "Không sừng"],
     mouths: ["Bình thường", "Cần kiểm tra răng"],
-    tagTypes: ["Thẻ tai trực quan", "Số quản lý", "Vòng cổ"],
-    tagLocations: ["Tai trái", "Tai phải", "Cổ", "Hồ sơ nhóm"],
     defaults: {
       breed: "Bách Thảo",
       headCount: "15",
@@ -216,7 +200,7 @@ const speciesProfiles: SpeciesProfile[] = [
       hornType: "Có sừng",
       mouth: "Bình thường",
       bodyConditionScore: "3",
-      primaryIdentification: "Thẻ tai trực quan",
+      primaryIdentification: "Mã QR cá thể",
       reproductiveState: "Chưa xác định",
       reproductiveAvailability: "Chưa xác định",
       lifetimeAdg: "0,16",
@@ -234,11 +218,9 @@ const speciesProfiles: SpeciesProfile[] = [
     origins: ["Sinh tại trang trại", "Mua nhập đàn", "Chuyển từ nhóm khác"],
     conceptionTypes: ["Phối giống tự nhiên", "Thụ tinh nhân tạo", "Không áp dụng"],
     eyeColors: ["Nâu", "Đen"],
-    earTypes: ["Bình thường", "Tai cụp", "Có thẻ tai"],
+    earTypes: ["Bình thường", "Tai cụp", "Cần theo dõi"],
     hornTypes: ["Không sừng", "Có sừng"],
     mouths: ["Bình thường", "Cần kiểm tra răng"],
-    tagTypes: ["Thẻ tai trực quan", "RFID", "Số quản lý"],
-    tagLocations: ["Tai trái", "Tai phải", "Hồ sơ nhóm"],
     defaults: {
       breed: "Dorper",
       headCount: "12",
@@ -257,7 +239,7 @@ const speciesProfiles: SpeciesProfile[] = [
       hornType: "Không sừng",
       mouth: "Bình thường",
       bodyConditionScore: "3",
-      primaryIdentification: "Thẻ tai trực quan",
+      primaryIdentification: "Mã QR cá thể",
       reproductiveState: "Chưa xác định",
       reproductiveAvailability: "Chưa xác định",
       lifetimeAdg: "0,22",
@@ -278,8 +260,6 @@ const speciesProfiles: SpeciesProfile[] = [
     earTypes: ["Tai đứng", "Tai cụp", "Bình thường"],
     hornTypes: ["Không áp dụng"],
     mouths: ["Bình thường", "Cần kiểm tra răng"],
-    tagTypes: ["Số tai", "RFID", "Mã đàn", "Số quản lý"],
-    tagLocations: ["Tai trái", "Tai phải", "Hồ sơ nhóm"],
     defaults: {
       breed: "Landrace",
       headCount: "20",
@@ -298,7 +278,7 @@ const speciesProfiles: SpeciesProfile[] = [
       hornType: "Không áp dụng",
       mouth: "Bình thường",
       bodyConditionScore: "3",
-      primaryIdentification: "Số tai",
+      primaryIdentification: "Mã QR cá thể",
       reproductiveState: "Chưa xác định",
       reproductiveAvailability: "Chưa xác định",
       lifetimeAdg: "0,70",
@@ -319,8 +299,6 @@ const speciesProfiles: SpeciesProfile[] = [
     earTypes: ["Không áp dụng"],
     hornTypes: ["Không áp dụng"],
     mouths: ["Bình thường", "Cần kiểm tra mỏ"],
-    tagTypes: ["Vòng chân", "Mã đàn", "Số quản lý"],
-    tagLocations: ["Chân trái", "Chân phải", "Hồ sơ nhóm"],
     defaults: {
       breed: "Gà ta",
       headCount: "50",
@@ -339,7 +317,7 @@ const speciesProfiles: SpeciesProfile[] = [
       hornType: "Không áp dụng",
       mouth: "Bình thường",
       bodyConditionScore: "3",
-      primaryIdentification: "Mã đàn",
+      primaryIdentification: "Mã QR cá thể",
       reproductiveState: "Chưa xác định",
       reproductiveAvailability: "Chưa xác định",
       lifetimeAdg: "0,045",
@@ -360,8 +338,6 @@ const speciesProfiles: SpeciesProfile[] = [
     earTypes: ["Không áp dụng"],
     hornTypes: ["Không áp dụng"],
     mouths: ["Bình thường", "Cần kiểm tra mỏ"],
-    tagTypes: ["Vòng chân", "Mã đàn", "Số quản lý"],
-    tagLocations: ["Chân trái", "Chân phải", "Hồ sơ nhóm"],
     defaults: {
       breed: "Vịt cỏ",
       headCount: "40",
@@ -380,7 +356,7 @@ const speciesProfiles: SpeciesProfile[] = [
       hornType: "Không áp dụng",
       mouth: "Bình thường",
       bodyConditionScore: "3",
-      primaryIdentification: "Mã đàn",
+      primaryIdentification: "Mã QR cá thể",
       reproductiveState: "Chưa xác định",
       reproductiveAvailability: "Chưa xác định",
       lifetimeAdg: "0,055",
@@ -401,8 +377,6 @@ const speciesProfiles: SpeciesProfile[] = [
     earTypes: ["Không áp dụng"],
     hornTypes: ["Không áp dụng"],
     mouths: ["Bình thường", "Cần kiểm tra"],
-    tagTypes: ["Mã lô ao", "PIT tag", "Số quản lý"],
-    tagLocations: ["Hồ sơ nhóm", "Ao nuôi", "Bể nuôi"],
     defaults: {
       breed: "Cá rô phi",
       headCount: "200",
@@ -421,7 +395,7 @@ const speciesProfiles: SpeciesProfile[] = [
       hornType: "Không áp dụng",
       mouth: "Bình thường",
       bodyConditionScore: "3",
-      primaryIdentification: "Mã lô ao",
+      primaryIdentification: "Mã QR cá thể",
       reproductiveState: "Chưa xác định",
       reproductiveAvailability: "Chưa xác định",
       lifetimeAdg: "0,018",
@@ -467,10 +441,10 @@ const steps = [
   },
   {
     key: "identification",
-    title: "Nhận diện",
+    title: "Mã QR",
     icon: "id",
-    desc: "Thông tin nhận diện chính và các thẻ quản lý.",
-    items: ["Nhận diện chính", "Danh sách thẻ"],
+    desc: "Hệ thống tự cấp mã QR riêng cho từng cá thể trong nhóm.",
+    items: ["Mã QR cá thể", "Quản lý QR-only", "Xuất PDF để in"],
   },
   {
     key: "production",
@@ -483,6 +457,109 @@ const steps = [
 
 const stepKeys = steps.map((step) => step.key);
 
+type SpeciesVisualKey = "cow" | "buffalo" | "goat" | "sheep" | "pig" | "chicken" | "duck" | "fish" | "other";
+type SpeciesVisual = { icon: SpeciesVisualKey; color: string; background: string };
+
+const speciesVisuals: Record<string, SpeciesVisual> = {
+  Bò: { icon: "cow", color: "#8a5a34", background: "linear-gradient(135deg, #fff7ed, #fed7aa)" },
+  Trâu: { icon: "buffalo", color: "#475569", background: "linear-gradient(135deg, #f8fafc, #cbd5e1)" },
+  Dê: { icon: "goat", color: "#0f766e", background: "linear-gradient(135deg, #ecfdf5, #99f6e4)" },
+  Cừu: { icon: "sheep", color: "#64748b", background: "linear-gradient(135deg, #f8fafc, #e2e8f0)" },
+  Heo: { icon: "pig", color: "#db2777", background: "linear-gradient(135deg, #fdf2f8, #fbcfe8)" },
+  Gà: { icon: "chicken", color: "#d97706", background: "linear-gradient(135deg, #fffbeb, #fde68a)" },
+  Vịt: { icon: "duck", color: "#0284c7", background: "linear-gradient(135deg, #ecfeff, #bae6fd)" },
+  Cá: { icon: "fish", color: "#2563eb", background: "linear-gradient(135deg, #eff6ff, #bfdbfe)" },
+};
+
+function getSpeciesVisual(species: string): SpeciesVisual {
+  return speciesVisuals[species] ?? { icon: "other", color: "#64748b", background: "linear-gradient(135deg, #f8fafc, #e5e7eb)" };
+}
+
+function speciesVisualStyle(visual: SpeciesVisual): CSSProperties {
+  return {
+    "--species-color": visual.color,
+    "--species-bg": visual.background,
+  } as CSSProperties;
+}
+
+function SpeciesGlyph({ type }: { type: SpeciesVisualKey }) {
+  switch (type) {
+    case "cow":
+    case "buffalo":
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M11 28c0-6 5-10 11-10h20c6 0 11 4 11 10v8c0 7-6 12-13 12H24c-7 0-13-5-13-12v-8Z" />
+          <path d="M17 23 9 17m38 6 8-6M24 18l-3-7m19 7 3-7M27 39c3 2 7 2 10 0M21 47v7m22-7v7" />
+          <circle cx="25" cy="32" r="2.4" />
+          <circle cx="39" cy="32" r="2.4" />
+        </svg>
+      );
+    case "goat":
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M18 29c3-8 9-12 17-12s13 4 16 12l-3 6c-2 4-6 7-11 7h-5c-5 0-9-3-11-7l-3-6Z" />
+          <path d="m22 22-6-8m31 8 6-8M28 39c3 2 9 2 12 0M22 45v8m22-8v8" />
+          <circle cx="28" cy="31" r="2.2" />
+          <circle cx="40" cy="31" r="2.2" />
+        </svg>
+      );
+    case "sheep":
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M18 29a9 9 0 0 1 9-9h10a9 9 0 0 1 9 9v7a9 9 0 0 1-9 9H27a9 9 0 0 1-9-9v-7Z" />
+          <path d="M20 25c-3-4-3-8 1-11m23 11c3-4 3-8-1-11M27 38c3 2 7 2 10 0M24 46v8m16-8v8" />
+          <circle cx="26" cy="31" r="2.3" />
+          <circle cx="38" cy="31" r="2.3" />
+        </svg>
+      );
+    case "pig":
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M14 31c0-7 6-13 13-13h10c7 0 13 6 13 13v4c0 7-6 13-13 13H27c-7 0-13-6-13-13v-4Z" />
+          <path d="m22 22-5-7m25 7 5-7M23 47v7m18-7v7" />
+          <ellipse cx="32" cy="38" rx="6" ry="4" />
+          <circle cx="27" cy="32" r="2.2" />
+          <circle cx="37" cy="32" r="2.2" />
+        </svg>
+      );
+    case "chicken":
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M22 30c0-8 6-14 14-14 7 0 13 5 13 12 0 4-2 8-5 10l-4 3H29c-4 0-7-3-7-7v-4Z" />
+          <path d="m30 16 3-6 3 6m4 1 5-4m-19 4-5-4M28 45v8m10-8v8" />
+          <path d="m42 30 8 3-8 4Z" />
+          <circle cx="35" cy="29" r="2.1" />
+        </svg>
+      );
+    case "duck":
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M18 35c0-6 5-11 11-11h7c7 0 13 6 13 13v2c0 7-6 13-13 13h-7c-6 0-11-5-11-11v-6Z" />
+          <path d="M36 25c3-4 7-6 11-6M24 47v7m12-7v7" />
+          <path d="M44 34h9l-4 5h-7Z" />
+          <circle cx="31" cy="31" r="2.2" />
+        </svg>
+      );
+    case "fish":
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M12 33c8-10 22-14 36-4l6-6v20l-6-6c-14 10-28 6-36-4Z" />
+          <path d="M37 27c-3 4-3 8 0 12" />
+          <circle cx="24" cy="31" r="2.3" />
+        </svg>
+      );
+    default:
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M14 34c0-8 6-14 14-14h8c8 0 14 6 14 14s-6 14-14 14h-8c-8 0-14-6-14-14Z" />
+          <path d="M28 39c2 1 6 1 8 0M23 48v6m18-6v6" />
+          <circle cx="26" cy="32" r="2.3" />
+          <circle cx="38" cy="32" r="2.3" />
+        </svg>
+      );
+  }
+}
+
 function addMonths(months: number) {
   const date = new Date();
   date.setMonth(date.getMonth() + months);
@@ -491,17 +568,6 @@ function addMonths(months: number) {
 
 function defaultGroupName(profile: SpeciesProfile) {
   return `${profile.groupPrefix} ${new Date().getFullYear()}`;
-}
-
-function makeTag(profile: SpeciesProfile, index = 0): TagItem {
-  const type = profile.tagTypes[index] ?? profile.tagTypes[0] ?? "Số quản lý";
-  return {
-    id: crypto.randomUUID(),
-    type,
-    label: index === 0 ? type : "Thẻ quản lý",
-    color: index === 0 ? "Trắng" : "Khác",
-    location: profile.tagLocations[index] ?? profile.tagLocations[0] ?? "Hồ sơ nhóm",
-  };
 }
 
 function makeInitialForm(defaultLocationId = ""): FormState {
@@ -519,7 +585,6 @@ function makeInitialForm(defaultLocationId = ""): FormState {
     maternityId: "",
     paternityId: "",
     traitNotes: "",
-    tags: [makeTag(profile, 0), makeTag(profile, 1)],
     targetWeightDate: addMonths(18),
     ...profile.defaults,
   };
@@ -610,6 +675,7 @@ export default function NewGroupWizard({
     () => speciesProfiles.find((item) => item.label === form.species) ?? speciesProfiles[0],
     [form.species]
   );
+  const speciesVisual = useMemo(() => getSpeciesVisual(form.species), [form.species]);
   const step = steps[stepIndex];
   const canSave = form.groupName.trim().length > 0 && form.breed.trim().length > 0 && Number(form.headCount) > 0;
 
@@ -627,29 +693,8 @@ export default function NewGroupWizard({
       ...current,
       species: nextProfile.label,
       groupName: nameTouched ? current.groupName : defaultGroupName(nextProfile),
-      tags: [makeTag(nextProfile, 0), makeTag(nextProfile, 1)],
       ...nextProfile.defaults,
     }));
-  };
-
-  const updateTag = (id: string, key: keyof Omit<TagItem, "id">, value: string) => {
-    setForm((current) => ({
-      ...current,
-      tags: current.tags.map((tag) => {
-        if (tag.id !== id) return tag;
-        const updated = { ...tag, [key]: value };
-        if (key === "type" && !tag.label) updated.label = value;
-        return updated;
-      }),
-    }));
-  };
-
-  const addTag = () => {
-    setForm((current) => ({ ...current, tags: [...current.tags, makeTag(profile, current.tags.length)] }));
-  };
-
-  const removeTag = (id: string) => {
-    setForm((current) => ({ ...current, tags: current.tags.filter((tag) => tag.id !== id) }));
   };
 
   const resetAndClose = () => {
@@ -695,7 +740,12 @@ export default function NewGroupWizard({
       <section className={styles.modal}>
         <aside className={styles.sidebar}>
           <div className={styles.photo}>
-            <div className={styles.photoArt} aria-hidden="true" />
+            <div className={styles.photoArt} style={speciesVisualStyle(speciesVisual)} aria-hidden="true">
+              <span className={styles.photoHalo} />
+              <span className={styles.photoIcon}><SpeciesGlyph type={speciesVisual.icon} /></span>
+              <strong>{form.species}</strong>
+              <small>{form.breed}</small>
+            </div>
           </div>
           <nav className={styles.stepNav} aria-label="Các bước thêm nhóm vật nuôi">
             {steps.map((item, index) => (
@@ -735,7 +785,7 @@ export default function NewGroupWizard({
             {step.key === "setup" && (
               <>
                 <p className={styles.helperText}>
-                  Chọn loài vật nuôi trước, hệ thống sẽ tự điền giống, thông số sinh trưởng và thông tin nhận diện phù hợp cho nhóm mới.
+                  Chọn loài vật nuôi trước, hệ thống sẽ tự điền giống, thông số sinh trưởng và chuẩn bị mã QR riêng cho từng cá thể trong nhóm mới.
                 </p>
                 <Field label="Loài vật nuôi">
                   <Select value={form.species} options={speciesProfiles.map((item) => item.label)} onChange={changeSpecies} />
@@ -866,42 +916,23 @@ export default function NewGroupWizard({
             )}
 
             {step.key === "identification" && (
-              <>
-                <Field label="Nhận diện chính" required>
-                  <Select value={form.primaryIdentification} options={profile.tagTypes} onChange={(value) => update("primaryIdentification", value)} />
-                </Field>
-                <div className={styles.tagArea}>
-                  <span className={styles.tagAreaLabel}>Danh sách thẻ</span>
-                  <div className={styles.tagList}>
-                    {form.tags.map((tag) => (
-                      <div key={tag.id} className={styles.tagCard}>
-                        <label>
-                          <span>Loại</span>
-                          <Select value={tag.type} options={profile.tagTypes} onChange={(value) => updateTag(tag.id, "type", value)} />
-                        </label>
-                        <label>
-                          <span>Mã/nhãn</span>
-                          <input value={tag.label} onChange={(event) => updateTag(tag.id, "label", event.target.value)} />
-                        </label>
-                        <label>
-                          <span>Màu sắc</span>
-                          <Select value={tag.color} options={["Trắng", "Vàng", "Đỏ", "Xanh", "Khác"]} onChange={(value) => updateTag(tag.id, "color", value)} />
-                        </label>
-                        <label>
-                          <span>Vị trí</span>
-                          <Select value={tag.location} options={profile.tagLocations} onChange={(value) => updateTag(tag.id, "location", value)} />
-                        </label>
-                        <button type="button" className={styles.deleteTag} onClick={() => removeTag(tag.id)} aria-label="Xóa thẻ">
-                          <Icon name="close" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <button type="button" className={styles.addTag} onClick={addTag}>
-                    + Thêm thẻ
-                  </button>
+              <div className={styles.qrPlan}>
+                <div className={styles.qrPlanIcon}>
+                  <Icon name="id" />
                 </div>
-              </>
+                <div>
+                  <span>Phương thức quản lý</span>
+                  <strong>{form.primaryIdentification}</strong>
+                  <p>
+                    Khi lưu nhóm, hệ thống sẽ tự tạo {Number(form.headCount) > 0 ? form.headCount : "mỗi"} mã QR không trùng trong database,
+                    mỗi cá thể một mã riêng để in và dùng cho các chức năng truy xuất sau này.
+                  </p>
+                </div>
+                <div className={styles.qrStats}>
+                  <span>Số QR sẽ cấp</span>
+                  <strong>{Number(form.headCount) > 0 ? Number(form.headCount).toLocaleString("vi-VN") : 0}</strong>
+                </div>
+              </div>
             )}
 
             {step.key === "production" && (
@@ -950,7 +981,7 @@ export default function NewGroupWizard({
             <div className={styles.actionButtons}>
               <button type="button" className={styles.saveButton} onClick={save} disabled={!canSave || saving}>
                 <Icon name="save" />
-                {saving ? "Đang lưu..." : "Lưu"}
+                {saving ? <CowLoading label="Đang tải..." /> : "Lưu"}
               </button>
               <button type="button" className={styles.cancelButton} onClick={resetAndClose} disabled={saving}>
                 <Icon name="close" />

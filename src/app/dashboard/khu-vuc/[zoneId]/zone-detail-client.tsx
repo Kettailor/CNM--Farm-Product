@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import ZoneActionMenu from "@/components/dashboard-zone-actions";
 import MapViewSwitcher from "@/components/map-view-switcher";
 import type { ZoneDetail } from "@/lib/dashboard-zone-detail";
 import type { VegetationIndexSeries } from "@/lib/zone-vegetation";
@@ -33,6 +33,15 @@ const chartColors: Record<string, string> = {
 const CHART_WIDTH = 900;
 const CHART_HEIGHT = 320;
 const CHART_PADDING = 34;
+
+function isCancelledStatus(value: string | null | undefined) {
+  const normalized = String(value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d");
+  return normalized.includes("huy") || normalized.includes("cancel");
+}
 
 function scalePoints(values: number[], min: number, max: number) {
   const span = max - min || 1;
@@ -112,6 +121,7 @@ export default function ZoneDetailClient({ zone, vegetation: initialVegetation }
 
   const mapPolygon = zone.polygon;
   const chartTitle = useMemo(() => "Biểu đồ nhiều đường theo thời gian", []);
+  const isCancelled = isCancelledStatus(`${zone.status} ${zone.statusLabel}`);
 
   return (
     <>
@@ -120,7 +130,7 @@ export default function ZoneDetailClient({ zone, vegetation: initialVegetation }
           <p className={styles.kicker}>Quản lý khu vực</p>
           <div className={styles.heroTitleRow}>
             <h1>{zone.name}</h1>
-            <span className={`${styles.statusBadge} ${styles.statusActive}`}>{zone.statusLabel}</span>
+            <span className={`${styles.statusBadge} ${isCancelled ? styles.statusMuted : styles.statusActive}`}>{zone.statusLabel}</span>
           </div>
           <p className={styles.heroSub}>{zone.description}</p>
           <div className={styles.heroMeta}>
@@ -130,8 +140,7 @@ export default function ZoneDetailClient({ zone, vegetation: initialVegetation }
           </div>
         </div>
         <div className={styles.heroActions}>
-          <Link href="/dashboard/khu-vuc" className={styles.secondaryButton}>Quay lại</Link>
-          <Link href={`/dashboard/khu-vuc/${zone.id}/chinh-sua`} className={styles.primaryButton}>Chỉnh sửa</Link>
+          <ZoneActionMenu context="detail" zoneId={zone.id} zoneStatus={zone.status} backHref="/dashboard/khu-vuc" />
         </div>
       </section>
 
@@ -165,6 +174,7 @@ export default function ZoneDetailClient({ zone, vegetation: initialVegetation }
         </article>
       </section>
 
+      {zone.isVegetationRelevant && (
       <section className={styles.card}>
         <div className={styles.sectionHeader}>
           <div>
@@ -190,12 +200,13 @@ export default function ZoneDetailClient({ zone, vegetation: initialVegetation }
           </div>
         </div>
       </section>
+      )}
 
       <section className={styles.card}>
         <div className={styles.sectionHeader}>
           <div>
             <p className={styles.kicker}>Thông tin liên quan</p>
-            <h2>Vật nuôi và cảm biến gắn với khu vực</h2>
+            <h2>Vật nuôi gắn với khu vực</h2>
           </div>
         </div>
         <div className={styles.linkedGrid}>
@@ -203,12 +214,6 @@ export default function ZoneDetailClient({ zone, vegetation: initialVegetation }
             <h3>Vật nuôi</h3>
             <div className={styles.scrollList}>
               {zone.livestock.map((item) => item.label || item.value ? <div key={item.label} className={styles.listRow}><strong>{item.label}</strong><span>{item.value}</span></div> : null)}
-            </div>
-          </div>
-          <div className={styles.linkedPanel}>
-            <h3>Cảm biến</h3>
-            <div className={styles.scrollList}>
-              {zone.sensors.map((item) => item.label || item.value ? <div key={item.label} className={styles.listRow}><strong>{item.label}</strong><span>{item.value}</span></div> : null)}
             </div>
           </div>
         </div>

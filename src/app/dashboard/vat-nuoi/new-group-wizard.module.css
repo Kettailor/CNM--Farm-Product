@@ -11,6 +11,8 @@
 .modal {
   width: min(1280px, calc(100vw - 32px));
   height: min(720px, calc(100vh - 32px));
+  max-height: calc(100vh - 32px);
+  min-height: 0;
   display: grid;
   grid-template-columns: 210px minmax(0, 1fr);
   overflow: hidden;
@@ -19,27 +21,99 @@
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.34);
 }
 
+.modal,
+.modal * {
+  box-sizing: border-box;
+}
+
 .sidebar {
   display: grid;
-  grid-template-rows: 178px auto 1fr;
+  grid-template-rows: 172px auto minmax(0, 1fr);
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   background: #f4f4f5;
   border-right: 1px solid #ded9d5;
 }
 
 .photo {
   overflow: hidden;
-  background: linear-gradient(135deg, #2f201b, #a27452);
+  background: #f8fafc;
 }
 
 .photoArt {
+  position: relative;
   width: 100%;
   height: 100%;
-  background-image: url("/assets/img/con_bo.svg");
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: 82%;
-  filter: drop-shadow(0 16px 24px rgba(0, 0, 0, 0.22));
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  place-items: center;
+  gap: 4px;
+  padding: 18px 14px 14px;
+  overflow: hidden;
+  color: var(--species-color, #64748b);
+  background: var(--species-bg, linear-gradient(135deg, #f8fafc, #e5e7eb));
+}
+
+.photoHalo {
+  position: absolute;
+  inset: 22px 26px 52px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
+.photoIcon {
+  position: relative;
+  z-index: 1;
+  width: min(118px, 70%);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(0 14px 20px rgba(15, 23, 42, 0.18));
+}
+
+.photoIcon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.photoIcon svg path,
+.photoIcon svg circle,
+.photoIcon svg ellipse {
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.photoIcon svg path:first-child {
+  opacity: 0.18;
+}
+
+.photoArt strong,
+.photoArt small {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  color: #111827;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photoArt strong {
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.photoArt small {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .stepNav,
@@ -50,6 +124,9 @@
 
 .stepNav {
   padding-top: 4px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .stepButton {
@@ -104,6 +181,10 @@
 
 .subNav {
   align-content: start;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: 8px 16px 20px 28px;
   margin: 0;
   list-style: none;
@@ -118,8 +199,10 @@
 
 .content {
   min-width: 0;
+  min-height: 0;
   display: grid;
   grid-template-rows: auto 1fr auto;
+  overflow: hidden;
   background: #ffffff;
 }
 
@@ -133,17 +216,22 @@
 }
 
 .headerTitle {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 11px;
+}
+
+.headerTitle > div {
+  min-width: 0;
 }
 
 .headerTitle > span {
   width: 26px;
   height: 26px;
   border-radius: 6px;
-  color: #58b90a;
-  background: #d9f99d;
+  color: #1f7a4a;
+  background: #ecfdf3;
 }
 
 .header h2 {
@@ -158,6 +246,7 @@
   margin: 5px 0 0;
   color: #6b7280;
   font-size: 14px;
+  overflow-wrap: anywhere;
 }
 
 .closeButton {
@@ -174,7 +263,9 @@
 
 .body {
   min-height: 0;
+  min-width: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   display: grid;
   align-content: start;
   gap: 14px;
@@ -200,9 +291,11 @@
 .field > span,
 .tagAreaLabel,
 .tagCard label > span {
+  min-width: 0;
   padding-top: 9px;
   color: #283143;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .field b {
@@ -215,6 +308,7 @@
 .tagCard input,
 .tagCard select {
   width: 100%;
+  max-width: 100%;
   min-width: 0;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
@@ -304,11 +398,13 @@
 .tagArea {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr);
+  min-width: 0;
   gap: 16px;
 }
 
 .tagList {
   display: grid;
+  min-width: 0;
   gap: 14px;
 }
 
@@ -325,6 +421,78 @@
 
 .tagCard label {
   display: contents;
+}
+
+.qrPlan {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 132px;
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid rgba(31, 122, 74, 0.22);
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ecfdf3, #ffffff);
+}
+
+.qrPlanIcon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #ecfdf3;
+  color: #1f7a4a;
+}
+
+.qrPlanIcon svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.qrPlan span,
+.qrStats span {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.qrPlan strong {
+  display: block;
+  margin-top: 4px;
+  color: #111827;
+  font-size: 18px;
+}
+
+.qrPlan p {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.qrStats {
+  min-height: 86px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  padding: 12px;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(84, 201, 0, 0.18);
+}
+
+.qrStats strong {
+  margin-top: 4px;
+  color: #46a400;
+  font-size: 30px;
+  line-height: 1;
 }
 
 .deleteTag {
@@ -347,7 +515,7 @@
   margin-top: 12px;
   border: 0;
   border-radius: 7px;
-  background: #2563eb;
+  background: #1f7a4a;
   color: #ffffff;
   padding: 8px 12px;
   font-size: 13px;
@@ -357,6 +525,7 @@
 
 .footer {
   min-height: 54px;
+  min-width: 0;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -370,6 +539,8 @@
 .actionButtons {
   display: flex;
   align-items: center;
+  min-width: 0;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -402,7 +573,7 @@
 }
 
 .saveButton {
-  background: #14843b;
+  background: #1f7a4a;
 }
 
 .cancelButton {
@@ -421,6 +592,7 @@
   font-size: 13px;
   font-weight: 700;
   text-align: right;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 900px) {
@@ -471,6 +643,11 @@
   .tagCard {
     grid-template-columns: 1fr;
     padding-right: 10px;
+  }
+
+  .qrPlan {
+    grid-template-columns: 1fr;
+    align-items: start;
   }
 
   .tagCard label {

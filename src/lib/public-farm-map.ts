@@ -24,14 +24,15 @@ export async function getPublicFarmMapItems(): Promise<PublicFarmMapItem[]> {
             v.ten_dia_diem as location_name,
             coalesce(v.vi_do, t.vi_do, 10.762622) as latitude,
             coalesce(v.kinh_do, t.kinh_do, 106.660172) as longitude,
-            true as is_map_shared
+            coalesce(t.is_map_shared, false) as is_map_shared
      from du_lieu.trang_trai t
      left join du_lieu.nguoi_dung u on u.id = t.chu_so_huu_id
      left join du_lieu.vi_tri_trang_trai v on v.trang_trai_id = t.id
-     where t.vi_do is not null
+     where coalesce(t.is_map_shared, false) = true
+       and (t.vi_do is not null
         or t.kinh_do is not null
         or v.vi_do is not null
-        or v.kinh_do is not null
+        or v.kinh_do is not null)
      order by t.created_at desc nulls last, t.id desc`
   );
 
