@@ -1,16 +1,19 @@
+import { createHash, createHmac, pbkdf2Sync, randomBytes, timingSafeEqual } from "crypto";
 import { cookies as nextCookies } from "next/headers";
 import { NextRequest } from "next/server";
-import { createHash, pbkdf2Sync, randomBytes, timingSafeEqual, createHmac } from "crypto";
+import { db } from "@/lib/db";
+import {
+  docPayloadTokenXacThuc,
+  layBiMatXacThuc,
+  payloadTokenConHan,
+  TEN_COOKIE_XAC_THUC,
+  THOI_GIAN_DANG_NHAP_GIAY,
+} from "@/lib/auth-token";
 
-export const TEN_COOKIE_XAC_THUC = "phien_dang_nhap";
-const THOI_GIAN_DANG_NHAP_GIAY = 60 * 60 * 24 * 14; // 14 ngày
+export { TEN_COOKIE_XAC_THUC } from "@/lib/auth-token";
+
 const PBKDF2_VONG_LAP = 210000;
 const PBKDF2_DO_DAI = 32;
-
-function layBiMatXacThuc() {
-  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "ketkat-ecofarm-dev-secret";
-  return secret;
-}
 
 export function taoMatKhauHash(matKhau: string) {
   const salt = randomBytes(16).toString("hex");
@@ -49,14 +52,9 @@ export function giaiMaTokenXacThuc(token?: string | null): string | null {
   const signatureHopLe = createHmac("sha256", layBiMatXacThuc()).update(payloadBase64).digest("base64url");
   if (signature !== signatureHopLe) return null;
 
-  try {
-    const payload = JSON.parse(Buffer.from(payloadBase64, "base64url").toString("utf8")) as { owner_id?: string; exp?: number };
-    if (!payload?.owner_id || !payload?.exp) return null;
-    if (payload.exp < Math.floor(Date.now() / 1000)) return null;
-    return payload.owner_id;
-  } catch {
-    return null;
-  }
+  const payload = docPayloadTokenXacThuc(payloadBase64);
+  if (!payloadTokenConHan(payload)) return null;
+  return payload?.owner_id ?? null;
 }
 
 export function layOwnerIdTuRequest(request: NextRequest): string | null {
@@ -69,6 +67,34 @@ export function layOwnerIdTuServerCookie(): string | null {
   return giaiMaTokenXacThuc(token);
 }
 
+export type TaiKhoanDangNhap = {
+  id: string;
+  fullName: string;
+  email: string;
+};
+
+export async function layTaiKhoanDangNhapTuServerCookie(): Promise<TaiKhoanDangNhap | null> {
+  const ownerId = layOwnerIdTuServerCookie();
+  if (!ownerId) return null;
+
+  const result = await db.query(
+    `select id::text, ho_ten, email
+     from du_lieu.nguoi_dung
+     where id = $1
+       and coalesce(nullif(trang_thai, ''), 'active') <> 'disabled'
+     limit 1`,
+    [ownerId]
+  );
+  const row = result.rows[0] as { id?: string; ho_ten?: string | null; email?: string | null } | undefined;
+  if (!row?.id || !row.email) return null;
+
+  return {
+    id: row.id,
+    fullName: row.ho_ten ?? "",
+    email: row.email,
+  };
+}
+
 export const cauHinhCookieXacThuc = {
   httpOnly: true,
   sameSite: "lax" as const,
@@ -76,4 +102,3 @@ export const cauHinhCookieXacThuc = {
   path: "/",
   maxAge: THOI_GIAN_DANG_NHAP_GIAY,
 };
-

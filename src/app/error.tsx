@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect } from "react";
 
@@ -27,7 +28,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
 
         <div className="farm-error-panel card">
           <div className="farm-error-brand">
-            <img src="/favicon.ico" alt="KetKat-EcoFarm" className="farm-error-logo" />
+            <Image src="/favicon.ico" alt="KetKat-EcoFarm" width={34} height={34} className="farm-error-logo" />
             <span>KetKat-EcoFarm</span>
           </div>
 

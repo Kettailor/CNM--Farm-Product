@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import DashboardShell from "@/components/dashboard-shell";
 import MapViewSwitcher from "@/components/dashboard-map-view-switcher";
 import { layOwnerIdTuServerCookie } from "@/lib/auth";
+import { getDashboardOverview } from "@/lib/dashboard-overview";
 import { loadLivestockGroupDetail, type LivestockDetail } from "@/lib/livestock-detail";
 import { getLivestockEventTypeOption, isLivestockEventType } from "@/lib/livestock-event-types";
 import { renderQrSvg } from "@/lib/qr-code";
@@ -60,10 +61,16 @@ function statusLabel(status: string | null) {
   const raw = String(status ?? "").trim();
   if (!raw) return "Chưa cập nhật";
   const normalized = normalizeSearch(raw);
+  if (normalized.includes("tu vong") || normalized.includes("deceased") || normalized.includes("dead")) return "Đã tử vong";
   if (normalized.includes("dang hoat dong") || normalized.includes("active")) return "Đang theo dõi";
   if (normalized.includes("theo doi") || normalized.includes("canh bao") || normalized.includes("benh")) return "Cần chú ý";
   if (normalized.includes("ngung") || normalized.includes("inactive")) return "Ngừng theo dõi";
   return raw;
+}
+
+function isDeceasedStatus(status: string | null) {
+  const normalized = normalizeSearch(status);
+  return normalized.includes("tu vong") || normalized.includes("deceased") || normalized.includes("dead");
 }
 
 function eventTypeLabel(type: string | null) {
@@ -107,7 +114,7 @@ function AnimalIcon({ species }: { species: string }) {
   );
 }
 
-function SmallIcon({ name }: { name: "back" | "qr" | "print" | "info" | "growth" | "animals" | "events" | "map" }) {
+function SmallIcon({ name }: { name: "back" | "qr" | "print" | "info" | "growth" | "animals" | "events" | "map" | "deceased" }) {
   switch (name) {
     case "back":
       return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7 5 12l5 5" /><path d="M5 12h14" /></svg>;
@@ -123,6 +130,8 @@ function SmallIcon({ name }: { name: "back" | "qr" | "print" | "info" | "growth"
       return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16H7z" /><path d="M10 8h4M10 12h4M10 16h2" /></svg>;
     case "map":
       return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 6-2 6 2 6-2v14l-6 2-6-2-6 2V6Z" /><path d="M9 4v14M15 6v14" /></svg>;
+    case "deceased":
+      return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 3 20h18L12 4Z" /><path d="M12 9v5M12 17h.01" /></svg>;
     default:
       return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v-6" /><path d="M12 7h.01" /><path d="M5 4h14v16H5z" /></svg>;
   }
@@ -165,26 +174,56 @@ export default async function LivestockGroupDetailPage({ params, searchParams }:
   const ownerId = layOwnerIdTuServerCookie();
   if (!ownerId) redirect(`/login?next=/dashboard/vat-nuoi/${params.groupId}`);
 
-  const detail = await loadLivestockGroupDetail(ownerId, params.groupId);
+  const [detail, overview] = await Promise.all([
+    loadLivestockGroupDetail(ownerId, params.groupId),
+    getDashboardOverview(ownerId),
+  ]);
   if (!detail) notFound();
 
   const group = detail.group;
   const zone = detail.zone;
-  if (searchValue(searchParams?.["hanh-dong"]) === "dieu-tri") {
+  const action = searchValue(searchParams?.["hanh-dong"]);
+  const showDeceasedAnimals = searchValue(searchParams?.["hien-ca-the-tu-vong"]) === "1";
+  const showHeader = searchValue(searchParams?.["hien-dau-nhom"]) !== "0";
+  const showSummary = searchValue(searchParams?.["hien-tom-tat"]) !== "0";
+  const showProfile = searchValue(searchParams?.["hien-ho-so"]) !== "0";
+  const showGrowth = searchValue(searchParams?.["hien-tang-truong"]) !== "0";
+  const showMedicalRecord = searchValue(searchParams?.["hien-so-kham"]) !== "0";
+  const showAnimalsTable = searchValue(searchParams?.["hien-bang-ca-the"]) !== "0";
+  const showEvents = searchValue(searchParams?.["hien-nhat-ky"]) !== "0";
+  const showMap = searchValue(searchParams?.["hien-ban-do"]) !== "0";
+  const visibleAnimals = showDeceasedAnimals ? detail.animals : detail.animals.filter((animal) => !isDeceasedStatus(animal.status));
+  const hiddenDeceasedAnimalCount = detail.animals.length - visibleAnimals.length;
+  const displayedAnimalCount = detail.animals.length > 0 ? visibleAnimals.length : group.linkedCount || group.headCount;
+  const groupDeceased = isDeceasedStatus(group.healthStatus) || (detail.animals.length > 0 && detail.animals.every((animal) => isDeceasedStatus(animal.status)));
+  if (!overview.access.canWrite && action) redirect(`/dashboard/vat-nuoi/${group.id}`);
+  if (action === "dieu-tri") {
     redirect(`/dashboard/vat-nuoi/dieu-tri?groupId=${group.id}`);
   }
-  if (searchValue(searchParams?.["hanh-dong"]) === "ghi-nhan-su-kien") {
+  if (action === "ghi-nhan-su-kien") {
     redirect(`/dashboard/vat-nuoi/su-kien?groupId=${group.id}`);
   }
-  const editOpen = searchValue(searchParams?.["hanh-dong"]) === "chinh-sua";
-  const qrReadyCount = detail.animals.filter((animal) => animal.qrCode).length;
+  if (action === "di-chuyen") {
+    redirect(`/dashboard/vat-nuoi/su-kien?groupId=${group.id}&loai=move`);
+  }
+  if (action === "tach-nhom") {
+    redirect(`/dashboard/vat-nuoi/su-kien?groupId=${group.id}&loai=grouping&kieu=tach_nhom`);
+  }
+  if (action === "ghep-nhom") {
+    redirect(`/dashboard/vat-nuoi/su-kien?groupId=${group.id}&loai=grouping&kieu=ghep_nhom`);
+  }
+  if (action === "cap-nhat-so-luong" || action === "tu-vong") {
+    redirect(`/dashboard/vat-nuoi/su-kien?groupId=${group.id}&loai=adjustment`);
+  }
+  const editOpen = overview.access.canWrite && action === "chinh-sua";
+  const qrReadyCount = visibleAnimals.filter((animal) => animal.qrCode).length;
   const latestUpdate = group.updatedAt || group.createdAt;
   const zoneColor = zone?.color ?? "#2f855a";
   const mapObjects = zone?.center
     ? [
         {
           id: `group-${group.id}`,
-          label: `${group.name}: ${formatNumber(group.linkedCount || group.headCount, " con")}`,
+          label: `${group.name}: ${formatNumber(displayedAnimalCount, " con")}`,
           color: zoneColor,
           kind: "vat_nuoi",
           geometry: { type: "Point" as const, coordinates: [zone.center.lng, zone.center.lat] as [number, number] },
@@ -205,13 +244,17 @@ export default async function LivestockGroupDetailPage({ params, searchParams }:
             </div>
           </div>
           <div className={styles.headerActions}>
-            <GroupDetailActions groupId={group.id} />
+            <GroupDetailActions
+              groupId={group.id}
+              canWrite={overview.access.canWrite}
+              showDeceasedAnimals={showDeceasedAnimals}
+            />
           </div>
         </section>
 
         <EditGroupForm open={editOpen} group={group} />
 
-        <section className={styles.heroPanel} style={accentStyle(zoneColor)}>
+        {showHeader && <section className={styles.heroPanel} style={accentStyle(zoneColor)}>
           <div className={styles.heroAvatar}>
             <AnimalIcon species={group.species} />
           </div>
@@ -219,9 +262,9 @@ export default async function LivestockGroupDetailPage({ params, searchParams }:
             <div className={styles.heroTitle}>
               <div>
                 <h2>{group.species}</h2>
-                <p>{group.breed || "Chưa cập nhật giống"} · {formatNumber(group.linkedCount || group.headCount, " con")}</p>
+                <p>{group.breed || "Chưa cập nhật giống"} · {formatNumber(displayedAnimalCount, " con")}</p>
               </div>
-              <span className={styles.statusPill}>{statusLabel(group.healthStatus)}</span>
+              <span className={`${styles.statusPill} ${groupDeceased ? styles.deceasedPill : ""}`}>{groupDeceased ? "Đã tử vong" : statusLabel(group.healthStatus)}</span>
             </div>
             <p className={styles.heroDescription}>{group.description || group.herdNotes || "Nhóm vật nuôi đang được theo dõi trong hệ thống trang trại."}</p>
             <div className={styles.quickFacts}>
@@ -232,16 +275,16 @@ export default async function LivestockGroupDetailPage({ params, searchParams }:
               <div><span>Khu vực</span><strong>{zone?.name || "Chưa gắn khu vực"}</strong></div>
             </div>
           </div>
-        </section>
+        </section>}
 
-        <section className={styles.statsGrid}>
-          <article><span>Tổng hồ sơ</span><strong>{formatNumber(group.linkedCount || group.headCount)}</strong></article>
+        {showSummary && <section className={styles.statsGrid}>
+          <article><span>Tổng hồ sơ</span><strong>{formatNumber(displayedAnimalCount)}</strong></article>
           <article><span>Mã QR sẵn sàng</span><strong>{formatNumber(qrReadyCount)}</strong></article>
           <article><span>Khối lượng mục tiêu</span><strong>{formatNumber(group.targetLiveWeight, " kg")}</strong></article>
           <article><span>Cập nhật</span><strong>{formatDate(latestUpdate)}</strong></article>
-        </section>
+        </section>}
 
-        <section className={styles.detailPanel}>
+        {showProfile && <section className={styles.detailPanel}>
           <div className={styles.sectionHead}>
             <div>
               <p className={styles.eyebrow}>Thông tin cơ bản</p>
@@ -264,9 +307,9 @@ export default async function LivestockGroupDetailPage({ params, searchParams }:
               { label: "Trạng thái sinh sản", value: group.reproductiveState },
             ]}
           />
-        </section>
+        </section>}
 
-        <section className={styles.detailPanel}>
+        {showGrowth && <section className={styles.detailPanel}>
           <div className={styles.sectionHead}>
             <div>
               <p className={styles.eyebrow}>Tăng trưởng</p>
@@ -287,18 +330,76 @@ export default async function LivestockGroupDetailPage({ params, searchParams }:
               ]}
             />
           </div>
-        </section>
+        </section>}
 
-        <section className={styles.detailPanel}>
+        {showMedicalRecord && <section id="so-kham-benh" className={styles.detailPanel}>
+          <div className={styles.sectionHead}>
+            <div>
+              <p className={styles.eyebrow}>Sổ khám bệnh</p>
+              <h2><SmallIcon name="events" /> Nhật ký gần đây</h2>
+            </div>
+            <div className={styles.sectionActions}>
+              <Link className={styles.inlineAction} href={`/dashboard/vat-nuoi/${group.id}/so-kham-benh`}>
+                <SmallIcon name="events" />
+                Xem chi tiết
+              </Link>
+            </div>
+          </div>
+          <div className={styles.timeline}>
+            {detail.treatments.slice(0, 3).map((treatment) => (
+              <article key={`medical-treatment-${treatment.id}`}>
+                <strong>{treatment.name || treatment.type || "Điều trị"}</strong>
+                <span>{formatDate(treatment.treatmentDate || treatment.createdAt)}</span>
+                <p>
+                  {formatNumber(treatment.treatedCount, " con")}
+                  {treatment.method ? ` · ${treatment.method}` : ""}
+                </p>
+              </article>
+            ))}
+            {detail.events
+              .filter((event) => {
+                const value = normalizeSearch(`${event.type ?? ""} ${event.title ?? ""} ${event.note ?? ""}`);
+                return value.includes("benh") || value.includes("kham") || value.includes("suc khoe") || value.includes("health") || value.includes("treatment");
+              })
+              .slice(0, Math.max(0, 3 - detail.treatments.slice(0, 3).length))
+              .map((event) => (
+                <article key={`medical-event-${event.id}`}>
+                  <strong>{event.title || eventTypeLabel(event.type)}</strong>
+                  <span>{formatDate(event.eventDate || event.createdAt)}</span>
+                  <p>{eventTypeLabel(event.type)} · {formatNumber(event.animalCount, " cá thể")}</p>
+                </article>
+              ))}
+            {detail.treatments.length === 0 && (
+              <article>
+                <strong>Chưa có hồ sơ khám bệnh</strong>
+                <span>Chưa cập nhật</span>
+                <p>Nhóm này chưa có bản ghi điều trị hoặc sự kiện sức khỏe.</p>
+              </article>
+            )}
+          </div>
+        </section>}
+
+        {showAnimalsTable && <section className={styles.detailPanel}>
           <div className={styles.sectionHead}>
             <div>
               <p className={styles.eyebrow}>Động vật trong nhóm</p>
-              <h2><SmallIcon name="animals" /> {formatNumber(detail.animals.length)} hồ sơ cá thể</h2>
+              <h2><SmallIcon name="animals" /> {formatNumber(visibleAnimals.length)} hồ sơ cá thể</h2>
             </div>
-            <Link className={styles.inlineAction} href={`/dashboard/vat-nuoi/${group.id}/qr-pdf`} target="_blank" rel="noopener noreferrer">
-              <SmallIcon name="qr" />
-              In QR
-            </Link>
+            <div className={styles.sectionActions}>
+              {hiddenDeceasedAnimalCount > 0 && (
+                <Link
+                  className={`${styles.inlineAction} ${showDeceasedAnimals ? styles.deceasedInlineAction : styles.secondaryInlineAction}`}
+                  href={showDeceasedAnimals ? `/dashboard/vat-nuoi/${group.id}` : `/dashboard/vat-nuoi/${group.id}?hien-ca-the-tu-vong=1`}
+                >
+                  <SmallIcon name="deceased" />
+                  {showDeceasedAnimals ? "Ẩn cá thể tử vong" : "Xem cá thể tử vong"}
+                </Link>
+              )}
+              <Link className={styles.inlineAction} href={`/dashboard/vat-nuoi/${group.id}/qr-pdf`} target="_blank" rel="noopener noreferrer">
+                <SmallIcon name="qr" />
+                In QR
+              </Link>
+            </div>
           </div>
           <div className={styles.tableScroll}>
             <table className={styles.dataTable}>
@@ -312,7 +413,9 @@ export default async function LivestockGroupDetailPage({ params, searchParams }:
                 </tr>
               </thead>
               <tbody>
-                {detail.animals.map((animal) => (
+                {visibleAnimals.map((animal) => {
+                  const animalDeceased = isDeceasedStatus(animal.status);
+                  return (
                   <tr key={animal.id}>
                     <td>
                       <Link className={styles.animalCellLink} href={`/dashboard/vat-nuoi/${group.id}/ca-the/${animal.id}`}>
@@ -326,22 +429,22 @@ export default async function LivestockGroupDetailPage({ params, searchParams }:
                         <code>{animal.qrCode || "Chưa có QR"}</code>
                       </Link>
                     </td>
-                    <td><span className={styles.statusPill}>{statusLabel(animal.status)}</span></td>
+                    <td><span className={`${styles.statusPill} ${animalDeceased ? styles.deceasedPill : ""}`}>{statusLabel(animal.status)}</span></td>
                     <td>{zone?.name || "Chưa gắn khu vực"}</td>
                     <td>{formatDate(animal.updatedAt || animal.createdAt)}</td>
                   </tr>
-                ))}
-                {detail.animals.length === 0 && (
+                );})}
+                {visibleAnimals.length === 0 && (
                   <tr>
-                    <td colSpan={5} className={styles.emptyTableCell}>Nhóm này chưa có hồ sơ cá thể.</td>
+                    <td colSpan={5} className={styles.emptyTableCell}>{hiddenDeceasedAnimalCount > 0 ? "Các cá thể tử vong đang được ẩn." : "Nhóm này chưa có hồ sơ cá thể."}</td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
-        </section>
+        </section>}
 
-        <section className={styles.detailPanel}>
+        {showEvents && <section className={styles.detailPanel}>
           <div className={styles.sectionHead}>
             <div>
               <p className={styles.eyebrow}>Sự kiện nhóm</p>
@@ -361,7 +464,7 @@ export default async function LivestockGroupDetailPage({ params, searchParams }:
                 <p>{eventTypeLabel(event.type)} · {formatNumber(event.animalCount, " cá thể")}{event.note ? ` · ${event.note}` : ""}</p>
               </article>
             ))}
-            {detail.events.length === 0 && detail.animals.slice(0, 5).map((animal) => (
+            {detail.events.length === 0 && visibleAnimals.slice(0, 5).map((animal) => (
               <article key={`event-${animal.id}`}>
                 <strong>Tạo hồ sơ cá thể</strong>
                 <span>{formatDate(animal.createdAt)}</span>
@@ -369,9 +472,9 @@ export default async function LivestockGroupDetailPage({ params, searchParams }:
               </article>
             ))}
           </div>
-        </section>
+        </section>}
 
-        <section className={styles.detailPanel}>
+        {showMap && <section className={styles.detailPanel}>
           <div className={styles.sectionHead}>
             <div>
               <p className={styles.eyebrow}>Bản đồ trang trại</p>
@@ -393,7 +496,7 @@ export default async function LivestockGroupDetailPage({ params, searchParams }:
               fitToPolygon={Boolean(zone?.polygon.length || mapObjects.length)}
             />
           </div>
-        </section>
+        </section>}
       </div>
     </DashboardShell>
   );

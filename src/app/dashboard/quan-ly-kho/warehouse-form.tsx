@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import CowLoading from "@/components/cow-loading";
+import { todayInBusinessTimeZone } from "@/lib/business-date";
 import {
   WAREHOUSE_STATUS_LABELS,
   WAREHOUSE_STATUS_VALUES,
@@ -95,11 +96,7 @@ const FIELD_LABELS = {
   },
 };
 
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function makeInitialForm(zones: WarehouseZone[], type: WarehouseType = zones[0]?.warehouseTypes[0] ?? "cong_cu"): FormState {
+function makeInitialForm(zones: WarehouseZone[], receivedDate: string, type: WarehouseType = zones[0]?.warehouseTypes[0] ?? "cong_cu"): FormState {
   const typeOption = getWarehouseTypeOption(type);
   return {
     code: "",
@@ -112,7 +109,7 @@ function makeInitialForm(zones: WarehouseZone[], type: WarehouseType = zones[0]?
     minimumQuantity: "",
     location: zones[0]?.name ?? "",
     status: "binh_thuong",
-    receivedDate: today(),
+    receivedDate,
     expiryDate: "",
     supplier: "",
     manager: "",
@@ -199,13 +196,15 @@ export default function WarehouseForm({
   item,
   zones,
   onSaved,
+  initialReceivedDate = todayInBusinessTimeZone(),
 }: {
   item?: WarehouseItem | null;
   zones: WarehouseZone[];
   onSaved?: (item: WarehouseItem) => void;
+  initialReceivedDate?: string;
 }) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(() => (item ? makeFormFromItem(item, zones) : makeInitialForm(zones)));
+  const [form, setForm] = useState<FormState>(() => (item ? makeFormFromItem(item, zones) : makeInitialForm(zones, initialReceivedDate)));
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const isEdit = Boolean(item?.id);

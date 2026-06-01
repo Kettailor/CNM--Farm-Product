@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await db.query(
-      "select 1 from du_lieu.chu_so_huu where lower(email) = $1 limit 1",
+      "select 1 from du_lieu.nguoi_dung where lower(email) = $1 limit 1",
       [email]
     );
 

@@ -30,6 +30,12 @@ type TreatmentGroupOption = {
   updatedAt: string | Date | null;
 };
 
+type TreatmentUserOption = {
+  id: string;
+  name: string;
+  email: string | null;
+};
+
 const accentStyle = (color: string): CSSProperties => ({ "--accent": color } as CSSProperties);
 
 const speciesColors = ["#1f7a4a", "#2563eb", "#b45309", "#7c3aed", "#0f766e", "#be123c"];
@@ -134,15 +140,45 @@ async function loadTreatmentGroups(farmId: string): Promise<TreatmentGroupOption
   }));
 }
 
+async function loadFarmUsers(farmId: string, ownerId: string): Promise<TreatmentUserOption[]> {
+  const result = await db.query<{ id: string; name: string | null; email: string | null; sort_order: number }>(
+    `select u.id::text,
+            coalesce(nullif(u.ho_ten, ''), nullif(u.email, ''), 'Người dùng') as name,
+            u.email,
+            case when u.id::text = $2 then 0 else 1 end as sort_order
+     from du_lieu.nguoi_dung u
+     where u.id::text = $2
+        or exists (
+          select 1
+          from du_lieu.thanh_vien_trang_trai tv
+          where tv.trang_trai_id = $1
+            and tv.nguoi_dung_id = u.id
+            and coalesce(lower(tv.trang_thai), '') not in ('inactive', 'disabled', 'da_huy', 'da huy', 'đã hủy', 'cancelled')
+        )
+     order by sort_order asc, name asc`,
+    [farmId, ownerId]
+  );
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    name: row.name ?? row.email ?? "Người dùng",
+    email: row.email,
+  }));
+}
+
 export default async function LivestockTreatmentPage({ searchParams }: PageProps) {
   const ownerId = layOwnerIdTuServerCookie();
   if (!ownerId) redirect("/login?next=/dashboard/vat-nuoi/dieu-tri");
 
   const data = await getDashboardOverview(ownerId);
   if (!data.farmId) redirect("/register/farm");
+  if (!data.access.canWrite) redirect("/dashboard/vat-nuoi");
 
   const selectedGroupId = singleParam(searchParams?.groupId);
-  const groups = await loadTreatmentGroups(data.farmId);
+  const [groups, responsibleUsers] = await Promise.all([
+    loadTreatmentGroups(data.farmId),
+    loadFarmUsers(data.farmId, ownerId),
+  ]);
   const selectedDetail = selectedGroupId ? await loadLivestockGroupDetail(ownerId, selectedGroupId) : null;
   if (selectedGroupId && !selectedDetail) notFound();
 
@@ -265,6 +301,8 @@ export default async function LivestockTreatmentPage({ searchParams }: PageProps
             animals={selectedDetail.animals.map((animal) => ({ id: animal.id, code: animal.code, qrCode: animal.qrCode, identity: animal.identity, status: animal.status }))}
             warehouseItems={treatmentSupport.warehouseItems}
             recentTreatments={treatmentSupport.treatments}
+            responsibleUsers={responsibleUsers}
+            successHref={`/dashboard/vat-nuoi/${selectedDetail.group.id}`}
             closeHref="/dashboard/vat-nuoi/dieu-tri"
           />
         ) : (

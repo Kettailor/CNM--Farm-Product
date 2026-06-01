@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { layOwnerIdTuRequest, layOwnerIdTuServerCookie } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getAccessibleFarmId } from "@/lib/farm-access";
 import { ensureWarehouseSchema } from "@/lib/warehouse-schema";
 import { loadWarehouseZones, mapWarehouseRow, type WarehouseRow } from "@/lib/warehouse-data";
 import {
@@ -84,15 +85,7 @@ function cleanMetadata(value: unknown): WarehouseMetadata {
 }
 
 async function getOwnerFarmId(ownerId: string) {
-  const farmRs = await db.query<{ id: string }>(
-    `select id
-     from du_lieu.trang_trai
-     where chu_so_huu_id = $1
-     order by created_at desc
-     limit 1`,
-    [ownerId]
-  );
-  return farmRs.rows[0]?.id;
+  return getAccessibleFarmId(ownerId, "write");
 }
 
 function normalizePayload(body: WarehousePayload) {
@@ -178,7 +171,7 @@ export async function PUT(request: NextRequest, { params }: { params: { itemId: 
 
     await ensureWarehouseSchema();
     const farmId = await getOwnerFarmId(ownerId);
-    if (!farmId) return NextResponse.json({ message: "Chưa có trang trại để cập nhật kho." }, { status: 404 });
+    if (!farmId) return NextResponse.json({ message: "Không có quyền cập nhật kho." }, { status: 403 });
 
     const body = (await request.json()) as WarehousePayload;
     const payload = normalizePayload(body);
@@ -294,7 +287,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { itemI
 
     await ensureWarehouseSchema();
     const farmId = await getOwnerFarmId(ownerId);
-    if (!farmId) return NextResponse.json({ message: "Chưa có trang trại để hủy vật tư kho." }, { status: 404 });
+    if (!farmId) return NextResponse.json({ message: "Không có quyền hủy vật tư kho." }, { status: 403 });
 
     const result = await db.query<WarehouseRow>(
       `with updated as (

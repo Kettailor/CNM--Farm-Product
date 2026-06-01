@@ -14,6 +14,7 @@ export type WarehouseIconName =
   | "product"
   | "back"
   | "menu"
+  | "settings"
   | "overview"
   | "warning";
 
@@ -117,6 +118,13 @@ export default function WarehouseIcon({ name }: { name: WarehouseIconName }) {
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M5 7h14M5 12h14M5 17h14" />
+        </svg>
+      );
+    case "settings":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" />
+          <path d="M4 12h2M18 12h2M12 4v2M12 18v2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M17.7 6.3l-1.4 1.4M7.7 16.3l-1.4 1.4" />
         </svg>
       );
     case "warning":

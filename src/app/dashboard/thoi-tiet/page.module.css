@@ -15,6 +15,9 @@
 .currentMain,
 .tempRange,
 .sourceStrip,
+.chartPanelHeader,
+.chartHeaderMeta,
+.chartLegend,
 .dailyRow {
   display: flex;
   align-items: center;
@@ -230,11 +233,148 @@
   padding: 14px;
 }
 
+.chartPanelHeader {
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
 .panelTitle {
   margin-bottom: 8px;
   color: #3f4943;
   font-size: 13px;
   font-weight: 700;
+}
+
+.chartPanelHeader .panelTitle {
+  margin-bottom: 0;
+}
+
+.chartHeaderMeta {
+  min-width: 0;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.chartRange {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  border: 1px solid rgba(31, 138, 192, 0.18);
+  border-radius: 6px;
+  background: #f1f8fc;
+  color: #25617e;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.chartInteractive {
+  position: relative;
+  min-width: 0;
+  cursor: zoom-in;
+  user-select: none;
+  touch-action: auto;
+}
+
+.chartLegend {
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  color: #52605a;
+  font-size: 12px;
+}
+
+.chartLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.chartLegend i {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+  border-radius: 2px;
+}
+
+.chartTooltip {
+  min-width: 148px;
+  max-width: 240px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(67, 88, 105, 0.92);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.22);
+  color: #fff;
+}
+
+.tooltipTitle {
+  padding-bottom: 7px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tooltipGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  padding-top: 8px;
+}
+
+.tooltipMetric {
+  display: grid;
+  gap: 4px;
+}
+
+.tooltipMetric span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tooltipMetric i {
+  width: 22px;
+  height: 4px;
+  display: inline-block;
+  border-radius: 999px;
+}
+
+.tooltipMetric strong {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.uvChartWrap {
+  position: relative;
+}
+
+.uvBandLabels {
+  position: absolute;
+  top: 23px;
+  right: 28px;
+  bottom: 38px;
+  display: grid;
+  grid-template-rows: repeat(5, 1fr);
+  justify-items: end;
+  pointer-events: none;
+  color: #24332b;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.uvBandLabels span {
+  align-self: center;
 }
 
 .weatherGlyph {
@@ -296,6 +436,19 @@
   .metricGrid,
   .dailyList {
     grid-template-columns: 1fr;
+  }
+
+  .chartPanelHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .chartHeaderMeta {
+    justify-content: flex-start;
+  }
+
+  .chartLegend {
+    justify-content: flex-start;
   }
 
   .currentMain strong {

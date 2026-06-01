@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { PoolClient } from "pg";
 import { layOwnerIdTuRequest, layOwnerIdTuServerCookie } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getAccessibleFarmId } from "@/lib/farm-access";
 import { ensureLivestockTreatmentSchema } from "@/lib/livestock-treatment-schema";
 import {
   getLivestockTreatmentTypeOption,
@@ -89,6 +90,18 @@ function dateOrNull(value: unknown) {
   return raw;
 }
 
+function dbDateOnly(value: string | Date | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+}
+
+function isExpiredDate(value: string | Date | null, treatmentDate: string) {
+  const expiryDate = dbDateOnly(value);
+  return Boolean(expiryDate && expiryDate < treatmentDate);
+}
+
 function addDays(value: string | null, days: number | null) {
   if (!value || days == null) return null;
   const date = new Date(`${value}T00:00:00.000Z`);
@@ -164,14 +177,13 @@ function batchLotFromItem(item: WarehouseItemRow) {
   );
 }
 
-async function loadOwnedGroup(client: PoolClient, ownerId: string, groupId: string) {
+async function loadOwnedGroup(client: PoolClient, farmId: string, groupId: string) {
   const groupRs = await client.query<GroupRow>(
     `select n.id::text, n.trang_trai_id::text, n.so_luong
      from du_lieu.nhom_vat_nuoi n
-     join du_lieu.trang_trai t on t.id = n.trang_trai_id
-     where n.id::text = $1 and t.chu_so_huu_id = $2
+     where n.id::text = $1 and n.trang_trai_id::text = $2
      limit 1`,
-    [groupId, ownerId]
+    [groupId, farmId]
   );
   return groupRs.rows[0] ?? null;
 }
@@ -192,6 +204,8 @@ export async function POST(request: NextRequest) {
   try {
     const ownerId = layOwnerIdTuRequest(request) || layOwnerIdTuServerCookie();
     if (!ownerId) return NextResponse.json({ message: "Phiên đăng nhập không hợp lệ." }, { status: 401 });
+    const farmId = await getAccessibleFarmId(ownerId, "write");
+    if (!farmId) return NextResponse.json({ message: "Không có quyền ghi điều trị vật nuôi." }, { status: 403 });
 
     await ensureLivestockTreatmentSchema();
 
@@ -208,7 +222,7 @@ export async function POST(request: NextRequest) {
     try {
       await client.query("begin");
 
-      const group = await loadOwnedGroup(client, ownerId, groupId);
+      const group = await loadOwnedGroup(client, farmId, groupId);
       if (!group) {
         await client.query("rollback");
         return NextResponse.json({ message: "Không tìm thấy nhóm vật nuôi hoặc không có quyền ghi điều trị." }, { status: 404 });
@@ -234,10 +248,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ message: "Vật tư kho không phù hợp với loại điều trị đã chọn." }, { status: 400 });
       }
 
+      const treatmentDate = dateOrNull(body.treatmentDate) ?? new Date().toISOString().slice(0, 10);
       const itemStatus = cleanString(item.trang_thai, 80);
       if (itemStatus === "da_huy" || itemStatus === "ngung_su_dung") {
         await client.query("rollback");
         return NextResponse.json({ message: "Vật tư kho đã ngừng sử dụng hoặc đã hủy." }, { status: 400 });
+      }
+      if (itemStatus === "het_han" || isExpiredDate(item.han_su_dung, treatmentDate)) {
+        await client.query("rollback");
+        return NextResponse.json({ message: "Vật tư điều trị đã hết hạn, không thể ghi điều trị." }, { status: 400 });
       }
 
       const requestedAnimalIds = normalizeAnimalIds(body.animalIds);
@@ -259,7 +278,7 @@ export async function POST(request: NextRequest) {
       }
 
       const dosePerAnimal = Math.max(0, parseNumber(body.dosePerAnimal, 0));
-      const totalQuantity = Math.max(0, parseNumber(body.totalQuantity, dosePerAnimal > 0 ? dosePerAnimal * treatedCount : 0));
+      const totalQuantity = dosePerAnimal > 0 ? dosePerAnimal * treatedCount : 0;
       const shouldDeductInventory = itemType !== "cong_cu";
       if (shouldDeductInventory && totalQuantity <= 0) {
         await client.query("rollback");
@@ -273,7 +292,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ message: "Tồn kho không đủ cho lần điều trị này." }, { status: 400 });
       }
 
-      const treatmentDate = dateOrNull(body.treatmentDate) ?? new Date().toISOString().slice(0, 10);
       const withdrawalDays = body.withdrawalDays == null || cleanString(body.withdrawalDays, 20) == null ? null : parseNonNegativeInt(body.withdrawalDays, 0);
       const esiDays = body.esiDays == null || cleanString(body.esiDays, 20) == null ? null : parseNonNegativeInt(body.esiDays, 0);
       const treatmentId = randomUUID();

@@ -2,13 +2,14 @@
 
 import { useCallback, useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import DashboardTopActions from "@/components/dashboard-top-actions";
+import GrazingGanttChart from "./grazing-gantt-chart";
 import {
   GRAZING_EVENT_TYPE_LABELS,
   GRAZING_EVENT_TYPE_VALUES,
   GRAZING_PLAN_TYPE_OPTIONS,
   GRAZING_STATUS_LABELS,
   getGrazingPlanTypeOption,
+  type GrazingEvent,
   type GrazingEventType,
   type GrazingLivestockGroup,
   type GrazingPaddock,
@@ -21,7 +22,12 @@ import styles from "./page.module.css";
 type ViewMode = "plans" | "table" | "chart";
 type WizardStep = 0 | 1 | 2;
 type FeatureFilter = "events" | "groups" | "paddocks";
-type TimeScale = "day" | "week" | "month";
+
+type GrazingUserOption = {
+  id: string;
+  name: string;
+  email: string | null;
+};
 
 type EventForm = {
   id: string;
@@ -29,7 +35,11 @@ type EventForm = {
   title: string;
   startDate: string;
   endDate: string;
+  startTime: string;
+  endTime: string;
   prerequisite: string;
+  prerequisiteId: string;
+  repeat: boolean;
 };
 
 type PaddockConfig = {
@@ -38,22 +48,6 @@ type PaddockConfig = {
   rating: string;
   supply: string;
   events: EventForm[];
-};
-
-type ChartRow = {
-  id: string;
-  name: string;
-  type: "plan" | "paddock" | "event" | "group";
-  priority?: number | string | null;
-  rating?: number | string | null;
-  area?: number | null;
-  startDate?: string | null;
-  endDate?: string | null;
-  eventType?: GrazingEventType;
-  label?: string;
-  prerequisite?: string | null;
-  collapseKey?: string;
-  collapsible?: boolean;
 };
 
 type FormState = {
@@ -76,11 +70,10 @@ const FEATURE_OPTIONS: Array<{ value: FeatureFilter; label: string }> = [
   { value: "groups", label: "Nhóm chăn nuôi" },
   { value: "paddocks", label: "Đám đồng" },
 ];
-const TIME_SCALE_OPTIONS: Array<{ value: TimeScale; label: string; step: number; slotWidth: number }> = [
-  { value: "day", label: "Ngày", step: 1, slotWidth: 84 },
-  { value: "week", label: "Tuần", step: 7, slotWidth: 96 },
-  { value: "month", label: "Tháng", step: 30, slotWidth: 110 },
-];
+const MAX_TABLE_EVENTS_PER_PLAN = 240;
+const PERPETUAL_PLAN_DAYS = 7;
+const MAX_RENDERED_PLANS = 40;
+const MINUTE_MS = 60_000;
 
 const emptyForm: FormState = {
   id: null,
@@ -103,30 +96,147 @@ function makeEvent(type: GrazingEventType, startDate: string, endDate: string): 
     title: type === "other" ? "" : GRAZING_EVENT_TYPE_LABELS[type],
     startDate,
     endDate,
+    startTime: "08:00",
+    endTime: "17:00",
     prerequisite: "",
+    prerequisiteId: "",
+    repeat: false,
+  };
+}
+
+function cleanTime(value: unknown) {
+  const text = String(value ?? "").trim();
+  const match = text.match(/^(\d{2}):(\d{2})/);
+  if (!match) return "";
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour > 23 || minute > 59) return "";
+  return `${match[1]}:${match[2]}`;
+}
+
+function metadataText(event: GrazingEvent, key: string) {
+  const value = event.metadata?.[key];
+  return typeof value === "string" ? value : "";
+}
+
+function dateTimeLocalValue(date: string, time: string) {
+  return date ? `${date}T${cleanTime(time) || "00:00"}` : "";
+}
+
+function splitDateTimeLocal(value: string) {
+  const [date = "", time = ""] = value.split("T");
+  return { date, time: cleanTime(time) };
+}
+
+function dateTimeToUtcMs(dateValue: string, timeValue: string, endOfDay = false) {
+  if (!dateValue) return null;
+  const date = dateToUtcTime(dateValue);
+  if (date == null) return null;
+  const time = cleanTime(timeValue);
+  if (!time) return date + (endOfDay ? 24 * 60 * MINUTE_MS - MINUTE_MS : 0);
+  const [hour, minute] = time.split(":").map(Number);
+  return date + (hour * 60 + minute) * MINUTE_MS;
+}
+
+function dateTimeFromUtcMs(value: number) {
+  const date = new Date(value);
+  return {
+    date: date.toISOString().slice(0, 10),
+    time: date.toISOString().slice(11, 16),
   };
 }
 
 function daysBetween(startDate: string | null, endDate: string | null) {
   if (!startDate || !endDate) return null;
-  const start = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T00:00:00`);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
-  return Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+  const start = dateToUtcTime(startDate);
+  const end = dateToUtcTime(endDate);
+  if (start == null || end == null) return null;
+  return Math.max(1, Math.round((end - start) / 86400000) + 1);
 }
 
 function dateOffset(startDate: string | null, value: string | null) {
   if (!startDate || !value) return 0;
-  const start = new Date(`${startDate}T00:00:00`);
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(date.getTime())) return 0;
-  return Math.max(0, Math.round((date.getTime() - start.getTime()) / 86400000));
+  const start = dateToUtcTime(startDate);
+  const date = dateToUtcTime(value);
+  if (start == null || date == null) return 0;
+  return Math.max(0, Math.round((date - start) / 86400000));
 }
 
 function addDays(value: string, days: number) {
-  const date = new Date(`${value}T00:00:00`);
-  date.setDate(date.getDate() + days);
+  const parts = value.split("-").map(Number);
+  if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return value;
+  const [year, month, day] = parts;
+  const date = new Date(Date.UTC(year, month - 1, day + days));
   return date.toISOString().slice(0, 10);
+}
+
+function dateToUtcTime(value: string) {
+  const parts = value.split("-").map(Number);
+  if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return null;
+  const [year, month, day] = parts;
+  return Date.UTC(year, month - 1, day);
+}
+
+function isTruthy(value: unknown) {
+  return value === true || value === "true" || value === "1" || value === 1;
+}
+
+function repeatWindow(form: FormState) {
+  return form.endDate;
+}
+
+function eventDuration(event: { startDate: string; endDate: string }) {
+  return daysBetween(event.startDate, event.endDate || event.startDate) ?? 1;
+}
+
+function eventDurationLabel(event: Pick<EventForm, "startDate" | "endDate" | "startTime" | "endTime">) {
+  if (event.startDate && (event.endDate || event.startDate) === event.startDate) {
+    const [startHour, startMinute] = (cleanTime(event.startTime) || "00:00").split(":").map(Number);
+    const [endHour, endMinute] = (cleanTime(event.endTime) || "23:59").split(":").map(Number);
+    const minutes = Math.max(1, endHour * 60 + endMinute - (startHour * 60 + startMinute));
+    if (minutes < 24 * 60) {
+      const hours = Math.floor(minutes / 60);
+      const remain = minutes % 60;
+      return [hours ? `${hours} giờ` : "", remain ? `${remain} phút` : ""].filter(Boolean).join(" ") || "1 phút";
+    }
+  }
+  return `${eventDuration(event)} ngày`;
+}
+
+function eventDurationMinutes(event: Pick<EventForm, "startDate" | "endDate" | "startTime" | "endTime">) {
+  const start = dateTimeToUtcMs(event.startDate, event.startTime);
+  const end = dateTimeToUtcMs(event.endDate || event.startDate, event.endTime, !event.endTime);
+  if (start == null || end == null || end <= start) return 24 * 60;
+  return Math.max(1, Math.round((end - start) / MINUTE_MS));
+}
+
+function alignEventAfterPrerequisite(event: EventForm, prerequisite: Pick<EventForm, "endDate" | "startDate" | "endTime">) {
+  const previousEnd = dateTimeToUtcMs(prerequisite.endDate || prerequisite.startDate, prerequisite.endTime, !prerequisite.endTime);
+  if (previousEnd == null) return event;
+  const durationMinutes = eventDurationMinutes(event);
+  const nextStart = dateTimeFromUtcMs(previousEnd);
+  const nextEnd = dateTimeFromUtcMs(previousEnd + durationMinutes * MINUTE_MS);
+  return {
+    ...event,
+    startDate: nextStart.date,
+    startTime: nextStart.time,
+    endDate: nextEnd.date,
+    endTime: nextEnd.time,
+  };
+}
+
+function currentPerpetualCycleStart(eventStartDate: string) {
+  const current = today();
+  return eventStartDate && eventStartDate > current ? eventStartDate : current;
+}
+
+function currentPerpetualCycleEnd(startDate: string) {
+  return addDays(startDate, PERPETUAL_PLAN_DAYS - 1);
+}
+
+function recurrenceIndex(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function formatDate(value: string | null) {
@@ -136,11 +246,11 @@ function formatDate(value: string | null) {
   return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-function formatShortDate(value: string | null) {
+function formatDateTime(value: string | null, time?: string | null) {
   if (!value) return "-";
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+  const formattedDate = formatDate(value);
+  const formattedTime = cleanTime(time);
+  return formattedTime ? `${formattedTime} ${formattedDate}` : formattedDate;
 }
 
 function displayStatus(status: GrazingStatus, startDate: string | null, endDate: string | null): GrazingStatus {
@@ -153,6 +263,36 @@ function displayStatus(status: GrazingStatus, startDate: string | null, endDate:
 
 function eventTitle(event: { type: GrazingEventType; title: string }) {
   return event.type === "other" ? event.title || GRAZING_EVENT_TYPE_LABELS.other : GRAZING_EVENT_TYPE_LABELS[event.type];
+}
+
+function eventSequence(index: number) {
+  return `CV${String(index + 1).padStart(2, "0")}`;
+}
+
+function dependencyText(value: string | null | undefined) {
+  return value?.trim() || "";
+}
+
+function actionHint(value: string | null | undefined) {
+  return dependencyText(value) ? "Làm sau công việc trước" : "Có thể làm ngay";
+}
+
+function prerequisiteLabel(events: GrazingEvent[], event: GrazingEvent) {
+  const prerequisiteId = String(event.metadata?.prerequisiteId ?? "");
+  if (!prerequisiteId) return dependencyText(event.note);
+  const index = events.findIndex((item) => item.id === prerequisiteId || item.metadata?.sourceId === prerequisiteId);
+  const source = index >= 0 ? events[index] : null;
+  return source ? `F-S: ${eventSequence(index)} - ${eventTitle(source)}` : dependencyText(event.note);
+}
+
+function limitedEventsForTable(events: GrazingEvent[], limit = MAX_TABLE_EVENTS_PER_PLAN, predicate?: (event: GrazingEvent) => boolean) {
+  const result: GrazingEvent[] = [];
+  for (const event of events) {
+    if (predicate && !predicate(event)) continue;
+    result.push(event);
+    if (result.length >= limit) break;
+  }
+  return result;
 }
 
 function planStyle(plan: GrazingPlan): CSSProperties {
@@ -266,27 +406,78 @@ function formFromPlan(plan: GrazingPlan): FormState {
       rating: String(paddock.rating),
       supply: "",
       events: plan.events
-        .filter((event) => event.paddockId === paddock.id)
+        .filter((event) => {
+          if (event.paddockId !== paddock.id) return false;
+          if (plan.type !== "perpetual" || !isTruthy(event.metadata?.repeat)) return true;
+          const index = recurrenceIndex(event.metadata?.recurrenceIndex);
+          return index == null || index <= 1;
+        })
         .map((event) => ({
           id: event.id,
           type: event.type,
           title: event.title,
           startDate: event.startDate ?? plan.startDate ?? "",
           endDate: event.endDate ?? plan.endDate ?? "",
+          startTime: cleanTime(metadataText(event, "startTime")) || "08:00",
+          endTime: cleanTime(metadataText(event, "endTime")) || "17:00",
           prerequisite: event.note ?? "",
+          prerequisiteId: String(event.metadata?.prerequisiteId ?? ""),
+          repeat: isTruthy(event.metadata?.repeat),
         })),
     })),
   };
 }
 
+function formatPlanEnd(plan: { type: GrazingPlanType; endDate: string | null }) {
+  return plan.type === "perpetual" ? `Vĩnh viễn (${PERPETUAL_PLAN_DAYS} ngày/lần)` : formatDate(plan.endDate);
+}
+
+function planDuration(plan: { type: GrazingPlanType; startDate: string | null; endDate: string | null }) {
+  return plan.type === "perpetual" ? PERPETUAL_PLAN_DAYS : daysBetween(plan.startDate, plan.endDate);
+}
+
 function payloadFromForm(form: FormState) {
+  const planEnd = repeatWindow(form);
+  const perpetualCycleStart = currentPerpetualCycleStart(form.startDate || today());
+  const perpetualCycleEnd = currentPerpetualCycleEnd(perpetualCycleStart);
+  const expandEvents = (events: EventForm[]) => events.flatMap((event) => {
+    const durationDays = eventDuration(event);
+    if (form.type === "perpetual") {
+      const offset = form.startDate && event.startDate ? Math.min(PERPETUAL_PLAN_DAYS - 1, dateOffset(form.startDate, event.startDate)) : 0;
+      const startDate = addDays(perpetualCycleStart, Math.max(0, offset));
+      const remainingDays = daysBetween(startDate, perpetualCycleEnd) ?? 1;
+      const cappedDurationDays = Math.max(1, Math.min(durationDays, remainingDays));
+      return [{
+        ...event,
+        repeat: true,
+        startDate,
+        endDate: addDays(startDate, cappedDurationDays - 1),
+        durationDays: cappedDurationDays,
+        recurrenceIndex: 1,
+      }];
+    }
+    const shouldRepeat = event.repeat && event.startDate && planEnd && durationDays > 0;
+    if (!shouldRepeat) return [{ ...event, durationDays }];
+    const expanded: Array<EventForm & { durationDays: number; recurrenceIndex: number }> = [];
+    let start = event.startDate;
+    let index = 1;
+    while (start && start <= planEnd && index <= 370) {
+      const endDate = addDays(start, durationDays - 1);
+      if (endDate > planEnd) break;
+      expanded.push({ ...event, repeat: true, startDate: start, endDate, durationDays, recurrenceIndex: index });
+      start = addDays(endDate, 1);
+      index += 1;
+    }
+    return expanded.length ? expanded : [{ ...event, durationDays }];
+  });
+
   return {
     code: form.code || undefined,
     name: form.name,
     type: form.type,
     status: form.status,
     startDate: form.startDate || null,
-    endDate: form.endDate || null,
+    endDate: form.type === "perpetual" ? null : form.endDate || null,
     manager: form.manager,
     note: form.note,
     groupIds: form.groupIds,
@@ -295,7 +486,7 @@ function payloadFromForm(form: FormState) {
       priority: paddock.priority,
       rating: paddock.rating,
       supply: paddock.supply,
-      events: paddock.events,
+      events: expandEvents(paddock.events),
     })),
   };
 }
@@ -332,11 +523,15 @@ export default function GrazingClient({
   initialPlans,
   paddocks,
   groups,
+  users,
+  canWrite,
 }: {
   farmName: string;
   initialPlans: GrazingPlan[];
   paddocks: GrazingPaddock[];
   groups: GrazingLivestockGroup[];
+  users: GrazingUserOption[];
+  canWrite: boolean;
 }) {
   const router = useRouter();
   const [plans, setPlans] = useState(initialPlans);
@@ -348,13 +543,13 @@ export default function GrazingClient({
   const [message, setMessage] = useState("");
   const [planTypeFilter, setPlanTypeFilter] = useState<"all" | GrazingPlanType>("all");
   const [featureFilters, setFeatureFilters] = useState<FeatureFilter[]>(["events", "groups", "paddocks"]);
-  const [timeScale, setTimeScale] = useState<TimeScale>("day");
   const [collapsedIds, setCollapsedIds] = useState<string[]>([]);
 
-  const visiblePlans = useMemo(
+  const filteredPlans = useMemo(
     () => plans.filter((plan) => plan.status !== "da_huy" && (planTypeFilter === "all" || plan.type === planTypeFilter)),
     [planTypeFilter, plans]
   );
+  const visiblePlans = useMemo(() => filteredPlans.slice(0, MAX_RENDERED_PLANS), [filteredPlans]);
   const canceledPlans = useMemo(() => plans.filter((plan) => plan.status === "da_huy"), [plans]);
   const isFeatureVisible = useCallback((feature: FeatureFilter) => featureFilters.includes(feature), [featureFilters]);
   const isCollapsed = useCallback((id: string) => collapsedIds.includes(id), [collapsedIds]);
@@ -364,109 +559,25 @@ export default function GrazingClient({
   const toggleFeature = (feature: FeatureFilter) => {
     setFeatureFilters((current) => (current.includes(feature) ? current.filter((item) => item !== feature) : [...current, feature]));
   };
-  const chartDates = useMemo(() => {
-    const dates = visiblePlans
-      .flatMap((plan) => [plan.startDate, plan.endDate || plan.startDate, ...plan.events.flatMap((event) => [event.startDate, event.endDate || event.startDate])])
-      .filter(Boolean) as string[];
-    const sorted = dates.sort();
-    const start = sorted[0] ?? today();
-    const end = sorted.at(-1) ?? start;
-    return { start, end, days: Math.max(1, daysBetween(start, end) ?? 1) };
-  }, [visiblePlans]);
-  const chartTicks = useMemo(() => {
-    const maxTicks = 36;
-    const scaleStep = TIME_SCALE_OPTIONS.find((item) => item.value === timeScale)?.step ?? 1;
-    const step = Math.max(scaleStep, Math.ceil(chartDates.days / maxTicks));
-    return Array.from({ length: Math.ceil(chartDates.days / step) + 1 }, (_, index) => addDays(chartDates.start, index * step)).filter((date) => date <= chartDates.end);
-  }, [chartDates, timeScale]);
-  const chartScale = TIME_SCALE_OPTIONS.find((item) => item.value === timeScale) ?? TIME_SCALE_OPTIONS[0];
-  const chartUnits = Math.max(1, Math.ceil(chartDates.days / chartScale.step));
-  const chartScaleDays = Math.max(chartScale.step, chartUnits * chartScale.step);
-  const chartWidth = Math.max(timeScale === "day" ? 560 : timeScale === "week" ? 460 : 360, chartUnits * chartScale.slotWidth);
-  const chartRows = useMemo<ChartRow[]>(() => {
-    return visiblePlans.flatMap((plan) => {
-      const planCollapsed = isCollapsed(`plan:${plan.id}`);
-      const rows: ChartRow[] = [{
-        id: `${plan.id}-plan`,
-        name: plan.name,
-        type: "plan",
-        startDate: plan.startDate,
-        endDate: plan.endDate || plan.startDate,
-        label: `${plan.name} (${daysBetween(plan.startDate, plan.endDate || plan.startDate) ?? 1} ngày)`,
-        collapseKey: `plan:${plan.id}`,
-        collapsible: true,
-      }];
-      if (planCollapsed) return rows;
-
-      if (isFeatureVisible("paddocks")) {
-        for (const paddock of plan.paddocks) {
-          const paddockKey = `paddock:${plan.id}:${paddock.id}`;
-          const paddockCollapsed = isCollapsed(paddockKey);
-          rows.push({
-            id: `${plan.id}-${paddock.id}`,
-            name: paddock.name,
-            type: "paddock",
-            priority: paddock.priority,
-            rating: paddock.rating,
-            area: paddock.areaHa,
-            startDate: plan.startDate,
-            endDate: plan.endDate || plan.startDate,
-            label: paddock.name,
-            collapseKey: paddockKey,
-            collapsible: true,
-          });
-          if (!paddockCollapsed && isFeatureVisible("events")) {
-            for (const event of plan.events.filter((item) => item.paddockId === paddock.id)) {
-              const duration = daysBetween(event.startDate, event.endDate || event.startDate) ?? 1;
-              rows.push({
-                id: `${plan.id}-${paddock.id}-${event.id}`,
-                name: eventTitle(event),
-                type: "event",
-                startDate: event.startDate,
-                endDate: event.endDate || event.startDate,
-                eventType: event.type,
-                label: `${eventTitle(event)} (${duration} ngày)`,
-                prerequisite: event.note,
-              });
-            }
-          }
-        }
-      } else if (isFeatureVisible("events")) {
-        for (const event of plan.events) {
-          const duration = daysBetween(event.startDate, event.endDate || event.startDate) ?? 1;
-          rows.push({
-            id: `${plan.id}-event-${event.id}`,
-            name: eventTitle(event),
-            type: "event",
-            startDate: event.startDate,
-            endDate: event.endDate || event.startDate,
-            eventType: event.type,
-            label: `${eventTitle(event)} (${duration} ngày)`,
-            prerequisite: event.note,
-          });
-        }
-      }
-
-      if (isFeatureVisible("groups")) {
-        for (const group of plan.groups) {
-          rows.push({
-            id: `${plan.id}-group-${group.id}`,
-            name: group.name,
-            type: "group",
-            startDate: plan.startDate,
-            endDate: plan.startDate,
-            label: group.name,
-          });
-        }
-      }
-      return rows;
-    });
-  }, [isCollapsed, isFeatureVisible, visiblePlans]);
 
   const selectedPaddocks = useMemo(
     () => form.paddocks.map((item) => paddocks.find((paddock) => paddock.id === item.paddockId)).filter((item): item is GrazingPaddock => Boolean(item)),
     [form.paddocks, paddocks]
   );
+  const eventOptions = useMemo(() => {
+    return form.paddocks.flatMap((config) => {
+      const paddock = paddocks.find((item) => item.id === config.paddockId);
+      return config.events.map((event) => ({
+        id: event.id,
+        paddockId: config.paddockId,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        label: `${eventTitle(event)} - ${paddock?.name ?? "Khu vực khác"} - ${formatDateTime(event.startDate || null, event.startTime)}`,
+      }));
+    });
+  }, [form.paddocks, paddocks]);
 
   const stats = [
     { label: "Kế hoạch", value: visiblePlans.length },
@@ -478,6 +589,22 @@ export default function GrazingClient({
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setMessage("");
     setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const updatePlanType = (type: GrazingPlanType) => {
+    setMessage("");
+    setForm((current) => ({
+      ...current,
+      type,
+      endDate: type === "perpetual" ? "" : current.endDate,
+      paddocks: current.paddocks.map((paddock) => ({
+        ...paddock,
+        events: paddock.events.map((event) => ({
+          ...event,
+          repeat: type === "perpetual" ? true : type === "seasonal" ? false : event.repeat,
+        })),
+      })),
+    }));
   };
 
   const updatePaddock = (paddockId: string, patch: Partial<PaddockConfig>) => {
@@ -502,7 +629,7 @@ export default function GrazingClient({
             priority: "5",
             rating: "5",
             supply: "",
-            events: [makeEvent(defaultType, current.startDate, current.endDate || current.startDate)],
+            events: [{ ...makeEvent(defaultType, current.startDate, current.endDate || current.startDate), repeat: current.type === "perpetual" }],
           },
         ],
       };
@@ -510,7 +637,7 @@ export default function GrazingClient({
   };
 
   const addPaddockEvent = (paddockId: string, type: GrazingEventType) => {
-    const nextEvent = makeEvent(type, form.startDate, form.endDate || form.startDate);
+    const nextEvent = { ...makeEvent(type, form.startDate, form.endDate || form.startDate), repeat: form.type === "perpetual" };
     updatePaddock(paddockId, {
       events: [...(form.paddocks.find((item) => item.paddockId === paddockId)?.events ?? []), nextEvent],
     });
@@ -531,6 +658,7 @@ export default function GrazingClient({
   };
 
   const openCreate = () => {
+    if (!canWrite) return;
     setStep(0);
     setForm({
       ...emptyForm,
@@ -544,6 +672,7 @@ export default function GrazingClient({
   };
 
   const openEdit = (plan: GrazingPlan) => {
+    if (!canWrite) return;
     setStep(1);
     setForm(formFromPlan(plan));
     setFormOpen(true);
@@ -559,6 +688,12 @@ export default function GrazingClient({
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
+    if (!canWrite) return;
+    if (form.type !== "perpetual" && !form.endDate) {
+      setMessage("Vui lòng nhập ngày kết thúc cho kế hoạch theo mùa hoặc trái mùa.");
+      setStep(1);
+      return;
+    }
     setSaving(true);
     setMessage("");
     try {
@@ -584,6 +719,7 @@ export default function GrazingClient({
   };
 
   const cancelPlan = async (plan: GrazingPlan) => {
+    if (!canWrite) return;
     if (!window.confirm(`Hủy kế hoạch "${plan.name}"? Bản ghi sẽ được chuyển trạng thái Đã hủy.`)) return;
     setSaving(true);
     setMessage("");
@@ -616,7 +752,8 @@ export default function GrazingClient({
       sub: `${form.paddocks.length} ô · ${form.paddocks.reduce((total, item) => total + item.events.length, 0)} sự kiện`,
     },
   ];
-  const canGoNext = step === 0 || (step === 1 && form.name.trim().length > 0) || step === 2;
+  const hasRequiredEndDate = form.type === "perpetual" || Boolean(form.endDate);
+  const canGoNext = step === 0 || (step === 1 && form.name.trim().length > 0 && hasRequiredEndDate) || step === 2;
 
   return (
     <div className={styles.page}>
@@ -631,8 +768,7 @@ export default function GrazingClient({
         </div>
         <div className={styles.headerTools}>
           <button type="button" className={styles.backButton} onClick={() => router.back()}><Icon name="back" /> Quay lại</button>
-          <button type="button" className={styles.primaryButton} onClick={openCreate}><Icon name="add" /> Thêm kế hoạch</button>
-          <DashboardTopActions />
+          {canWrite && <button type="button" className={styles.primaryButton} onClick={openCreate}><Icon name="add" /> Thêm kế hoạch</button>}
         </div>
       </section>
 
@@ -696,26 +832,31 @@ export default function GrazingClient({
       {view === "plans" && (
         <section className={styles.planGrid}>
           {visiblePlans.length > 0 ? visiblePlans.map((plan) => {
-            const duration = daysBetween(plan.startDate, plan.endDate);
+            const duration = planDuration(plan);
             return (
               <article key={plan.id} className={styles.planCard} style={planStyle(plan)}>
                 <span className={styles.demoBadge}>{getGrazingPlanTypeOption(plan.type).shortLabel}</span>
                 <header>
                   <h2>{plan.name}</h2>
-                  <div className={styles.cardActions}>
-                    <button type="button" onClick={() => openEdit(plan)} aria-label="Sửa kế hoạch"><Icon name="edit" /></button>
-                    <button type="button" onClick={() => cancelPlan(plan)} aria-label="Hủy kế hoạch" disabled={saving}><Icon name="trash" /></button>
-                  </div>
+                  {canWrite && (
+                    <div className={styles.cardActions}>
+                      <button type="button" onClick={() => openEdit(plan)} aria-label="Sửa kế hoạch"><Icon name="edit" /></button>
+                      <button type="button" onClick={() => cancelPlan(plan)} aria-label="Hủy kế hoạch" disabled={saving}><Icon name="trash" /></button>
+                    </div>
+                  )}
                 </header>
                 <div className={styles.planMeta}>
                   <span>Trạng thái: <b data-status={plan.status}>{GRAZING_STATUS_LABELS[plan.status]}</b></span>
                   <span>Loại: <strong>{getGrazingPlanTypeOption(plan.type).label}</strong></span>
                   <span>Bắt đầu: <strong>{formatDate(plan.startDate)}</strong></span>
-                  <span>Kết thúc: <strong>{formatDate(plan.endDate)}</strong></span>
+                  <span>Kết thúc: <strong>{formatPlanEnd(plan)}</strong></span>
                   <span>Thời lượng: <strong>{duration ? `${duration} ngày` : "-"}</strong></span>
                   {isFeatureVisible("events") && <span>Sự kiện: <strong>{plan.events.length}</strong></span>}
                   {isFeatureVisible("paddocks") && <span>Đám đồng: <strong>{plan.paddocks.length}</strong></span>}
                   {isFeatureVisible("groups") && <span>Nhóm chăn nuôi: <strong>{plan.groups.length}</strong></span>}
+                </div>
+                <div className={styles.rowActions}>
+                  <a className={styles.secondaryButton} href={`/dashboard/chan-tha/${plan.id}`}>Chi tiết</a>
                 </div>
               </article>
             );
@@ -742,6 +883,8 @@ export default function GrazingClient({
                   <th>Bắt đầu</th>
                   <th>Kết thúc</th>
                   <th>Thời lượng (ngày)</th>
+                  <th>Công việc trước</th>
+                  <th>Cách xử lý</th>
                 </tr>
               </thead>
               <tbody>
@@ -760,8 +903,10 @@ export default function GrazingClient({
                       <td><span className={styles.statusPill} data-status={planStatus}>{GRAZING_STATUS_LABELS[planStatus]}</span></td>
                       <td>Kế hoạch</td>
                       <td>{formatDate(plan.startDate)}</td>
-                      <td>{formatDate(plan.endDate)}</td>
-                      <td>{daysBetween(plan.startDate, plan.endDate) ?? "-"}</td>
+                      <td>{formatPlanEnd(plan)}</td>
+                      <td>{planDuration(plan) ?? "-"}</td>
+                      <td>-</td>
+                      <td>-</td>
                     </tr>,
                   ];
                   if (planCollapsed) return rows;
@@ -783,35 +928,45 @@ export default function GrazingClient({
                           <td>-</td>
                           <td>-</td>
                           <td>-</td>
+                          <td>-</td>
+                          <td>-</td>
                         </tr>
                       );
                       if (!paddockCollapsed && isFeatureVisible("events")) {
-                        for (const event of plan.events.filter((item) => item.paddockId === paddock.id)) {
+                        for (const [eventIndex, event] of limitedEventsForTable(plan.events, MAX_TABLE_EVENTS_PER_PLAN, (item) => item.paddockId === paddock.id).entries()) {
                           const status = displayStatus(event.status, event.startDate, event.endDate);
+                          const sequence = eventSequence(eventIndex);
+                          const dependency = prerequisiteLabel(plan.events, event);
                           rows.push(
                             <tr key={`${plan.id}-${paddock.id}-${event.id}`} className={styles.eventTableRow}>
-                              <td><span className={styles.tableName}><Icon name="calendar" />{eventTitle(event)}</span></td>
+                              <td><span className={styles.tableName}><Icon name="calendar" /><span className={styles.sequenceBadge}>{sequence}</span>{eventTitle(event)}</span></td>
                               <td><span className={styles.statusPill} data-status={status}>{GRAZING_STATUS_LABELS[status]}</span></td>
                               <td>Đám đồng (sự kiện)</td>
-                              <td>{formatDate(event.startDate)}</td>
-                              <td>{formatDate(event.endDate)}</td>
+                              <td>{formatDateTime(event.startDate, metadataText(event, "startTime"))}</td>
+                              <td>{formatDateTime(event.endDate || event.startDate, metadataText(event, "endTime"))}</td>
                               <td>{daysBetween(event.startDate, event.endDate || event.startDate) ?? "-"}</td>
+                              <td>{dependency ? <span className={styles.dependencyPill}>{dependency}</span> : <span className={styles.readyPill}>Không có</span>}</td>
+                              <td><span className={dependency ? styles.waitingPill : styles.readyPill}>{dependency ? "F-S" : actionHint(event.note)}</span></td>
                             </tr>
                           );
                         }
                       }
                     }
                   } else if (isFeatureVisible("events")) {
-                    for (const event of plan.events) {
+                    for (const [eventIndex, event] of limitedEventsForTable(plan.events).entries()) {
                       const status = displayStatus(event.status, event.startDate, event.endDate);
+                      const sequence = eventSequence(eventIndex);
+                      const dependency = prerequisiteLabel(plan.events, event);
                       rows.push(
                         <tr key={`${plan.id}-event-${event.id}`} className={styles.eventTableRow}>
-                          <td><span className={styles.tableName}><Icon name="calendar" />{eventTitle(event)}</span></td>
+                          <td><span className={styles.tableName}><Icon name="calendar" /><span className={styles.sequenceBadge}>{sequence}</span>{eventTitle(event)}</span></td>
                           <td><span className={styles.statusPill} data-status={status}>{GRAZING_STATUS_LABELS[status]}</span></td>
                           <td>Sự kiện</td>
-                          <td>{formatDate(event.startDate)}</td>
-                          <td>{formatDate(event.endDate)}</td>
+                          <td>{formatDateTime(event.startDate, metadataText(event, "startTime"))}</td>
+                          <td>{formatDateTime(event.endDate || event.startDate, metadataText(event, "endTime"))}</td>
                           <td>{daysBetween(event.startDate, event.endDate || event.startDate) ?? "-"}</td>
+                          <td>{dependency ? <span className={styles.dependencyPill}>{dependency}</span> : <span className={styles.readyPill}>Không có</span>}</td>
+                          <td><span className={dependency ? styles.waitingPill : styles.readyPill}>{dependency ? "F-S" : actionHint(event.note)}</span></td>
                         </tr>
                       );
                     }
@@ -827,6 +982,8 @@ export default function GrazingClient({
                           <td>-</td>
                           <td>-</td>
                           <td>{group.headCount.toLocaleString("vi-VN")} con</td>
+                          <td>-</td>
+                          <td>-</td>
                         </tr>
                       );
                     }
@@ -839,110 +996,9 @@ export default function GrazingClient({
         </section>
       )}
 
-      {view === "chart" && (
-        <section className={styles.chartPanel}>
-          <div className={styles.sectionHead}>
-            <div>
-              <p className={styles.eyebrow}>Biểu đồ</p>
-              <h2>Sơ đồ dòng thời gian chăn thả</h2>
-            </div>
-            <span className={styles.panelBadge}>Theo {chartScale.label.toLowerCase()}</span>
-          </div>
-          <div className={styles.ganttShell}>
-            <div className={styles.ganttToolbar}>
-              <details className={styles.filterMenu}>
-                <summary><Icon name="table" /> Kế hoạch</summary>
-                <div className={styles.filterDropdown}>
-                  <button type="button" className={planTypeFilter === "all" ? styles.filterChecked : ""} onClick={() => setPlanTypeFilter("all")}>Tất cả</button>
-                  {GRAZING_PLAN_TYPE_OPTIONS.map((item) => (
-                    <button key={item.value} type="button" className={planTypeFilter === item.value ? styles.filterChecked : ""} onClick={() => setPlanTypeFilter(item.value)}>
-                      {item.shortLabel}
-                    </button>
-                  ))}
-                </div>
-              </details>
-              <details className={styles.filterMenu}>
-                <summary><Icon name="table" /> Đặc trưng</summary>
-                <div className={styles.filterDropdown}>
-                  {FEATURE_OPTIONS.map((item) => (
-                    <button key={item.value} type="button" className={featureFilters.includes(item.value) ? styles.filterChecked : ""} onClick={() => toggleFeature(item.value)}>
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </details>
-              <details className={styles.filterMenu}>
-                <summary><Icon name="calendar" /> {TIME_SCALE_OPTIONS.find((item) => item.value === timeScale)?.label ?? "Ngày"}</summary>
-                <div className={styles.filterDropdown}>
-                  {TIME_SCALE_OPTIONS.map((item) => (
-                    <button key={item.value} type="button" className={timeScale === item.value ? styles.filterChecked : ""} onClick={() => setTimeScale(item.value)}>
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </details>
-            </div>
-            <div
-              className={styles.ganttGrid}
-              style={{
-                "--chart-days": chartDates.days,
-                "--time-units": chartUnits,
-                "--slot-width": `${chartScale.slotWidth}px`,
-                "--timeline-width": `${chartWidth}px`,
-              } as CSSProperties}
-            >
-              <div className={styles.ganttLeftHead}>
-                <strong>Tên</strong>
-                <strong>Ưu tiên</strong>
-                <strong>Xếp hạng</strong>
-                <strong>Diện tích</strong>
-              </div>
-              <div className={styles.ganttScale}>
-                {chartTicks.map((tick) => (
-                  <span key={tick} style={{ left: `${(dateOffset(chartDates.start, tick) / chartDates.days) * 100}%` } as CSSProperties}>
-                    {formatShortDate(tick)}
-                  </span>
-                ))}
-              </div>
-              {chartRows.map((row) => {
-                const left = `${Math.min(98, (dateOffset(chartDates.start, row.startDate || chartDates.start) / chartScaleDays) * 100)}%`;
-                const width = `${Math.max(2, Math.min(100, ((daysBetween(row.startDate || chartDates.start, row.endDate || row.startDate || chartDates.start) ?? 1) / chartScaleDays) * 100))}%`;
-                const color = row.eventType ? eventColor(row.eventType) : row.type === "plan" ? "#d99a00" : row.type === "group" ? "#3f3f46" : "#67a832";
-                return (
-                  <div key={row.id} className={styles.ganttRow}>
-                    <div className={`${styles.ganttLabel} ${styles[`ganttLabel${row.type[0].toUpperCase()}${row.type.slice(1)}`]}`}>
-                      <span>
-                        {row.collapsible && row.collapseKey && (
-                          <button type="button" className={styles.collapseButton} onClick={() => toggleCollapsed(row.collapseKey!)}>
-                            {isCollapsed(row.collapseKey) ? "▸" : "▾"}
-                          </button>
-                        )}
-                        {row.name}
-                      </span>
-                      <small>{row.prerequisite ? `Trước: ${row.prerequisite}` : ""}</small>
-                    </div>
-                    <div className={styles.ganttMetric}>{row.priority ?? "-"}</div>
-                    <div className={styles.ganttMetric}>{row.rating ?? "-"}</div>
-                    <div className={styles.ganttMetric}>{row.area ? `${row.area.toLocaleString("vi-VN")} ha` : "-"}</div>
-                    <div className={styles.ganttCanvas}>
-                      {row.startDate && (
-                        <span
-                          className={`${styles.ganttBar} ${styles[`ganttBar${row.type[0].toUpperCase()}${row.type.slice(1)}`]}`}
-                          style={{ left, width, "--bar-color": color } as CSSProperties}
-                        >
-                          {row.label}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      )}
+      {view === "chart" && <GrazingGanttChart plans={visiblePlans} title="Sơ đồ dòng thời gian chăn thả" />}
 
-      {formOpen && (
+      {canWrite && formOpen && (
         <div className={styles.overlay} role="dialog" aria-modal="true" aria-labelledby="grazing-form-title">
           <form className={styles.modal} onSubmit={save}>
             <header className={styles.modalHead}>
@@ -966,7 +1022,7 @@ export default function GrazingClient({
                 <div className={styles.formSummary}>
                   <span><strong>Kế hoạch:</strong> {form.name.trim() || "Chưa nhập"}</span>
                   <span><strong>Kiểu:</strong> {getGrazingPlanTypeOption(form.type).shortLabel}</span>
-                  <span><strong>Thời gian:</strong> {formatDate(form.startDate || null)} - {formatDate(form.endDate || null)}</span>
+                  <span><strong>Thời gian:</strong> {formatDate(form.startDate || null)} - {form.type === "perpetual" ? `Vĩnh viễn (${PERPETUAL_PLAN_DAYS} ngày/lần)` : formatDate(form.endDate || null)}</span>
                   <span><strong>Dữ liệu:</strong> {form.paddocks.length} ô, {form.paddocks.reduce((total, item) => total + item.events.length, 0)} sự kiện</span>
                 </div>
                 {step === 0 && (
@@ -988,12 +1044,20 @@ export default function GrazingClient({
                 {step === 1 && (
                   <div className={styles.formGrid}>
                     <label><span>Tên kế hoạch *</span><input value={form.name} onChange={(e) => update("name", e.target.value)} required /></label>
-                    <label><span>Mã kế hoạch</span><input value={form.code} onChange={(e) => update("code", e.target.value)} placeholder="Tự sinh nếu bỏ trống" /></label>
-                    <label><span>Kiểu kế hoạch *</span><select value={form.type} onChange={(e) => update("type", e.target.value as GrazingPlanType)}>{GRAZING_PLAN_TYPE_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+                    {form.id && <label><span>Mã kế hoạch</span><input value={form.code} onChange={(e) => update("code", e.target.value)} placeholder="Tự sinh nếu bỏ trống" /></label>}
+                    <label><span>Kiểu kế hoạch *</span><select value={form.type} onChange={(e) => updatePlanType(e.target.value as GrazingPlanType)}>{GRAZING_PLAN_TYPE_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
                     <label><span>Trạng thái</span><select value={form.status} onChange={(e) => update("status", e.target.value as GrazingStatus)}>{Object.entries(GRAZING_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
                     <label><span>Ngày bắt đầu *</span><input type="date" value={form.startDate} onChange={(e) => update("startDate", e.target.value)} required /></label>
-                    <label><span>Ngày kết thúc</span><input type="date" value={form.endDate} onChange={(e) => update("endDate", e.target.value)} /></label>
-                    <label><span>Người phụ trách</span><input value={form.manager} onChange={(e) => update("manager", e.target.value)} /></label>
+                    {form.type !== "perpetual" && <label><span>Ngày kết thúc *</span><input type="date" value={form.endDate} onChange={(e) => update("endDate", e.target.value)} required /></label>}
+                    <label>
+                      <span>Người phụ trách</span>
+                      <select value={form.manager} onChange={(e) => update("manager", e.target.value)}>
+                        <option value="">Chưa chọn</option>
+                        {users.map((user) => (
+                          <option key={user.id} value={user.name}>{user.name}{user.email ? ` - ${user.email}` : ""}</option>
+                        ))}
+                      </select>
+                    </label>
                     <label className={styles.fullField}><span>Mục tiêu dài hạn / ghi chú</span><textarea value={form.note} onChange={(e) => update("note", e.target.value)} rows={4} /></label>
                     <div className={styles.selectorPanel}>
                       <span>Nhóm vật nuôi</span>
@@ -1061,7 +1125,10 @@ export default function GrazingClient({
                             </button>
                           </div>
                           <div className={styles.eventList}>
-                            {config.events.map((event) => (
+                            {config.events.map((event) => {
+                              const prerequisiteOptions = eventOptions.filter((item) => item.id !== event.id);
+                              const repeatEnabled = form.type === "perpetual" || form.type === "off_season";
+                              return (
                               <div key={event.id} className={`${styles.eventLine} ${event.type === "other" ? "" : styles.eventLineCompact}`}>
                                 <span className={styles.eventDot} style={{ "--event-color": eventColor(event.type) } as CSSProperties} />
                                 <select
@@ -1084,16 +1151,60 @@ export default function GrazingClient({
                                     required
                                   />
                                 )}
-                                <input type="date" value={event.startDate} onChange={(e) => updatePaddockEvent(config.paddockId, event.id, { startDate: e.target.value })} />
-                                <input type="date" value={event.endDate} onChange={(e) => updatePaddockEvent(config.paddockId, event.id, { endDate: e.target.value })} />
                                 <input
+                                  type="datetime-local"
+                                  value={dateTimeLocalValue(event.startDate, event.startTime)}
+                                  onChange={(e) => {
+                                    const value = splitDateTimeLocal(e.target.value);
+                                    updatePaddockEvent(config.paddockId, event.id, { startDate: value.date, startTime: value.time });
+                                  }}
+                                />
+                                <input
+                                  type="datetime-local"
+                                  value={dateTimeLocalValue(event.endDate, event.endTime)}
+                                  onChange={(e) => {
+                                    const value = splitDateTimeLocal(e.target.value);
+                                    updatePaddockEvent(config.paddockId, event.id, { endDate: value.date, endTime: value.time });
+                                  }}
+                                />
+                                <span className={styles.durationChip}>Thời lượng: {eventDurationLabel(event)}</span>
+                                {repeatEnabled && (
+                                  <label className={styles.repeatToggle}>
+                                    <input
+                                      type="checkbox"
+                                      checked={form.type === "perpetual" || event.repeat}
+                                      disabled={form.type === "perpetual"}
+                                      onChange={(e) => updatePaddockEvent(config.paddockId, event.id, { repeat: e.target.checked })}
+                                    />
+                                    <span>Lặp lại</span>
+                                  </label>
+                                )}
+                                <select
+                                  value={event.prerequisiteId}
+                                  onChange={(e) => {
+                                    const selected = prerequisiteOptions.find((item) => item.id === e.target.value);
+                                    const alignedEvent = selected ? alignEventAfterPrerequisite(event, selected) : event;
+                                    updatePaddockEvent(config.paddockId, event.id, {
+                                      startDate: alignedEvent.startDate,
+                                      startTime: alignedEvent.startTime,
+                                      endDate: alignedEvent.endDate,
+                                      endTime: alignedEvent.endTime,
+                                      prerequisiteId: e.target.value,
+                                      prerequisite: selected?.label ?? "",
+                                    });
+                                  }}
+                                >
+                                  <option value="">Không có công việc trước</option>
+                                  {prerequisiteOptions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                                </select>
+                                <input type="hidden"
                                   value={event.prerequisite}
                                   onChange={(e) => updatePaddockEvent(config.paddockId, event.id, { prerequisite: e.target.value })}
                                   placeholder="Việc cần làm trước"
                                 />
                                 <button type="button" onClick={() => removePaddockEvent(config.paddockId, event.id)}>Xóa</button>
                               </div>
-                            ))}
+                            );})}
                           </div>
                         </article>
                       );

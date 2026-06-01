@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -21,6 +22,12 @@ type AnimalOption = {
   qrCode: string | null;
   identity: string | null;
   status: string | null;
+};
+
+type ResponsibleUserOption = {
+  id: string;
+  name: string;
+  email: string | null;
 };
 
 type FormState = {
@@ -71,6 +78,13 @@ function formatDate(value: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Chưa cập nhật";
   return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function addDays(value: string, days: number) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return "";
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 function statusText(status: string) {
@@ -206,6 +220,17 @@ function metadataPayload(metadata: Record<string, string>) {
   }, {});
 }
 
+function sameResponsibleUser(user: ResponsibleUserOption, value: string) {
+  const clean = value.trim().toLowerCase();
+  return user.name.trim().toLowerCase() === clean || user.email?.trim().toLowerCase() === clean;
+}
+
+function fillIfBlank(currentValue: string, nextValue: string | number | null | undefined) {
+  if (currentValue.trim()) return currentValue;
+  if (nextValue == null || nextValue === "") return currentValue;
+  return String(nextValue);
+}
+
 function readImageFile(file: File) {
   return new Promise<AttachmentImage>((resolve, reject) => {
     const reader = new FileReader();
@@ -233,6 +258,8 @@ export default function TreatmentForm({
   animals,
   warehouseItems,
   recentTreatments,
+  responsibleUsers,
+  successHref = `/dashboard/vat-nuoi/${groupId}`,
   closeHref = `/dashboard/vat-nuoi/${groupId}`,
 }: {
   groupId: string;
@@ -241,6 +268,8 @@ export default function TreatmentForm({
   animals: AnimalOption[];
   warehouseItems: TreatmentWarehouseItem[];
   recentTreatments: LivestockTreatmentRecord[];
+  responsibleUsers: ResponsibleUserOption[];
+  successHref?: string;
   closeHref?: string;
 }) {
   const router = useRouter();
@@ -252,6 +281,7 @@ export default function TreatmentForm({
   const [attachmentImages, setAttachmentImages] = useState<AttachmentImage[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scannerActive, setScannerActive] = useState(false);
+  const [responsibleMode, setResponsibleMode] = useState<"user" | "other">("user");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const scanCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -269,8 +299,7 @@ export default function TreatmentForm({
     [form.warehouseItemId, warehouseItems]
   );
   const effectiveCount = form.selectedAnimalIds.length;
-  const suggestedTotal = numeric(form.dosePerAnimal) > 0 && effectiveCount > 0 ? numeric(form.dosePerAnimal) * effectiveCount : 0;
-  const submittedTotal = numeric(form.totalQuantity) > 0 ? numeric(form.totalQuantity) : suggestedTotal;
+  const submittedTotal = numeric(form.dosePerAnimal) > 0 && effectiveCount > 0 ? numeric(form.dosePerAnimal) * effectiveCount : 0;
   const remainingAfter = selectedItem ? selectedItem.quantity - submittedTotal : 0;
   const canDeduct = selectedItem?.type !== "cong_cu";
   const allAnimalIds = useMemo(() => animals.map((animal) => animal.id), [animals]);
@@ -278,6 +307,11 @@ export default function TreatmentForm({
     () => animals.filter((animal) => form.selectedAnimalIds.includes(animal.id)),
     [animals, form.selectedAnimalIds]
   );
+  const responsibleSelectValue = useMemo(() => {
+    if (responsibleMode === "other") return "__other__";
+    if (!form.performedBy.trim()) return "";
+    return responsibleUsers.some((user) => sameResponsibleUser(user, form.performedBy)) ? form.performedBy : "__other__";
+  }, [form.performedBy, responsibleMode, responsibleUsers]);
 
   const stopQrScanner = useCallback(() => {
     if (scanLoopRef.current != null) {
@@ -299,21 +333,64 @@ export default function TreatmentForm({
   };
 
   const setMetadata = (key: string, value: string) => {
-    setForm((current) => ({ ...current, metadata: { ...current.metadata, [key]: value } }));
+    setForm((current) => {
+      const metadata = { ...current.metadata, [key]: value };
+      const clean = value.trim();
+      const option = getLivestockTreatmentTypeOption(current.type);
+      const patch: Partial<FormState> = {};
+
+      if ((key === "boosterDate" || key === "reviewDate") && clean) patch.nextDueDate = clean;
+      if (key === "injectionRoute") patch.method = clean ? `${option.defaultMethod} - ${clean}` : option.defaultMethod;
+      if (key === "repeatAfterDays" && clean) {
+        const days = Math.floor(numeric(clean));
+        if (days > 0 && current.treatmentDate) patch.nextDueDate = addDays(current.treatmentDate, days);
+      }
+
+      return { ...current, ...patch, metadata };
+    });
+  };
+
+  const setTreatmentDate = (value: string) => {
+    setForm((current) => {
+      const repeatAfterDays = Math.floor(numeric(current.metadata.repeatAfterDays ?? ""));
+      return {
+        ...current,
+        treatmentDate: value,
+        nextDueDate: repeatAfterDays > 0 && value ? addDays(value, repeatAfterDays) : current.nextDueDate,
+      };
+    });
   };
 
   const applyWarehouseDefaults = (
     item: TreatmentWarehouseItem | null,
     option = typeOption,
     current: FormState
-  ): FormState => ({
-    ...current,
-    warehouseItemId: item?.id ?? "",
-    name: item ? `${option.shortLabel} - ${item.name}` : current.name,
-    doseUnit: item ? `${item.unit}/con` : option.defaultDoseUnit,
-    batchLot: item?.batchLot ?? "",
-    method: option.defaultMethod,
-  });
+  ): FormState => {
+    const metadata = { ...current.metadata };
+    if (item) {
+      metadata.productCode = fillIfBlank(metadata.productCode ?? "", item.code);
+      metadata.productGroup = fillIfBlank(metadata.productGroup ?? "", item.group);
+      metadata.supplier = fillIfBlank(metadata.supplier ?? "", item.supplier);
+      metadata.productDescription = fillIfBlank(metadata.productDescription ?? "", item.productDescription);
+      metadata.expiryDate = fillIfBlank(metadata.expiryDate ?? "", item.expiryDate);
+      metadata.manufactureDate = fillIfBlank(metadata.manufactureDate ?? "", item.manufactureDate);
+      metadata.purchaseDate = fillIfBlank(metadata.purchaseDate ?? "", item.purchaseDate);
+    }
+
+    return {
+      ...current,
+      warehouseItemId: item?.id ?? "",
+      name: item ? fillIfBlank(current.name, `${option.shortLabel} - ${item.name}`) : current.name,
+      doseUnit: item && !current.doseUnit.trim() ? `${item.unit}/con` : current.doseUnit || option.defaultDoseUnit,
+      batchLot: fillIfBlank(current.batchLot, item?.batchLot),
+      method: fillIfBlank(current.method, option.defaultMethod),
+      withdrawalDays: fillIfBlank(current.withdrawalDays, item?.whpDays),
+      esiDays: fillIfBlank(current.esiDays, item?.esiDays),
+      performedBy: fillIfBlank(current.performedBy, item?.manager),
+      note: fillIfBlank(current.note, item?.productDescription),
+      metadata,
+    };
+  };
 
   const changeType = (type: LivestockTreatmentType) => {
     const option = getLivestockTreatmentTypeOption(type);
@@ -557,7 +634,7 @@ export default function TreatmentForm({
     try {
       if (!form.warehouseItemId) throw new Error("Vui lòng chọn vật tư điều trị từ kho.");
       if (form.selectedAnimalIds.length < 1) throw new Error("Vui lòng chọn ít nhất một vật nuôi trong đàn để ghi điều trị.");
-      if (canDeduct && submittedTotal <= 0) throw new Error("Vui lòng nhập liều hoặc tổng lượng vật tư dùng.");
+      if (canDeduct && submittedTotal <= 0) throw new Error("Vui lòng nhập liều / con để tự tính tổng lượng vật tư dùng.");
       if (canDeduct && selectedItem && submittedTotal > selectedItem.quantity) throw new Error("Tồn kho không đủ cho lần điều trị này.");
 
       const response = await fetch("/api/du-lieu/vat-nuoi/dieu-tri", {
@@ -588,8 +665,8 @@ export default function TreatmentForm({
       const data = await readApiResponse(response);
       const restockText = data.inventoryDeducted === false ? " Vật tư công cụ được ghi nhận nhưng không trừ tồn kho." : "";
       setMessage(`${data.message ?? "Đã ghi nhận điều trị."}${restockText}`);
-      setForm(initialForm(warehouseItems, headCount));
       setAttachmentImages([]);
+      router.push(successHref);
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Không thể ghi nhận điều trị.");
@@ -687,7 +764,7 @@ export default function TreatmentForm({
 
             <label className={styles.treatmentField}>
               <span>Ngày điều trị</span>
-              <input type="date" value={form.treatmentDate} onChange={(event) => setField("treatmentDate", event.target.value)} required />
+              <input type="date" value={form.treatmentDate} onChange={(event) => setTreatmentDate(event.target.value)} required />
             </label>
 
             <label className={styles.treatmentField}>
@@ -713,7 +790,7 @@ export default function TreatmentForm({
 
             <label className={styles.treatmentField}>
               <span>Tổng lượng dùng</span>
-              <input type="number" min="0" step="0.01" value={form.totalQuantity} placeholder={suggestedTotal ? String(suggestedTotal) : ""} onChange={(event) => setField("totalQuantity", event.target.value)} />
+              <input type="number" min="0" step="0.01" value={submittedTotal ? String(submittedTotal) : ""} readOnly />
             </label>
 
             <label className={styles.treatmentField}>
@@ -728,7 +805,28 @@ export default function TreatmentForm({
 
             <label className={styles.treatmentField}>
               <span>Người thực hiện</span>
-              <input value={form.performedBy} onChange={(event) => setField("performedBy", event.target.value)} />
+              <select
+                value={responsibleSelectValue}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value === "__other__") {
+                    setResponsibleMode("other");
+                    setField("performedBy", responsibleUsers.some((user) => sameResponsibleUser(user, form.performedBy)) ? "" : form.performedBy);
+                    return;
+                  }
+                  setResponsibleMode("user");
+                  setField("performedBy", value);
+                }}
+              >
+                <option value="">Chưa chọn</option>
+                {responsibleUsers.map((user) => (
+                  <option key={user.id} value={user.name}>{user.name}{user.email ? ` - ${user.email}` : ""}</option>
+                ))}
+                <option value="__other__">Khác</option>
+              </select>
+              {responsibleSelectValue === "__other__" && (
+                <input value={form.performedBy} onChange={(event) => setField("performedBy", event.target.value)} placeholder="Nhập tên người thực hiện" />
+              )}
             </label>
 
             <label className={styles.treatmentField}>
@@ -764,7 +862,7 @@ export default function TreatmentForm({
                 <div className={styles.attachmentPreviewGrid}>
                   {attachmentImages.map((image, index) => (
                     <figure key={`${image.name}-${index}`}>
-                      <img src={image.dataUrl} alt={image.name} />
+                      <Image src={image.dataUrl} alt={image.name} width={360} height={270} unoptimized />
                       <figcaption>
                         <span>{image.name}</span>
                         <button type="button" onClick={() => removeAttachmentImage(index)} aria-label={`Xóa ${image.name}`}>

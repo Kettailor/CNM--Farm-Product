@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { getAccessibleFarm } from "@/lib/farm-access";
 
 export type DashboardOverview = {
   farmId: string | null;
@@ -21,6 +22,16 @@ export type DashboardOverview = {
     status: string | null;
     areaHa: number;
   }>;
+  access: {
+    roleCode: string | null;
+    roleName: string | null;
+    canRead: boolean;
+    canWrite: boolean;
+    canManageSettings: boolean;
+    canManageUsers: boolean;
+    canManageDocuments: boolean;
+    isOwner: boolean;
+  };
 };
 
 const DEFAULT_COORD = { latitude: 10.762622, longitude: 106.660172 };
@@ -37,6 +48,16 @@ const ZERO_OVERVIEW: DashboardOverview = {
   ownerName: null,
   metrics: { assets: 0, livestock: 0, zones: 0, waterSources: 0 },
   latestZones: [],
+  access: {
+    roleCode: null,
+    roleName: null,
+    canRead: false,
+    canWrite: false,
+    canManageSettings: false,
+    canManageUsers: false,
+    canManageDocuments: false,
+    isOwner: false,
+  },
 };
 
 async function getCount(tableSql: string, whereSql = "", params: unknown[] = []) {
@@ -45,16 +66,19 @@ async function getCount(tableSql: string, whereSql = "", params: unknown[] = [])
 }
 
 async function loadDuLieuOverview(ownerId: string): Promise<DashboardOverview> {
+  const access = await getAccessibleFarm(ownerId);
+  if (!access?.farmId) return ZERO_OVERVIEW;
+
   const farmRs = await db.query(
     `select n.id, n.ten_trang_trai as farm_name, n.created_at, c.ho_ten as owner_name,
+            n.is_map_shared,
             v.vi_do as latitude, v.kinh_do as longitude, v.ten_dia_diem as location_name
      from du_lieu.trang_trai n
      left join du_lieu.nguoi_dung c on c.id = n.chu_so_huu_id
      left join du_lieu.vi_tri_trang_trai v on v.trang_trai_id = n.id
-     where n.chu_so_huu_id = $1
-     order by n.created_at desc
+     where n.id = $1
      limit 1`,
-    [ownerId]
+    [access.farmId]
   );
 
   const farm = farmRs.rows[0] as
@@ -105,6 +129,16 @@ async function loadDuLieuOverview(ownerId: string): Promise<DashboardOverview> {
       status: row.status ? String(row.status) : null,
       areaHa: Number(row.area_ha ?? 0),
     })),
+    access: {
+      roleCode: access.roleCode,
+      roleName: access.roleName,
+      canRead: access.canRead,
+      canWrite: access.canWrite,
+      canManageSettings: access.canManageSettings,
+      canManageUsers: access.canManageUsers,
+      canManageDocuments: access.canManageDocuments,
+      isOwner: access.isOwner,
+    },
   };
 }
 

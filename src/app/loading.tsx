@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export default function Loading() {
   return (
     <main className="farm-loading-page">
@@ -10,13 +12,13 @@ export default function Loading() {
             <span />
           </div>
           <div className="farm-loading-path">
-            <img src="/assets/img/con_bo.svg" alt="" className="farm-loading-cow" />
+            <Image src="/assets/img/con_bo.svg" alt="" width={92} height={92} className="farm-loading-cow" />
           </div>
         </div>
 
         <div className="farm-loading-panel card">
           <div className="farm-loading-brand">
-            <img src="/favicon.ico" alt="KetKat-EcoFarm" className="farm-loading-logo" />
+            <Image src="/favicon.ico" alt="KetKat-EcoFarm" width={34} height={34} className="farm-loading-logo" />
             <span>KetKat-EcoFarm</span>
           </div>
 

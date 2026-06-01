@@ -1,5 +1,4 @@
 import DashboardShell from "@/components/dashboard-shell";
-import DashboardTopActions from "@/components/dashboard-top-actions";
 import MapViewSwitcher from "@/components/dashboard-map-view-switcher";
 import Link from "next/link";
 import LivestockPageTools from "./livestock-page-tools";
@@ -34,6 +33,7 @@ type AnimalGroupRow = {
   breed: string | null;
   headCount: number;
   linkedCount: number;
+  deceasedCount: number;
   healthStatus: string | null;
   zoneName: string | null;
   updatedAt: string | Date | null;
@@ -73,6 +73,8 @@ type AnimalGroup = {
   color: string;
   count: number;
   activeCount: number;
+  deceased: boolean;
+  deceasedCount: number;
   zones: string[];
   statusLabel: string;
   updatedAt: string | Date | null;
@@ -128,6 +130,7 @@ function statusLabel(status: string | null) {
   const raw = cleanText(status);
   if (!raw) return "Chưa cập nhật";
   const normalized = normalizeSearch(raw);
+  if (normalized.includes("tu vong") || normalized.includes("deceased") || normalized.includes("dead")) return "Đã tử vong";
   if (normalized.includes("dang hoat dong") || normalized.includes("active")) return "Đang theo dõi";
   if (normalized.includes("theo doi") || normalized.includes("canh bao") || normalized.includes("benh")) return "Cần chú ý";
   if (normalized.includes("ngung") || normalized.includes("inactive")) return "Ngừng theo dõi";
@@ -141,6 +144,11 @@ function searchValue(value: string | string[] | undefined) {
 function isActiveStatus(status: string | null) {
   const normalized = normalizeSearch(status);
   return normalized.includes("dang hoat dong") || normalized.includes("active");
+}
+
+function isDeceasedStatus(status: string | null) {
+  const normalized = normalizeSearch(status);
+  return normalized.includes("tu vong") || normalized.includes("deceased") || normalized.includes("dead");
 }
 
 function resolveSpecies(row: AnimalRow) {
@@ -216,12 +224,13 @@ function zoneColor(index: number, color: unknown, status: string | null) {
   return zonePalette[index % zonePalette.length];
 }
 
-function buildLegacyAnimalGroups(animals: AnimalRow[]): AnimalGroup[] {
+function buildLegacyAnimalGroups(animals: AnimalRow[], includeDeceased: boolean): AnimalGroup[] {
   const groups = new Map<string, AnimalGroup & { statusCounts: Map<string, number> }>();
 
-  for (const animal of animals) {
+  for (const animal of includeDeceased ? animals : animals.filter((item) => !isDeceasedStatus(item.status))) {
     const species = resolveSpecies(animal);
     const key = makeKey(species.label);
+    const deceased = isDeceasedStatus(animal.status);
     const current =
       groups.get(key) ??
       ({
@@ -231,6 +240,8 @@ function buildLegacyAnimalGroups(animals: AnimalRow[]): AnimalGroup[] {
         color: species.color,
         count: 0,
         activeCount: 0,
+        deceased: false,
+        deceasedCount: 0,
         zones: [],
         statusLabel: "Chưa cập nhật",
         updatedAt: null,
@@ -239,6 +250,8 @@ function buildLegacyAnimalGroups(animals: AnimalRow[]): AnimalGroup[] {
 
     current.count += 1;
     if (isActiveStatus(animal.status)) current.activeCount += 1;
+    if (deceased) current.deceasedCount += 1;
+    current.deceased = current.count > 0 && current.deceasedCount >= current.count;
 
     const zoneName = cleanText(animal.zoneName) || "Chưa gắn khu vực";
     if (!current.zones.includes(zoneName)) current.zones.push(zoneName);
@@ -256,33 +269,37 @@ function buildLegacyAnimalGroups(animals: AnimalRow[]): AnimalGroup[] {
 
   return Array.from(groups.values())
     .map(({ statusCounts, ...group }) => {
-      const mainStatus = Array.from(statusCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Chưa cập nhật";
+      const mainStatus = group.deceased ? "Đã tử vong" : Array.from(statusCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Chưa cập nhật";
       return { ...group, statusLabel: mainStatus };
     })
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "vi"));
 }
 
-function buildAnimalGroups(animals: AnimalRow[] = [], savedGroups: AnimalGroupRow[] = []): AnimalGroup[] {
+function buildAnimalGroups(animals: AnimalRow[] = [], savedGroups: AnimalGroupRow[] = [], includeDeceasedGroups = false, includeDeceasedAnimals = includeDeceasedGroups): AnimalGroup[] {
   const explicitGroups: AnimalGroup[] = savedGroups.map((group) => {
     const species = resolveSpeciesFromText(group.species);
     const count = group.linkedCount || group.headCount;
+    const deceased = count > 0 && (group.deceasedCount >= count || isDeceasedStatus(group.healthStatus));
+    const visibleCount = includeDeceasedAnimals || (deceased && includeDeceasedGroups) ? count : Math.max(count - group.deceasedCount, 0);
     return {
       key: `nhom-${group.id}`,
       href: `/dashboard/vat-nuoi/${group.id}`,
       label: group.name,
       icon: species.icon,
       color: species.color,
-      count,
-      activeCount: isActiveStatus(group.healthStatus) ? count : 0,
+      count: visibleCount,
+      activeCount: deceased ? 0 : visibleCount,
+      deceased,
+      deceasedCount: group.deceasedCount,
       zones: [cleanText(group.zoneName) || "Chưa gắn khu vực"],
-      statusLabel: statusLabel(group.healthStatus),
+      statusLabel: deceased ? "Đã tử vong" : statusLabel(group.healthStatus),
       updatedAt: group.updatedAt || group.createdAt,
     };
-  });
+  }).filter((group) => includeDeceasedGroups || !group.deceased);
 
   const groupedAnimalIds = new Set(savedGroups.map((group) => group.id));
   const legacyAnimals = animals.filter((animal) => !animal.groupId || !groupedAnimalIds.has(animal.groupId));
-  return [...explicitGroups, ...buildLegacyAnimalGroups(legacyAnimals)].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "vi"));
+  return [...explicitGroups, ...buildLegacyAnimalGroups(legacyAnimals, includeDeceasedAnimals)].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "vi"));
 }
 
 async function loadLivestockData(farmId: string) {
@@ -302,7 +319,14 @@ async function loadLivestockData(farmId: string) {
     db.query(
       `select n.id::text, n.ten_nhom, n.loai_vat_nuoi, n.giong, n.so_luong,
               n.trang_thai_suc_khoe, n.created_at, n.updated_at, k.ten_khu_vuc,
-              (select count(*)::int from du_lieu.vat_nuoi v where v.nhom_vat_nuoi_id = n.id) as linked_count
+              (select count(*)::int from du_lieu.vat_nuoi v where v.nhom_vat_nuoi_id = n.id) as linked_count,
+              (select count(*)::int
+                 from du_lieu.vat_nuoi v
+                where v.nhom_vat_nuoi_id = n.id
+                  and (
+                    coalesce(lower(v.trang_thai), '') in ('đã tử vong', 'da tu vong', 'deceased', 'dead')
+                    or coalesce(v.metadata_json, '{}'::jsonb) ? 'lastDeathEventId'
+                  )) as deceased_count
        from du_lieu.nhom_vat_nuoi n
        left join du_lieu.khu_vuc k on k.id = n.khu_vuc_id and coalesce(lower(k.trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')
        where n.trang_trai_id = $1
@@ -376,6 +400,7 @@ async function loadLivestockData(farmId: string) {
     breed: cleanText(row.giong),
     headCount: Number(row.so_luong ?? 0),
     linkedCount: Number(row.linked_count ?? 0),
+    deceasedCount: Number(row.deceased_count ?? 0),
     healthStatus: cleanText(row.trang_thai_suc_khoe),
     zoneName: cleanText(row.ten_khu_vuc),
     updatedAt: row.updated_at ?? null,
@@ -520,11 +545,20 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
   if (!data.farmId) redirect("/register/farm");
   if (searchValue(searchParams?.["hanh-dong"]) === "dieu-tri") redirect("/dashboard/vat-nuoi/dieu-tri");
   if (searchValue(searchParams?.["hanh-dong"]) === "ghi-nhan-su-kien") redirect("/dashboard/vat-nuoi/su-kien");
+  const showDeceasedGroups = searchValue(searchParams?.["hien-nhom-tu-vong"]) === "1";
+  const showDeceasedAnimals = searchValue(searchParams?.["hien-ca-the-tu-vong"]) === "1";
+  const showSummary = searchValue(searchParams?.["hien-tom-tat"]) !== "0";
+  const showGroupCards = searchValue(searchParams?.["hien-the-nhom"]) !== "0";
+  const showGroupsTable = searchValue(searchParams?.["hien-bang-nhom"]) !== "0";
+  const showMap = searchValue(searchParams?.["hien-ban-do"]) !== "0";
 
   const { animals, savedGroups, zones, countSummary, alertSummary } = await loadLivestockData(data.farmId);
-  const groups = buildAnimalGroups(animals, savedGroups);
-  const activeAnimals = animals.filter((animal) => isActiveStatus(animal.status)).length;
-  const linkedAnimals = animals.filter((animal) => animal.zoneId).length;
+  const includeDeceasedAnimals = showDeceasedGroups || showDeceasedAnimals;
+  const visibleAnimals = includeDeceasedAnimals ? animals : animals.filter((animal) => !isDeceasedStatus(animal.status));
+  const groups = buildAnimalGroups(animals, savedGroups, showDeceasedGroups, includeDeceasedAnimals);
+  const deceasedGroupCount = buildAnimalGroups(animals, savedGroups, true).filter((group) => group.deceased).length;
+  const activeAnimals = visibleAnimals.filter((animal) => isActiveStatus(animal.status)).length;
+  const linkedAnimals = visibleAnimals.filter((animal) => animal.zoneId).length;
   const locationZones = zones.filter((zone) => zone.animalCount > 0 || Number(zone.latestCount ?? 0) > 0);
   const mapZones = (locationZones.length > 0 ? locationZones : zones).filter((zone) => zone.polygon.length >= 3);
   const mapObjects = locationZones
@@ -538,7 +572,7 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
     }));
 
   const statCards = [
-    { label: "Tổng vật nuôi", value: formatNumber(animals.length), icon: "stable" as const },
+    { label: "Tổng vật nuôi", value: formatNumber(visibleAnimals.length), icon: "stable" as const },
     { label: "Nhóm ghi nhận", value: formatNumber(groups.length), icon: "list" as const },
     { label: "Đang theo dõi", value: formatNumber(activeAnimals), icon: "stable" as const },
     { label: "Có khu vực", value: `${formatNumber(linkedAnimals)}/${formatNumber(animals.length)}`, icon: "map" as const },
@@ -559,12 +593,16 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
             </div>
           </div>
           <div className={styles.headerActions}>
-            <LivestockPageTools zones={zones.map((zone) => ({ id: zone.id, name: zone.name }))} />
-            <DashboardTopActions />
+            <LivestockPageTools
+              zones={zones.map((zone) => ({ id: zone.id, name: zone.name }))}
+              canWrite={data.access.canWrite}
+              showDeceasedGroups={showDeceasedGroups}
+              showDeceasedAnimals={showDeceasedAnimals}
+            />
           </div>
         </section>
 
-        <section className={styles.statsGrid} aria-label="Chỉ số vật nuôi">
+        {showSummary && <section className={styles.statsGrid} aria-label="Chỉ số vật nuôi">
           {statCards.map((item) => (
             <article key={item.label} className={styles.statCard}>
               <span className={styles.statIcon}><SmallIcon name={item.icon} /></span>
@@ -574,14 +612,15 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
               </div>
             </article>
           ))}
-        </section>
+        </section>}
 
-        <section className={styles.speciesSection}>
+        {showGroupCards && <section className={styles.speciesSection}>
           <div className={styles.sectionHead}>
             <div>
               <p className={styles.eyebrow}>Nhóm vật nuôi</p>
-              <h2>{formatNumber(animals.length)} hồ sơ vật nuôi · {formatNumber(groups.length)} nhóm</h2>
+              <h2>{formatNumber(visibleAnimals.length)} hồ sơ vật nuôi · {formatNumber(groups.length)} nhóm</h2>
             </div>
+            {deceasedGroupCount > 0 && <div className={styles.panelBadge}>{showDeceasedGroups ? `Đang hiện ${formatNumber(deceasedGroupCount)} nhóm tử vong` : `Đã ẩn ${formatNumber(deceasedGroupCount)} nhóm tử vong`}</div>}
           </div>
 
           {groups.length > 0 ? (
@@ -592,7 +631,7 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
                     <span className={styles.speciesIcon}><AnimalIcon type={group.icon} /></span>
                     <div>
                       <h3>{group.label}</h3>
-                      <p>{group.statusLabel}</p>
+                      <p><span className={`${styles.statusPill} ${group.deceased ? styles.deceasedPill : ""}`}>{group.statusLabel}</span></p>
                     </div>
                   </div>
                   <div className={styles.speciesCount}>{formatNumber(group.count)}</div>
@@ -606,9 +645,9 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
           ) : (
             <div className={styles.emptyState}>Chưa có hồ sơ vật nuôi trong cơ sở dữ liệu của trang trại này.</div>
           )}
-        </section>
+        </section>}
 
-        <section className={styles.tablePanel}>
+        {showGroupsTable && <section className={styles.tablePanel}>
           <div className={styles.sectionHead}>
             <div>
               <p className={styles.eyebrow}>Bảng quản lý</p>
@@ -641,7 +680,7 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
                       <td>{formatNumber(group.count)}</td>
                       <td>{formatNumber(group.activeCount)}</td>
                       <td>{group.zones.join(", ")}</td>
-                      <td><span className={styles.statusPill}>{group.statusLabel}</span></td>
+                      <td><span className={`${styles.statusPill} ${group.deceased ? styles.deceasedPill : ""}`}>{group.statusLabel}</span></td>
                       <td>{formatDate(group.updatedAt)}</td>
                     </tr>
                   ))}
@@ -651,9 +690,9 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
           ) : (
             <div className={styles.emptyState}>Chưa có nhóm vật nuôi để hiển thị.</div>
           )}
-        </section>
+        </section>}
 
-        <section className={styles.mapPanel}>
+        {showMap && <section className={styles.mapPanel}>
           <div className={styles.sectionHead}>
             <div>
               <p className={styles.eyebrow}>Vị trí vật nuôi</p>
@@ -689,7 +728,7 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
               ? "Bản đồ ưu tiên các khu vực có vật nuôi được gắn khu vực hoặc có bản ghi đếm mới nhất."
               : "Chưa có vị trí vật nuôi được gắn trực tiếp; bản đồ đang hiển thị các khu vực hiện có của trang trại."}
           </div>
-        </section>
+        </section>}
       </div>
     </DashboardShell>
   );

@@ -7,22 +7,25 @@ import styles from "./page.module.css";
 
 type ToolItem = {
   label: string;
-  href: string;
+  href?: string;
+  action?: "open-settings";
   icon: WarehouseIconName;
   tone: "neutral" | "green" | "blue" | "amber" | "red";
 };
 
 const TOOLS: ToolItem[] = [
+  { label: "Cài đặt hiển thị", action: "open-settings", icon: "settings", tone: "blue" },
   { label: "Hồ sơ hóa chất", href: "/dashboard/ho-so-hoa-chat", icon: "warning", tone: "amber" },
   { label: "Thêm danh mục", href: "/dashboard/quan-ly-kho/tao-moi", icon: "plus", tone: "green" },
   { label: "Sửa danh mục", href: "/dashboard/quan-ly-kho/chinh-sua", icon: "edit", tone: "blue" },
   { label: "Hủy danh mục", href: "/dashboard/quan-ly-kho/huy", icon: "trash", tone: "red" },
 ];
 
-export default function WarehouseTools() {
+export default function WarehouseTools({ canWrite = false, onOpenSettings }: { canWrite?: boolean; onOpenSettings?: () => void }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const tools = canWrite ? TOOLS : TOOLS.filter((tool) => tool.action === "open-settings" || tool.href === "/dashboard/ho-so-hoa-chat");
 
   useEffect(() => {
     if (!open) return;
@@ -60,15 +63,20 @@ export default function WarehouseTools() {
         </button>
         {open && (
           <div className={styles.dropdown} role="menu">
-            {TOOLS.map((tool) => (
+            {tools.map((tool) => (
               <button
                 type="button"
-                key={tool.href}
+                key={tool.href ?? tool.action}
                 role="menuitem"
                 className={styles.dropdownItem}
                 data-tone={tool.tone}
                 onClick={() => {
                   setOpen(false);
+                  if (tool.action === "open-settings") {
+                    onOpenSettings?.();
+                    return;
+                  }
+                  if (!tool.href) return;
                   window.dispatchEvent(new Event("farm:navigation-loading"));
                   router.push(tool.href);
                 }}

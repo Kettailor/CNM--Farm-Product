@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+import NotificationBell from "@/components/notification-bell";
 import TopbarUserMenu from "@/components/topbar-user-menu";
 import styles from "./dashboard-shell.module.css";
 
@@ -17,13 +19,12 @@ const MENU_ITEMS = [
   { label: "Tổng quan", href: "/dashboard", icon: "dashboard" },
   { label: "Bản đồ trang trại", href: "/dashboard/map", icon: "map" },
   { label: "Vật nuôi", href: "/dashboard/vat-nuoi", icon: "livestock" },
-  { label: "Theo dõi vật nuôi", href: "#", icon: "track" },
   { label: "Quản lý khu vực", href: "/dashboard/khu-vuc", icon: "zones" },
   { label: "Chăn thả", href: "/dashboard/chan-tha", icon: "pasture" },
   { label: "Quản lý kho", href: "/dashboard/quan-ly-kho", icon: "warehouse" },
   { label: "Hồ sơ hóa chất", href: "/dashboard/ho-so-hoa-chat", icon: "chemical" },
   { label: "Dự báo thời tiết", href: "/dashboard/thoi-tiet", icon: "weather" },
-  { label: "Kế hoạch", href: "/dashboard/ke-hoach", icon: "plan" },
+  { label: "Công việc", href: "/dashboard/cong-viec", icon: "plan" },
 ];
 
 function MenuIcon({ name }: MenuIconProps) {
@@ -47,13 +48,6 @@ function MenuIcon({ name }: MenuIconProps) {
           <path d="M6 13c0-2.8 2.2-5 5-5s5 2.2 5 5" />
           <path d="M5 13h14l-1.2 6H6.2L5 13Z" />
           <path d="M8 8 7 5M16 8l1-3" />
-        </svg>
-      );
-    case "track":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M12 3a7 7 0 0 1 7 7c0 5-7 11-7 11S5 15 5 10a7 7 0 0 1 7-7Z" />
-          <circle cx="12" cy="10" r="2.5" />
         </svg>
       );
     case "zones":
@@ -125,13 +119,16 @@ export default function DashboardShell({ farmName, activePath, children }: Dashb
     <main className={styles.shell}>
       <header className={styles.header}>
         <div className={styles.brand}>
-          <img src="/favicon.ico" alt="KetKat-EcoFarm" className={styles.brandLogo} />
+          <Image src="/favicon.ico" alt="KetKat-EcoFarm" width={34} height={34} className={styles.brandLogo} />
           <div>
             <div className={styles.brandText}>KetKat-EcoFarm</div>
             <div className={styles.brandSubtext}>{farmName}</div>
           </div>
         </div>
-        <TopbarUserMenu />
+        <div className={styles.headerActions}>
+          <NotificationBell />
+          <TopbarUserMenu />
+        </div>
       </header>
 
       <section className={styles.layout}>

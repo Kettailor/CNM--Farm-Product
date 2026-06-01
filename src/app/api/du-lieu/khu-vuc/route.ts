@@ -3,6 +3,7 @@ import type { PoolClient } from "pg";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { layOwnerIdTuRequest, layOwnerIdTuServerCookie } from "@/lib/auth";
+import { getAccessibleFarmId } from "@/lib/farm-access";
 import { WAREHOUSE_TYPE_VALUES, type WarehouseType } from "@/lib/warehouse-types";
 import { ensureZoneSchema } from "@/lib/zone-schema";
 import { normalizeText, type ZoneTypeKey } from "@/lib/zone-type-utils";
@@ -117,16 +118,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Tọa độ vị trí không hợp lệ." }, { status: 400 });
     }
 
-    const farm = await db.query(
-      `select t.id as farm_id
-       from du_lieu.trang_trai t
-       where t.chu_so_huu_id = $1
-       order by t.created_at desc
-       limit 1`,
-      [ownerId]
-    );
-    const farmId = farm.rows[0]?.farm_id as string | undefined;
-    if (!farmId) return NextResponse.json({ message: "Chưa có nông trại cho tài khoản này." }, { status: 404 });
+    const farmId = await getAccessibleFarmId(ownerId, "write");
+    if (!farmId) return NextResponse.json({ message: "Không có quyền tạo khu vực." }, { status: 403 });
 
     const client = await db.connect();
     try {

@@ -22,6 +22,15 @@ type AnimalOption = {
   status: string | null;
 };
 
+type EventGroupOption = {
+  id: string;
+  name: string;
+  species: string;
+  breed: string | null;
+  count: number;
+  zoneName: string | null;
+};
+
 type MovementScope = "on_farm" | "off_farm";
 
 type MovementType =
@@ -50,18 +59,25 @@ type MovementMetadataField = {
   options?: string[];
 };
 
-type AdjustmentType = "add_animals" | "archive_animals" | "archive_group" | "remove_animals";
+type AdjustmentType = "deceased_animals" | "deceased_group";
 
 type AdjustmentOption = {
   value: AdjustmentType;
   label: string;
   summary: string;
   defaultTitle: string;
-  quantityLabel?: string;
-  quantityRequired?: boolean;
 };
 
 type AdjustmentMetadataField = MovementMetadataField;
+
+type GroupingAction = "split_group" | "merge_group";
+
+type GroupingOption = {
+  value: GroupingAction;
+  label: string;
+  summary: string;
+  defaultTitle: string;
+};
 
 type HealthType =
   | "castration"
@@ -131,7 +147,8 @@ type CameraConstraintSet = MediaTrackConstraintSet & {
 };
 
 const DEFAULT_MOVEMENT_TYPE: MovementType = "move_group_to_new_paddock";
-const DEFAULT_ADJUSTMENT_TYPE: AdjustmentType = "add_animals";
+const DEFAULT_ADJUSTMENT_TYPE: AdjustmentType = "deceased_animals";
+const DEFAULT_GROUPING_ACTION: GroupingAction = "split_group";
 
 const ON_FARM_MOVEMENT_TYPES: MovementType[] = [
   "move_group_to_new_paddock",
@@ -230,73 +247,44 @@ const MOVE_FIELD_CONFIG: Record<MovementType, MovementMetadataField[]> = {
 
 const ADJUSTMENT_TYPE_OPTIONS: AdjustmentOption[] = [
   {
-    value: "add_animals",
-    label: "Thêm vật nuôi",
-    summary: "Ghi nhận cá thể mới được bổ sung vào nhóm đang chọn.",
-    defaultTitle: "Thêm vật nuôi vào nhóm",
-    quantityLabel: "Số lượng thêm",
-    quantityRequired: true,
+    value: "deceased_animals",
+    label: "Cá thể tử vong",
+    summary: "Chọn một hoặc nhiều cá thể trong nhóm để đánh dấu đã tử vong.",
+    defaultTitle: "Ghi nhận cá thể vật nuôi tử vong",
   },
   {
-    value: "archive_animals",
-    label: "Lưu trữ vật nuôi",
-    summary: "Đưa các cá thể đã chọn vào trạng thái lưu trữ để vẫn giữ lịch sử theo dõi.",
-    defaultTitle: "Lưu trữ vật nuôi",
-  },
-  {
-    value: "archive_group",
-    label: "Lưu trữ nhóm",
-    summary: "Lưu trữ cả nhóm và toàn bộ cá thể trong nhóm, không xóa lịch sử đã ghi nhận.",
-    defaultTitle: "Lưu trữ nhóm vật nuôi",
-  },
-  {
-    value: "remove_animals",
-    label: "Loại bỏ vật nuôi",
-    summary: "Ghi nhận cá thể rời khỏi nhóm hoặc không còn được quản lý trong nhóm này.",
-    defaultTitle: "Loại bỏ vật nuôi khỏi nhóm",
+    value: "deceased_group",
+    label: "Cả nhóm tử vong",
+    summary: "Đánh dấu toàn bộ cá thể trong nhóm là đã tử vong và cập nhật trạng thái nhóm.",
+    defaultTitle: "Ghi nhận cả nhóm vật nuôi tử vong",
   },
 ];
 
 const ADJUSTMENT_FIELD_CONFIG: Record<AdjustmentType, AdjustmentMetadataField[]> = {
-  add_animals: [
-    { key: "sourceNote", label: "Nguồn bổ sung", placeholder: "Ví dụ: mua mới, sinh sản, chuyển từ nhóm khác" },
-    { key: "batchLot", label: "Mã lô/phiếu nhập" },
-    { key: "reason", label: "Lý do", placeholder: "Ghi chú lý do điều chỉnh số lượng" },
+  deceased_animals: [
+    { key: "causeOfDeath", label: "Nguyên nhân tử vong", placeholder: "Không bắt buộc" },
+    { key: "deathReference", label: "Mã biên bản/chứng từ" },
   ],
-  archive_animals: [
-    {
-      key: "archiveReason",
-      label: "Lý do lưu trữ",
-      inputType: "select",
-      required: true,
-      options: ["Đã bán", "Chết", "Mất tích", "Không còn theo dõi", "Khác"],
-    },
-    { key: "archiveReference", label: "Mã chứng từ/biên bản" },
-    { key: "archiveNote", label: "Ghi chú lưu trữ", inputType: "textarea" },
-  ],
-  archive_group: [
-    {
-      key: "archiveGroupReason",
-      label: "Lý do lưu trữ nhóm",
-      inputType: "select",
-      required: true,
-      options: ["Kết thúc lứa nuôi", "Đã bán toàn bộ", "Chuyển sang nhóm khác", "Không còn sử dụng", "Khác"],
-    },
-    { key: "archiveReference", label: "Mã chứng từ/biên bản" },
-    { key: "archiveNote", label: "Ghi chú lưu trữ nhóm", inputType: "textarea" },
-  ],
-  remove_animals: [
-    {
-      key: "removalReason",
-      label: "Lý do loại bỏ",
-      inputType: "select",
-      required: true,
-      options: ["Bán/loại thải", "Chết", "Hủy ghi nhận", "Chuyển nhầm nhóm", "Khác"],
-    },
-    { key: "removalReference", label: "Mã chứng từ/biên bản" },
-    { key: "removalDestination", label: "Nơi đến/ghi chú xử lý" },
+  deceased_group: [
+    { key: "causeOfDeath", label: "Nguyên nhân tử vong", placeholder: "Không bắt buộc" },
+    { key: "deathReference", label: "Mã biên bản/chứng từ" },
   ],
 };
+
+const GROUPING_ACTION_OPTIONS: GroupingOption[] = [
+  {
+    value: "split_group",
+    label: "Tách nhóm",
+    summary: "Chọn một phần cá thể trong nhóm hiện tại để tạo thành nhóm vật nuôi mới.",
+    defaultTitle: "Tách nhóm vật nuôi",
+  },
+  {
+    value: "merge_group",
+    label: "Gộp nhóm",
+    summary: "Chuyển các cá thể đã chọn sang một nhóm vật nuôi khác trong cùng trang trại.",
+    defaultTitle: "Gộp nhóm vật nuôi",
+  },
+];
 
 const HEALTH_CATEGORY_LABELS: Record<HealthCategory, string> = {
   procedures: "Thủ thuật & xử lý",
@@ -600,22 +588,58 @@ function parseClientNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function initialForm(groupZoneId = "", currentUserName = ""): FormState {
-  const option = LIVESTOCK_EVENT_TYPE_OPTIONS[0];
+function normalizeComparableText(value: string | null | undefined) {
+  return String(value ?? "").trim().normalize("NFC").toLowerCase();
+}
+
+function defaultMetadataForType(type: LivestockEventType, initialMetadata: Record<string, string> = {}) {
+  const metadata: Record<string, string> =
+    type === "move"
+      ? { movementType: DEFAULT_MOVEMENT_TYPE }
+      : type === "adjustment"
+        ? { adjustmentType: DEFAULT_ADJUSTMENT_TYPE }
+        : type === "grouping"
+          ? { groupingAction: DEFAULT_GROUPING_ACTION }
+          : {};
+  return { ...metadata, ...initialMetadata };
+}
+
+function defaultTitleForType(type: LivestockEventType, metadata: Record<string, string>) {
+  if (type === "move") return getMovementOption(getMovementType(metadata.movementType)).defaultTitle;
+  if (type === "adjustment") return getAdjustmentOption(getAdjustmentType(metadata.adjustmentType)).defaultTitle;
+  if (type === "grouping") return getGroupingOption(getGroupingAction(metadata.groupingAction)).defaultTitle;
+  return getLivestockEventTypeOption(type).defaultTitle;
+}
+
+function defaultUnitForType(type: LivestockEventType) {
+  if (type === "adjustment" || type === "grouping") return "con";
+  if (type === "health") return "";
+  if (type === "weight") return "kg";
+  return getLivestockEventTypeOption(type).defaultUnit ?? "";
+}
+
+function initialForm(
+  groupZoneId = "",
+  currentUserName = "",
+  initialType: LivestockEventType = LIVESTOCK_EVENT_TYPE_OPTIONS[0].value,
+  initialMetadata: Record<string, string> = {}
+): FormState {
+  const option = getLivestockEventTypeOption(initialType);
+  const metadata = defaultMetadataForType(option.value, initialMetadata);
   return {
     type: option.value,
-    title: option.defaultTitle,
+    title: defaultTitleForType(option.value, metadata),
     selectedAnimalIds: [],
     animalWeights: {},
     eventDate: today(),
     sourceZoneId: groupZoneId,
     destinationZoneId: "",
     numericValue: "",
-    unit: option.defaultUnit ?? "",
+    unit: defaultUnitForType(option.value),
     performedBy: currentUserName,
     followUpDate: "",
     note: "",
-    metadata: option.value === "adjustment" ? { adjustmentType: DEFAULT_ADJUSTMENT_TYPE } : {},
+    metadata,
   };
 }
 
@@ -647,6 +671,14 @@ function getAdjustmentOption(value: AdjustmentType) {
   return ADJUSTMENT_TYPE_OPTIONS.find((option) => option.value === value) ?? ADJUSTMENT_TYPE_OPTIONS[0];
 }
 
+function getGroupingAction(value: string | undefined): GroupingAction {
+  return GROUPING_ACTION_OPTIONS.some((option) => option.value === value) ? (value as GroupingAction) : DEFAULT_GROUPING_ACTION;
+}
+
+function getGroupingOption(value: GroupingAction) {
+  return GROUPING_ACTION_OPTIONS.find((option) => option.value === value) ?? GROUPING_ACTION_OPTIONS[0];
+}
+
 function getHealthType(value: string | undefined): HealthType | "" {
   return HEALTH_TYPE_OPTIONS.some((option) => option.value === value) ? (value as HealthType) : "";
 }
@@ -672,6 +704,8 @@ function eventMetadataPayload(form: FormState) {
       ...payload,
       adjustmentType,
       adjustmentLabel: option.label,
+      deathDate: form.eventDate,
+      deathScope: adjustmentType === "deceased_group" ? "group" : "animals",
     };
   }
 
@@ -701,6 +735,17 @@ function eventMetadataPayload(form: FormState) {
             weightSourceLabel: option.label,
           }
         : {}),
+    };
+  }
+
+  if (form.type === "grouping") {
+    const groupingAction = getGroupingAction(form.metadata.groupingAction);
+    const option = getGroupingOption(groupingAction);
+    return {
+      ...payload,
+      groupingAction,
+      groupingLabel: option.label,
+      targetZoneId: form.destinationZoneId || null,
     };
   }
 
@@ -803,6 +848,9 @@ export default function EventForm({
   groupZoneId,
   currentUserName,
   recentEvents,
+  groupOptions = [],
+  initialType,
+  initialGroupingAction,
   closeHref,
 }: {
   groupId: string;
@@ -812,12 +860,24 @@ export default function EventForm({
   groupZoneId: string;
   currentUserName: string;
   recentEvents: LivestockEventRecord[];
+  groupOptions?: EventGroupOption[];
+  initialType?: LivestockEventType;
+  initialGroupingAction?: GroupingAction;
   closeHref: string;
 }) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(() => initialForm(groupZoneId, currentUserName));
+  const makeInitialForm = useCallback(() => {
+    const initialMetadata: Record<string, string> =
+      initialType === "grouping" && initialGroupingAction
+        ? { groupingAction: initialGroupingAction }
+        : {};
+    return initialForm(groupZoneId, currentUserName, initialType, initialMetadata);
+  }, [currentUserName, groupZoneId, initialGroupingAction, initialType]);
+  const [form, setForm] = useState<FormState>(() => makeInitialForm());
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [deathConfirmOpen, setDeathConfirmOpen] = useState(false);
+  const [deathConfirmChecked, setDeathConfirmChecked] = useState(false);
   const [codeInput, setCodeInput] = useState("");
   const [activeWeightAnimalId, setActiveWeightAnimalId] = useState("");
   const [weightEntryValue, setWeightEntryValue] = useState("");
@@ -867,11 +927,20 @@ export default function EventForm({
   const weightSourceOption = getWeightSourceOption(weightSource);
   const movementType = getMovementType(form.metadata.movementType);
   const movementOption = getMovementOption(movementType);
+  const groupingAction = getGroupingAction(form.metadata.groupingAction);
+  const groupingOption = getGroupingOption(groupingAction);
+  const currentGroupSpecies = useMemo(() => groupOptions.find((group) => group.id === groupId)?.species ?? "", [groupId, groupOptions]);
+  const targetGroupOptions = useMemo(() => {
+    const sourceSpecies = normalizeComparableText(currentGroupSpecies);
+    return groupOptions.filter((group) => {
+      if (group.id === groupId) return false;
+      if (!sourceSpecies) return true;
+      return normalizeComparableText(group.species) === sourceSpecies;
+    });
+  }, [currentGroupSpecies, groupId, groupOptions]);
   const moveNeedsDestination = form.type === "move" && needsFarmDestination(movementType);
-  const adjustmentNumericValue =
-    form.type === "adjustment" && adjustmentType !== "add_animals"
-      ? String(form.selectedAnimalIds.length)
-      : form.numericValue;
+  const adjustmentNumericValue = form.type === "adjustment" ? String(form.selectedAnimalIds.length) : form.numericValue;
+  const isDeceasedGroup = form.type === "adjustment" && adjustmentType === "deceased_group";
 
   const stopQrScanner = useCallback(() => {
     if (scanLoopRef.current != null) {
@@ -887,6 +956,16 @@ export default function EventForm({
   }, []);
 
   useEffect(() => stopQrScanner, [stopQrScanner]);
+
+  useEffect(() => {
+    setForm(makeInitialForm());
+    setMessage(null);
+    setQrMessage(null);
+    setDeathConfirmOpen(false);
+    setDeathConfirmChecked(false);
+    setActiveWeightAnimalId("");
+    setWeightEntryValue("");
+  }, [groupId, makeInitialForm]);
 
   useEffect(() => {
     selectedAnimalIdsRef.current = form.selectedAnimalIds;
@@ -907,9 +986,13 @@ export default function EventForm({
         ? { movementType: DEFAULT_MOVEMENT_TYPE }
         : type === "adjustment"
           ? { adjustmentType: DEFAULT_ADJUSTMENT_TYPE }
+          : type === "grouping"
+            ? { groupingAction: DEFAULT_GROUPING_ACTION }
           : {};
     setMessage(null);
     setQrMessage(null);
+    setDeathConfirmOpen(false);
+    setDeathConfirmChecked(false);
     setActiveWeightAnimalId("");
     setWeightEntryValue("");
     setForm((current) => ({
@@ -920,8 +1003,10 @@ export default function EventForm({
           ? getMovementOption(DEFAULT_MOVEMENT_TYPE).defaultTitle
           : type === "adjustment"
             ? getAdjustmentOption(DEFAULT_ADJUSTMENT_TYPE).defaultTitle
-            : nextOption.defaultTitle,
-      unit: type === "adjustment" ? "con" : type === "health" ? "" : type === "weight" ? "kg" : nextOption.defaultUnit ?? "",
+            : type === "grouping"
+              ? getGroupingOption(DEFAULT_GROUPING_ACTION).defaultTitle
+              : nextOption.defaultTitle,
+      unit: defaultUnitForType(type),
       performedBy: currentUserName,
       sourceZoneId: groupZoneId,
       destinationZoneId: type === "move" ? current.destinationZoneId : "",
@@ -986,14 +1071,20 @@ export default function EventForm({
     const nextOption = getAdjustmentOption(nextType);
     setMessage(null);
     setQrMessage(null);
+    setDeathConfirmOpen(false);
+    setDeathConfirmChecked(false);
     setForm((current) => ({
       ...current,
       title: nextOption.defaultTitle,
       unit: "con",
-      numericValue: nextType === "add_animals" ? "" : String(nextType === "archive_group" ? allAnimalIds.length : current.selectedAnimalIds.length),
+      numericValue: String(nextType === "deceased_group" ? allAnimalIds.length : current.selectedAnimalIds.length),
       destinationZoneId: "",
-      selectedAnimalIds: nextType === "archive_group" ? allAnimalIds : current.selectedAnimalIds,
-      metadata: { adjustmentType: nextType },
+      selectedAnimalIds: nextType === "deceased_group" ? allAnimalIds : current.selectedAnimalIds,
+      metadata: {
+        adjustmentType: nextType,
+        causeOfDeath: current.metadata.causeOfDeath ?? "",
+        deathReference: current.metadata.deathReference ?? "",
+      },
     }));
   };
 
@@ -1008,7 +1099,32 @@ export default function EventForm({
     }));
   };
 
+  const changeGroupingAction = (nextAction: GroupingAction) => {
+    const nextOption = getGroupingOption(nextAction);
+    setMessage(null);
+    setQrMessage(null);
+    setForm((current) => ({
+      ...current,
+      title: nextOption.defaultTitle,
+      unit: "con",
+      numericValue: "",
+      destinationZoneId: "",
+      metadata: {
+        groupingAction: nextAction,
+        groupingReason: current.metadata.groupingReason ?? "",
+        newGroupName: nextAction === "split_group" ? current.metadata.newGroupName ?? "" : "",
+        targetGroupId:
+          nextAction === "merge_group" && targetGroupOptions.some((group) => group.id === current.metadata.targetGroupId)
+            ? current.metadata.targetGroupId ?? ""
+            : "",
+      },
+    }));
+  };
+
   const toggleAnimal = (animalId: string) => {
+    if (isDeceasedGroup) return;
+    setDeathConfirmOpen(false);
+    setDeathConfirmChecked(false);
     setForm((current) => {
       const exists = current.selectedAnimalIds.includes(animalId);
       return {
@@ -1022,11 +1138,16 @@ export default function EventForm({
 
   const selectAllAnimals = () => {
     setQrMessage(null);
+    setDeathConfirmOpen(false);
+    setDeathConfirmChecked(false);
     setField("selectedAnimalIds", allAnimalIds);
   };
 
   const clearSelectedAnimals = () => {
+    if (isDeceasedGroup) return;
     setQrMessage(null);
+    setDeathConfirmOpen(false);
+    setDeathConfirmChecked(false);
     setActiveWeightAnimalId("");
     setWeightEntryValue("");
     setForm((current) => ({
@@ -1279,8 +1400,7 @@ export default function EventForm({
     };
   }, [decodeFromVideo, scannerActive, scannerOpen, selectAnimalByCode]);
 
-  const submitForm = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const submitEvent = async (confirmedDeath = false) => {
     setSubmitting(true);
     setMessage(null);
 
@@ -1288,14 +1408,18 @@ export default function EventForm({
       if (form.type !== "weight" && form.selectedAnimalIds.length < 1) throw new Error("Vui lòng chọn ít nhất một cá thể để ghi sự kiện.");
 
       if (form.type === "adjustment") {
-        if (adjustmentType === "archive_group" && form.selectedAnimalIds.length !== animals.length) {
-          throw new Error("Lưu trữ nhóm cần chọn toàn bộ cá thể trong nhóm.");
+        if (adjustmentType === "deceased_group" && form.selectedAnimalIds.length !== animals.length) {
+          throw new Error("Đánh dấu cả nhóm tử vong cần chọn toàn bộ cá thể trong nhóm.");
         }
-        if (adjustmentOption.quantityRequired && Number(adjustmentNumericValue) <= 0) {
-          throw new Error(`Vui lòng nhập ${adjustmentOption.quantityLabel?.toLowerCase() ?? "số lượng"}.`);
-        }
+        if (!form.eventDate) throw new Error("Vui lòng nhập ngày tử vong.");
         const missingField = ADJUSTMENT_FIELD_CONFIG[adjustmentType].find((field) => field.required && !form.metadata[field.key]?.trim());
         if (missingField) throw new Error(`Vui lòng nhập ${missingField.label.toLowerCase()}.`);
+        if (!confirmedDeath) {
+          setDeathConfirmChecked(false);
+          setDeathConfirmOpen(true);
+          setSubmitting(false);
+          return;
+        }
       }
 
       if (form.type === "health") {
@@ -1328,6 +1452,17 @@ export default function EventForm({
         if (missingField) throw new Error(`Vui lòng nhập ${missingField.label.toLowerCase()}.`);
       }
 
+      if (form.type === "grouping") {
+        if (groupingAction === "split_group") {
+          if (!form.metadata.newGroupName?.trim()) throw new Error("Vui lòng nhập tên nhóm mới.");
+          if (form.selectedAnimalIds.length >= animals.length) throw new Error("Tách nhóm cần giữ lại ít nhất một cá thể trong nhóm hiện tại.");
+        }
+        if (groupingAction === "merge_group") {
+          const selectedTargetGroup = targetGroupOptions.find((group) => group.id === form.metadata.targetGroupId?.trim());
+          if (!selectedTargetGroup) throw new Error("Vui lòng chọn nhóm đích cùng loại vật nuôi để gộp.");
+        }
+      }
+
       const response = await fetch("/api/du-lieu/vat-nuoi/su-kien", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1340,8 +1475,15 @@ export default function EventForm({
           animalWeights: submittedWeights,
           sourceZoneId: form.sourceZoneId,
           destinationZoneId: form.destinationZoneId,
-          numericValue: form.type === "weight" && averageWeight != null ? String(averageWeight) : form.type === "adjustment" ? adjustmentNumericValue : form.numericValue,
-          unit: form.type === "adjustment" ? "con" : form.unit,
+          numericValue:
+            form.type === "weight" && averageWeight != null
+              ? String(averageWeight)
+              : form.type === "adjustment"
+                ? adjustmentNumericValue
+                : form.type === "grouping"
+                  ? String(form.selectedAnimalIds.length)
+                : form.numericValue,
+          unit: form.type === "adjustment" || form.type === "grouping" ? "con" : form.unit,
           performedBy: currentUserName,
           followUpDate: form.followUpDate,
           note: form.note,
@@ -1352,16 +1494,23 @@ export default function EventForm({
       const data = await readApiResponse(response);
       setMessage(data.message ?? "Đã ghi nhận sự kiện.");
       setQrMessage(null);
+      setDeathConfirmOpen(false);
+      setDeathConfirmChecked(false);
       stopQrScanner();
       setActiveWeightAnimalId("");
       setWeightEntryValue("");
-      setForm(initialForm(groupZoneId, currentUserName));
+      setForm(makeInitialForm());
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Không thể ghi nhận sự kiện.");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const submitForm = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void submitEvent(false);
   };
 
   const renderMetadataField = (field: LivestockEventMetadataField) => {
@@ -1443,19 +1592,19 @@ export default function EventForm({
   const renderAdjustmentForm = () => (
     <div className={styles.movePanel}>
       <div className={styles.moveHeader}>
-        <span className={styles.moveIcon}>DC</span>
+        <span className={`${styles.moveIcon} ${styles.dangerMoveIcon}`}>TV</span>
         <div>
-          <h3>Điều chỉnh</h3>
-          <p>Ghi nhận các thay đổi số lượng như thêm vật nuôi, lưu trữ cá thể, lưu trữ nhóm hoặc loại bỏ cá thể. Mỗi cá thể được chọn vẫn được gắn riêng với sự kiện.</p>
+          <h3>Vật nuôi tử vong</h3>
+          <p>Ghi nhận cá thể hoặc cả nhóm vật nuôi đã tử vong. Hồ sơ cá thể vẫn được lưu lại để tra cứu lịch sử về sau.</p>
         </div>
       </div>
 
       <div className={styles.moveTabs}>
-        <span>Sự kiện điều chỉnh</span>
+        <span>Sự kiện tử vong</span>
       </div>
 
       <label className={`${styles.eventField} ${styles.moveTypeField}`}>
-        <span>Loại điều chỉnh *</span>
+        <span>Phạm vi tử vong *</span>
         <select
           className={styles.moveTypeSelect}
           value={adjustmentType}
@@ -1477,7 +1626,7 @@ export default function EventForm({
         </label>
 
         <label className={styles.eventField}>
-          <span>Ngày điều chỉnh</span>
+          <span>Ngày tử vong</span>
           <input type="date" value={form.eventDate} onChange={(event) => setField("eventDate", event.target.value)} required />
         </label>
 
@@ -1496,26 +1645,10 @@ export default function EventForm({
           </select>
         </label>
 
-        {adjustmentOption.quantityLabel && (
-          <label className={styles.eventField}>
-            <span>{adjustmentOption.quantityRequired ? `${adjustmentOption.quantityLabel} *` : adjustmentOption.quantityLabel}</span>
-            <input
-              type="number"
-              min="1"
-              value={form.numericValue}
-              required={adjustmentOption.quantityRequired}
-              onChange={(event) => setField("numericValue", event.target.value)}
-              placeholder="Ví dụ: 5"
-            />
-          </label>
-        )}
-
-        {adjustmentType !== "add_animals" && (
-          <label className={styles.eventField}>
-            <span>Số cá thể áp dụng</span>
-            <input value={`${selectedAnimals.length} con`} readOnly aria-readonly="true" />
-          </label>
-        )}
+        <label className={styles.eventField}>
+          <span>Số cá thể tử vong</span>
+          <input value={`${selectedAnimals.length} con`} readOnly aria-readonly="true" />
+        </label>
 
         {ADJUSTMENT_FIELD_CONFIG[adjustmentType].map(renderMoveMetadataField)}
 
@@ -1902,6 +2035,127 @@ export default function EventForm({
     </div>
   );
 
+  const renderGroupingForm = () => (
+    <div className={styles.movePanel}>
+      <div className={styles.moveHeader}>
+        <span className={styles.moveIcon}>PN</span>
+        <div>
+          <h3>Phân nhóm</h3>
+          <p>Tách một phần cá thể sang nhóm mới hoặc gộp cá thể trong nhóm hiện tại sang nhóm khác. Hệ thống sẽ cập nhật nhóm của từng cá thể sau khi lưu sự kiện.</p>
+        </div>
+      </div>
+
+      <div className={styles.moveTabs}>
+        <span>Sự kiện phân nhóm</span>
+      </div>
+
+      <label className={`${styles.eventField} ${styles.moveTypeField}`}>
+        <span>Tác vụ phân nhóm *</span>
+        <select
+          className={styles.moveTypeSelect}
+          value={groupingAction}
+          onChange={(event) => changeGroupingAction(event.target.value as GroupingAction)}
+          required
+        >
+          {GROUPING_ACTION_OPTIONS.map((entry) => (
+            <option key={entry.value} value={entry.value}>{entry.label}</option>
+          ))}
+        </select>
+        <small className={styles.moveFieldHint}>{groupingOption.summary}</small>
+      </label>
+
+      <div className={styles.eventFormGrid}>
+        <label className={styles.eventField}>
+          <span>Nhóm nguồn</span>
+          <input value={groupName} readOnly aria-readonly="true" />
+        </label>
+
+        <label className={styles.eventField}>
+          <span>Cá thể đã chọn</span>
+          <input value={`${selectedAnimals.length} / ${animals.length} cá thể`} readOnly aria-readonly="true" />
+        </label>
+
+        <label className={styles.eventField}>
+          <span>Tiêu đề</span>
+          <input value={form.title} onChange={(event) => setField("title", event.target.value)} required />
+        </label>
+
+        <label className={styles.eventField}>
+          <span>Ngày thực hiện</span>
+          <input type="date" value={form.eventDate} onChange={(event) => setField("eventDate", event.target.value)} required />
+        </label>
+
+        <label className={styles.eventField}>
+          <span>Người thực hiện</span>
+          <input value={currentUserName} readOnly aria-readonly="true" />
+        </label>
+
+        {groupingAction === "split_group" ? (
+          <>
+            <label className={styles.eventField}>
+              <span>Tên nhóm mới *</span>
+              <input
+                value={form.metadata.newGroupName ?? ""}
+                onChange={(event) => setMetadata("newGroupName", event.target.value)}
+                placeholder={`${groupName} - tách`}
+                required
+              />
+            </label>
+
+            <label className={styles.eventField}>
+              <span>Khu vực nhóm mới</span>
+              <select value={form.destinationZoneId} onChange={(event) => setField("destinationZoneId", event.target.value)}>
+                <option value="">Giữ khu vực hiện tại</option>
+                {zones.map((zone) => (
+                  <option key={zone.id} value={zone.id}>{zone.name}</option>
+                ))}
+              </select>
+            </label>
+          </>
+        ) : (
+          <label className={styles.eventField}>
+            <span>Nhóm đích *</span>
+            <select
+              value={form.metadata.targetGroupId ?? ""}
+              onChange={(event) => setMetadata("targetGroupId", event.target.value)}
+              required
+            >
+              <option value="">Chọn nhóm đích</option>
+              {targetGroupOptions.length === 0 ? (
+                <option value="" disabled>Không có nhóm cùng loại</option>
+              ) : (
+                targetGroupOptions.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name} · {group.species}{group.breed ? ` · ${group.breed}` : ""} · {group.count} con
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
+        )}
+
+        <label className={styles.eventField}>
+          <span>Lý do phân nhóm</span>
+          <input
+            value={form.metadata.groupingReason ?? ""}
+            onChange={(event) => setMetadata("groupingReason", event.target.value)}
+            placeholder="Ví dụ: tách đàn, phân loại tuổi, chuyển lứa..."
+          />
+        </label>
+
+        <label className={styles.eventField}>
+          <span>Ngày nhắc lại</span>
+          <input type="date" value={form.followUpDate} onChange={(event) => setField("followUpDate", event.target.value)} />
+        </label>
+
+        <label className={`${styles.eventField} ${styles.eventFullField}`}>
+          <span>Ghi chú</span>
+          <textarea rows={3} value={form.note} onChange={(event) => setField("note", event.target.value)} />
+        </label>
+      </div>
+    </div>
+  );
+
   const renderStandardForm = () => (
     <div className={styles.eventFormGrid}>
       <label className={styles.eventField}>
@@ -1972,6 +2226,90 @@ export default function EventForm({
     </div>
   );
 
+  const renderDeathConfirmModal = () => {
+    const targetLabel =
+      adjustmentType === "deceased_group"
+        ? `cả nhóm ${groupName} (${selectedAnimals.length} cá thể)`
+        : `${selectedAnimals.length} cá thể đã chọn`;
+
+    return (
+      <div className={styles.deathModalBackdrop} role="presentation">
+        <div className={styles.deathModal} role="dialog" aria-modal="true" aria-labelledby="death-confirm-title">
+          <button
+            type="button"
+            className={styles.deathModalClose}
+            aria-label="Đóng cảnh báo"
+            onClick={() => {
+              setDeathConfirmOpen(false);
+              setDeathConfirmChecked(false);
+            }}
+          >
+            ×
+          </button>
+
+          <div className={styles.deathModalHead}>
+            <h3 id="death-confirm-title">Xác nhận vật nuôi tử vong</h3>
+            <span className={styles.deathModalIcon} aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M6 11c0-3 2.5-5 6-5s6 2 6 5v3c0 3-2.5 5-6 5s-6-2-6-5v-3Z" />
+                <path d="M7 8 5 5m12 3 2-3M10 12h.01M14 12h.01M10 16c1.3.7 2.7.7 4 0" />
+              </svg>
+            </span>
+          </div>
+
+          <div className={styles.deathModalCopy}>
+            <strong>Bạn có chắc muốn đánh dấu {targetLabel} là đã tử vong?</strong>
+            <p>Thao tác này sẽ cập nhật trạng thái vật nuôi thành “Đã tử vong”. Lịch sử, điều trị, ghi chú và dữ liệu truy xuất vẫn được giữ để xem lại, nhưng các cá thể này không còn được xem là đang theo dõi.</p>
+          </div>
+
+          <div className={styles.deathModalGrid}>
+            <label className={styles.eventField}>
+              <span>Ngày tử vong *</span>
+              <input type="date" value={form.eventDate} onChange={(event) => setField("eventDate", event.target.value)} required />
+            </label>
+            <label className={styles.eventField}>
+              <span>Nguyên nhân tử vong</span>
+              <input
+                value={form.metadata.causeOfDeath ?? ""}
+                onChange={(event) => setMetadata("causeOfDeath", event.target.value)}
+                placeholder="Không bắt buộc"
+              />
+            </label>
+          </div>
+
+          <p className={styles.deathModalHint}>Dữ liệu cá thể sẽ được lưu lại trong hồ sơ sau khi chuyển trạng thái.</p>
+
+          <label className={styles.deathConfirmCheck}>
+            <input type="checkbox" checked={deathConfirmChecked} onChange={(event) => setDeathConfirmChecked(event.target.checked)} />
+            <span>Tôi hiểu và xác nhận</span>
+          </label>
+
+          <div className={styles.deathModalActions}>
+            <button
+              type="button"
+              className={styles.secondaryAction}
+              disabled={submitting}
+              onClick={() => {
+                setDeathConfirmOpen(false);
+                setDeathConfirmChecked(false);
+              }}
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              className={styles.dangerAction}
+              disabled={submitting || !deathConfirmChecked || !form.eventDate}
+              onClick={() => void submitEvent(true)}
+            >
+              {submitting ? <CowLoading label="Đang tải..." /> : "Đánh dấu tử vong"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <section className={styles.eventPanel}>
       <div className={styles.sectionHead}>
@@ -2006,23 +2344,31 @@ export default function EventForm({
                 ? renderWeightForm()
               : form.type === "move"
                 ? renderMoveForm()
+                : form.type === "grouping"
+                  ? renderGroupingForm()
                 : renderStandardForm()}
 
           {form.type !== "weight" && (
           <div className={styles.animalPickerPanel}>
             <div className={styles.animalPickerHead}>
               <div>
-                <span>Cá thể trong nhóm cần ghi nhận</span>
+                <span>
+                  {form.type === "adjustment"
+                    ? "Cá thể tử vong"
+                    : form.type === "grouping"
+                      ? groupingAction === "split_group" ? "Cá thể tách sang nhóm mới" : "Cá thể gộp sang nhóm đích"
+                      : "Cá thể trong nhóm cần ghi nhận"}
+                </span>
                 <strong>{selectedAnimals.length} / {animals.length} cá thể</strong>
               </div>
               <div className={styles.animalPickerActions}>
                 <button type="button" className={styles.secondaryAction} onClick={selectAllAnimals} disabled={animals.length === 0}>
-                  Chọn tất cả
+                  {form.type === "adjustment" ? "Chọn cả nhóm" : "Chọn tất cả"}
                 </button>
-                <button type="button" className={styles.secondaryAction} onClick={clearSelectedAnimals} disabled={form.selectedAnimalIds.length === 0}>
+                <button type="button" className={styles.secondaryAction} onClick={clearSelectedAnimals} disabled={isDeceasedGroup || form.selectedAnimalIds.length === 0}>
                   Bỏ chọn
                 </button>
-                <button type="button" className={styles.secondaryAction} onClick={scannerActive ? stopQrScanner : startQrScanner} disabled={animals.length === 0}>
+                <button type="button" className={styles.secondaryAction} onClick={scannerActive ? stopQrScanner : startQrScanner} disabled={isDeceasedGroup || animals.length === 0}>
                   {scannerActive ? "Dừng quét QR" : "Quét QR bằng camera"}
                 </button>
               </div>
@@ -2039,6 +2385,7 @@ export default function EventForm({
             <div className={styles.qrManualRow}>
               <input
                 value={codeInput}
+                disabled={isDeceasedGroup}
                 onChange={(event) => setCodeInput(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
@@ -2046,9 +2393,9 @@ export default function EventForm({
                     scanManualCode();
                   }
                 }}
-                placeholder="Nhập hoặc dán mã cá thể/mã QR"
+                placeholder={isDeceasedGroup ? "Cả nhóm đã được chọn" : "Nhập hoặc dán mã cá thể/mã QR"}
               />
-              <button type="button" className={styles.secondaryAction} onClick={scanManualCode}>
+              <button type="button" className={styles.secondaryAction} onClick={scanManualCode} disabled={isDeceasedGroup}>
                 Chọn theo mã
               </button>
             </div>
@@ -2061,7 +2408,7 @@ export default function EventForm({
               ) : (
                 animals.map((animal) => (
                   <label key={animal.id}>
-                    <input type="checkbox" checked={form.selectedAnimalIds.includes(animal.id)} onChange={() => toggleAnimal(animal.id)} />
+                    <input type="checkbox" checked={form.selectedAnimalIds.includes(animal.id)} disabled={isDeceasedGroup} onChange={() => toggleAnimal(animal.id)} />
                     <span>{animal.code || animal.qrCode || "Cá thể chưa có mã"}</span>
                     {animal.qrCode && <small>{animal.qrCode}</small>}
                   </label>
@@ -2075,13 +2422,21 @@ export default function EventForm({
 
           <div className={styles.eventActions}>
             <button type="submit" disabled={submitting || (form.type === "weight" ? weightRows.length === 0 : form.selectedAnimalIds.length === 0)} className={styles.primaryAction}>
-              {submitting ? <CowLoading label="Đang tải..." /> : "Lưu sự kiện"}
+              {submitting
+                ? <CowLoading label="Đang tải..." />
+                : form.type === "adjustment"
+                  ? "Tiếp tục xác nhận"
+                  : form.type === "grouping"
+                    ? groupingAction === "split_group" ? "Tách nhóm" : "Gộp nhóm"
+                    : "Lưu sự kiện"}
             </button>
             <button type="button" disabled={submitting} className={styles.secondaryAction} onClick={() => router.push(closeHref)}>
               Đóng
             </button>
           </div>
         </form>
+
+        {deathConfirmOpen && renderDeathConfirmModal()}
 
         <aside className={styles.eventHistory}>
           <div>

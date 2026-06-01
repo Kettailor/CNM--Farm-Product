@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { getAccessibleFarmId } from "@/lib/farm-access";
 import { ensureLivestockSchema } from "@/lib/livestock-schema";
 import { ensureZoneSchema } from "@/lib/zone-schema";
 import { getZoneTypeInfo, normalizeText, normalizeWarehouseTypeValues, ZONE_TYPE_FORM_CONFIGS, type ZoneTypeKey } from "@/lib/zone-type-utils";
@@ -88,10 +89,10 @@ async function queryRows<T>(sql: string, values: unknown[]): Promise<QueryRows<T
   }
 }
 
-async function fetchZoneRow(zoneId: string, ownerId?: string | null) {
+async function fetchZoneRow(zoneId: string, farmId?: string | null) {
   await ensureZoneSchema();
-  const sql = `select k.id::text as id, coalesce(t.ten_trang_trai::text, '') as farm_name, coalesce(nullif(k.ten_khu_vuc::text, ''), '') as name, coalesce(nullif(k.loai_khu_vuc::text, ''), nullif(k.hinh_hoc_geojson->'metadata'->>'kind', ''), nullif(k.hinh_hoc_geojson->'metadata'->>'areaType', ''), nullif(k.hinh_hoc_geojson->'metadata'->>'usage', ''), nullif(loai.ten::text, ''), nullif(k.nguon_tao::text, ''), nullif(k.mo_ta::text, ''), nullif(k.hinh_hoc_geojson->'metadata'->>'farmType', ''), '') as raw_type, case when cardinality(coalesce(k.nhom_luu_tru_kho, '{}'::text[])) > 0 then to_jsonb(k.nhom_luu_tru_kho) else coalesce(k.hinh_hoc_geojson->'metadata'->'warehouseTypes', k.hinh_hoc_geojson->'metadata'->'extra'->'warehouseTypes', '[]'::jsonb) end as warehouse_types, coalesce(k.hinh_hoc_geojson->'metadata'->'extra', '{}'::jsonb) || coalesce(k.thong_tin_loai, '{}'::jsonb) as metadata_extra, coalesce(nullif(k.trang_thai::text, ''), '') as status, coalesce(k.dien_tich_ha::float8, 0)::float8 as area_ha, coalesce(k.chu_vi_m::float8, (k.hinh_hoc_geojson->'metadata'->>'perimeterM')::float8, null) as perimeter_m, nullif(coalesce(k.suc_chua::text, k.hinh_hoc_geojson->'metadata'->>'capacity', k.hinh_hoc_geojson->'metadata'->>'suc_chua'), '') as capacity, nullif(coalesce(k.mo_ta::text, k.hinh_hoc_geojson->'metadata'->>'description', k.hinh_hoc_geojson->'metadata'->>'notes'), '') as description, k.created_at, k.updated_at, k.hinh_hoc_geojson::jsonb as boundary_geojson, coalesce(k.mau_sac, k.hinh_hoc_geojson->'metadata'->>'areaColor', k.hinh_hoc_geojson->'metadata'->>'area_color') as area_color, coalesce(k.hinh_hoc_geojson->'geo', k.hinh_hoc_geojson) as geo from du_lieu.khu_vuc k join du_lieu.trang_trai t on t.id = k.trang_trai_id left join du_lieu.danh_muc_loai_khu_vuc loai on loai.id = k.loai_khu_vuc_id where (k.id::text = $1 or k.ma_khu_vuc::text = $1) ${ownerId ? "and t.chu_so_huu_id::text = $2" : ""} limit 1`;
-  return queryRows<ZoneRowDetail>(sql, ownerId ? [zoneId, ownerId] : [zoneId]);
+  const sql = `select k.id::text as id, coalesce(t.ten_trang_trai::text, '') as farm_name, coalesce(nullif(k.ten_khu_vuc::text, ''), '') as name, coalesce(nullif(k.loai_khu_vuc::text, ''), nullif(k.hinh_hoc_geojson->'metadata'->>'kind', ''), nullif(k.hinh_hoc_geojson->'metadata'->>'areaType', ''), nullif(k.hinh_hoc_geojson->'metadata'->>'usage', ''), nullif(loai.ten::text, ''), nullif(k.nguon_tao::text, ''), nullif(k.mo_ta::text, ''), nullif(k.hinh_hoc_geojson->'metadata'->>'farmType', ''), '') as raw_type, case when cardinality(coalesce(k.nhom_luu_tru_kho, '{}'::text[])) > 0 then to_jsonb(k.nhom_luu_tru_kho) else coalesce(k.hinh_hoc_geojson->'metadata'->'warehouseTypes', k.hinh_hoc_geojson->'metadata'->'extra'->'warehouseTypes', '[]'::jsonb) end as warehouse_types, coalesce(k.hinh_hoc_geojson->'metadata'->'extra', '{}'::jsonb) || coalesce(k.thong_tin_loai, '{}'::jsonb) as metadata_extra, coalesce(nullif(k.trang_thai::text, ''), '') as status, coalesce(k.dien_tich_ha::float8, 0)::float8 as area_ha, coalesce(k.chu_vi_m::float8, (k.hinh_hoc_geojson->'metadata'->>'perimeterM')::float8, null) as perimeter_m, nullif(coalesce(k.suc_chua::text, k.hinh_hoc_geojson->'metadata'->>'capacity', k.hinh_hoc_geojson->'metadata'->>'suc_chua'), '') as capacity, nullif(coalesce(k.mo_ta::text, k.hinh_hoc_geojson->'metadata'->>'description', k.hinh_hoc_geojson->'metadata'->>'notes'), '') as description, k.created_at, k.updated_at, k.hinh_hoc_geojson::jsonb as boundary_geojson, coalesce(k.mau_sac, k.hinh_hoc_geojson->'metadata'->>'areaColor', k.hinh_hoc_geojson->'metadata'->>'area_color') as area_color, coalesce(k.hinh_hoc_geojson->'geo', k.hinh_hoc_geojson) as geo from du_lieu.khu_vuc k join du_lieu.trang_trai t on t.id = k.trang_trai_id left join du_lieu.danh_muc_loai_khu_vuc loai on loai.id = k.loai_khu_vuc_id where (k.id::text = $1 or k.ma_khu_vuc::text = $1) ${farmId ? "and k.trang_trai_id::text = $2" : ""} limit 1`;
+  return queryRows<ZoneRowDetail>(sql, farmId ? [zoneId, farmId] : [zoneId]);
 }
 
 async function fetchZoneTypeSpecificData(zoneId: string): Promise<ZoneTypeSpecificData> {
@@ -126,20 +127,22 @@ async function fetchZoneTypeSpecificData(zoneId: string): Promise<ZoneTypeSpecif
   };
 }
 
-async function fetchLinkedZoneData(zoneId: string, ownerId?: string | null) {
+async function fetchLinkedZoneData(zoneId: string, farmId?: string | null) {
   await ensureLivestockSchema();
-  const zoneRs = await fetchZoneRow(zoneId, ownerId);
+  const zoneRs = await fetchZoneRow(zoneId, farmId);
   const zone = zoneRs.rows[0] as ZoneRowDetail | undefined;
   if (!zone) return null;
-  const ownerFilter = ownerId ? "and t.chu_so_huu_id::text = $2" : "";
+  const ownerFilter = farmId ? "and k.trang_trai_id::text = $2" : "";
   const livestockSql = `select v.id::text, v.ma_vat_nuoi, v.ma_qr, v.trang_thai, v.mo_ta from du_lieu.vat_nuoi v join du_lieu.khu_vuc k on k.id = v.khu_vuc_id join du_lieu.trang_trai t on t.id = k.trang_trai_id where k.id::text = $1 ${ownerFilter} order by v.created_at desc limit 6`;
   const countSql = `select coalesce((select count(*) from du_lieu.vat_nuoi v where v.khu_vuc_id = k.id), 0)::int as livestock_count, 0::int as water_asset_count, coalesce((select count(*) from du_lieu.canh_bao w where w.khu_vuc_id = k.id), 0)::int as note_count from du_lieu.khu_vuc k where k.id::text = $1 limit 1`;
-  const [livestockRs, countRs, typeSpecific] = await Promise.all([queryRows<LivestockRow>(livestockSql, ownerId ? [zoneId, ownerId] : [zoneId]), queryRows<CountRow>(countSql, [zoneId]), fetchZoneTypeSpecificData(zone.id)]);
+  const [livestockRs, countRs, typeSpecific] = await Promise.all([queryRows<LivestockRow>(livestockSql, farmId ? [zoneId, farmId] : [zoneId]), queryRows<CountRow>(countSql, [zoneId]), fetchZoneTypeSpecificData(zone.id)]);
   return { zone, livestock: livestockRs.rows, counts: countRs.rows[0] ?? {}, typeSpecific };
 }
 
 export async function getZoneDetail(ownerId: string | null, zoneId: string): Promise<ZoneDetail | null> {
-  const linked = await fetchLinkedZoneData(zoneId, ownerId);
+  const farmId = ownerId ? await getAccessibleFarmId(ownerId, "read") : null;
+  if (ownerId && !farmId) return null;
+  const linked = await fetchLinkedZoneData(zoneId, farmId);
   if (!linked) return null;
   return buildZoneDetail(linked.zone as ZoneRowDetail, linked);
 }

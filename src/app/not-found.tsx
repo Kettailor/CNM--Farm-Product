@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export default function NotFound() {
@@ -15,7 +16,7 @@ export default function NotFound() {
 
         <div className="farm-404-panel card">
           <div className="farm-404-brand">
-            <img src="/favicon.ico" alt="KetKat-EcoFarm" className="farm-404-logo" />
+            <Image src="/favicon.ico" alt="KetKat-EcoFarm" width={34} height={34} className="farm-404-logo" />
             <span>KetKat-EcoFarm</span>
           </div>
 

@@ -16,6 +16,13 @@
   cursor: pointer;
 }
 
+.userName {
+  max-width: min(180px, 34vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .avatar {
   width: 28px;
   height: 28px;

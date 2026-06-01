@@ -115,7 +115,17 @@ export default async function LivestockAnimalDetailPage({ params }: PageProps) {
               <span>{detail.group.name}</span>
             </div>
           </div>
-          <span className={styles.statusPill}>{statusLabel(animal.status)}</span>
+          <div className={styles.sectionActions}>
+            <Link className={styles.inlineAction} href={`/dashboard/vat-nuoi/${detail.group.id}/ca-the/${animal.id}/so-kham-benh`}>
+              <SmallIcon name="events" />
+              Sổ khám bệnh
+            </Link>
+            <Link className={`${styles.inlineAction} ${styles.secondaryInlineAction}`} href={`/dashboard/vat-nuoi/dieu-tri?groupId=${detail.group.id}`}>
+              <SmallIcon name="growth" />
+              Ghi điều trị
+            </Link>
+            <span className={styles.statusPill}>{statusLabel(animal.status)}</span>
+          </div>
         </section>
 
         <section className={styles.heroPanel} style={accentStyle(detail.zone?.color ?? "#2f855a")}>
@@ -164,29 +174,33 @@ export default async function LivestockAnimalDetailPage({ params }: PageProps) {
           />
         </section>
 
-        <section className={styles.detailPanel}>
+        <section id="so-kham-benh" className={styles.detailPanel}>
           <div className={styles.sectionHead}>
             <div>
-              <p className={styles.eyebrow}>Điều trị</p>
-              <h2><SmallIcon name="growth" /> Lịch sử chăm sóc</h2>
+              <p className={styles.eyebrow}>Sổ khám bệnh</p>
+              <h2><SmallIcon name="growth" /> Nhật ký gần đây</h2>
             </div>
             <span className={styles.panelBadge}>{formatNumber(detail.treatments.length)} lần</span>
           </div>
+          <div className={styles.sectionActions}>
+            <Link className={styles.inlineAction} href={`/dashboard/vat-nuoi/${detail.group.id}/ca-the/${animal.id}/so-kham-benh`}>
+              <SmallIcon name="growth" />
+              Xem chi tiết
+            </Link>
+          </div>
           <div className={styles.timeline}>
-            {detail.treatments.map((treatment) => (
+            {detail.treatments.slice(0, 3).map((treatment) => (
               <article key={treatment.id}>
                 <strong>{treatment.name || treatment.type || "Điều trị"}</strong>
                 <span>{formatDate(treatment.treatmentDate || treatment.createdAt)}</span>
                 <p>
-                  {formatNumber(treatment.dosage, treatment.dosageUnit ? ` ${treatment.dosageUnit}` : "")}
-                  {treatment.method ? ` · ${treatment.method}` : ""}
-                  {treatment.note ? ` · ${treatment.note}` : ""}
+                  {treatment.method || treatment.status || "Đã ghi nhận"}
                 </p>
               </article>
             ))}
             {detail.treatments.length === 0 && (
               <article>
-                <strong>Chưa có điều trị</strong>
+                <strong>Chưa có hồ sơ khám bệnh</strong>
                 <span>Chưa cập nhật</span>
                 <p>Cá thể này chưa có bản ghi điều trị riêng.</p>
               </article>

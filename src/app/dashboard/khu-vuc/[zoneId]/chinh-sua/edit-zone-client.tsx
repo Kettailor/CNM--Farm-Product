@@ -147,7 +147,7 @@ export default function EditZoneClient({ zone }: Props) {
           <span className={styles.kicker}>Chỉnh sửa khu vực</span>
           <h1>{zone.name}</h1>
         </div>
-        <ZoneActionMenu context="edit" zoneId={zone.id} zoneStatus={zone.status} backHref={`/dashboard/khu-vuc/${zone.id}`} />
+        <ZoneActionMenu context="edit" zoneId={zone.id} zoneStatus={zone.status} backHref={`/dashboard/khu-vuc/${zone.id}`} canWrite />
       </header>
 
       <div className={styles.body}>

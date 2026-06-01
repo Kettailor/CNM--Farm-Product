@@ -34,6 +34,8 @@ type Props = {
   backHref?: string;
   zoneStatus?: string | null;
   onOpenSettings?: () => void;
+  canWrite?: boolean;
+  canOpenSettings?: boolean;
 };
 
 function Icon({ name }: { name: ActionIcon }) {
@@ -96,7 +98,7 @@ function actionGroups(context: ZoneActionContext, zoneId?: string, zoneStatus?: 
       ...base,
       [
         { label: "Làm mới danh sách", icon: "reset", tone: "blue", href: "/dashboard/khu-vuc" },
-        { label: "Cài đặt", icon: "settings", tone: "blue", action: "open-settings" },
+        { label: "Cài đặt hiển thị", icon: "settings", tone: "blue", action: "open-settings" },
       ],
     ];
   }
@@ -124,12 +126,21 @@ function actionGroups(context: ZoneActionContext, zoneId?: string, zoneStatus?: 
         : { label: "Hủy khu vực", icon: "delete", tone: "red", action: "cancel-zone" },
     ],
     [
-      { label: "Cài đặt", icon: "settings", tone: "blue", href: "/dashboard/settings" },
+      { label: "Cài đặt trang trại", icon: "settings", tone: "blue", href: "/dashboard/settings" },
     ],
   ];
 }
 
-export default function ZoneActionMenu({ context, zoneId, backHref, zoneStatus, onOpenSettings }: Props) {
+function isWriteAction(item: ActionItem) {
+  return Boolean(
+    item.href?.includes("/tao-moi") ||
+      item.href?.includes("/chinh-sua") ||
+      item.action === "cancel-zone" ||
+      item.action === "restore-zone"
+  );
+}
+
+export default function ZoneActionMenu({ context, zoneId, backHref, zoneStatus, onOpenSettings, canWrite = false, canOpenSettings = false }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -154,6 +165,7 @@ export default function ZoneActionMenu({ context, zoneId, backHref, zoneStatus, 
 
   const runAction = async (item: ActionItem) => {
     if (item.disabled || busy) return;
+    if (!canWrite && isWriteAction(item)) return;
     setOpen(false);
     if (item.action === "open-settings") {
       onOpenSettings?.();
@@ -192,6 +204,9 @@ export default function ZoneActionMenu({ context, zoneId, backHref, zoneStatus, 
       router.push(item.href);
     }
   };
+  const visibleActionGroups = actionGroups(context, zoneId, zoneStatus)
+    .map((group) => group.filter((item) => (canWrite || !isWriteAction(item)) && (canOpenSettings || !item.href?.startsWith("/dashboard/settings"))))
+    .filter((group) => group.length > 0);
 
   return (
     <div className={styles.tools} ref={rootRef}>
@@ -210,7 +225,7 @@ export default function ZoneActionMenu({ context, zoneId, backHref, zoneStatus, 
         </button>
         {open && (
           <div className={styles.dropdown} role="menu">
-            {actionGroups(context, zoneId, zoneStatus).map((group, groupIndex) => (
+            {visibleActionGroups.map((group, groupIndex) => (
               <div key={groupIndex} className={styles.dropdownSection}>
                 {group.map((item) => (
                   <button

@@ -135,10 +135,10 @@ export async function ensureFarmSettingsDefaults(farmId: string, ownerId: string
     `insert into du_lieu.vai_tro_trang_trai
        (trang_trai_id, ma_vai_tro, ten_vai_tro, mo_ta, quyen, la_mac_dinh)
      values
-       ($1, 'owner', 'Chủ trang trại', 'Toàn quyền cấu hình và quản trị trang trại.', '{"settings": true, "users": true, "documents": true, "farm": true}'::jsonb, false),
-       ($1, 'admin', 'Quản trị', 'Quản trị vận hành và dữ liệu trang trại.', '{"settings": true, "users": true, "documents": true, "farm": true}'::jsonb, true),
-       ($1, 'editor', 'Biên tập', 'Xem và chỉnh sửa dữ liệu trang trại được phân quyền.', '{"settings": false, "users": false, "documents": true, "farm": true, "write": true}'::jsonb, false),
-       ($1, 'viewer', 'Chỉ xem', 'Chỉ xem dữ liệu được phân quyền.', '{"settings": false, "users": false, "documents": false, "farm": true, "write": false}'::jsonb, false)
+       ($1, 'owner', 'Chủ sở hữu', 'Toàn quyền cấu hình và quản trị trang trại.', '{"read": true, "settings": true, "users": true, "documents": true, "farm": true, "write": true}'::jsonb, false),
+       ($1, 'admin', 'Quản trị', 'Quản trị vận hành và dữ liệu trang trại.', '{"read": true, "settings": true, "users": true, "documents": true, "farm": true, "write": true}'::jsonb, true),
+       ($1, 'editor', 'Biên tập', 'Xem và chỉnh sửa dữ liệu trang trại được phân quyền.', '{"read": true, "settings": false, "users": false, "documents": true, "farm": true, "write": true}'::jsonb, false),
+       ($1, 'viewer', 'Chỉ xem', 'Chỉ xem dữ liệu được phân quyền.', '{"read": true, "settings": false, "users": false, "documents": false, "farm": true, "write": false}'::jsonb, false)
      on conflict (trang_trai_id, ma_vai_tro) do update
      set ten_vai_tro = excluded.ten_vai_tro,
          mo_ta = excluded.mo_ta,

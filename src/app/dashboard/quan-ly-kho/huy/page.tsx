@@ -11,6 +11,7 @@ export default async function WarehouseCancelPage() {
 
   const overview = await getDashboardOverview(ownerId);
   if (!overview.farmId) redirect("/register/farm");
+  if (!overview.access.canWrite) redirect("/dashboard/quan-ly-kho");
 
   const [items, zones] = await Promise.all([loadWarehouseItems(overview.farmId), loadWarehouseZones(overview.farmId)]);
 

@@ -8,7 +8,7 @@ import { getDashboardOverview } from "@/lib/dashboard-overview";
 import { loadLivestockGroupDetail } from "@/lib/livestock-detail";
 import { loadLivestockEventSupport } from "@/lib/livestock-event-data";
 import { ensureLivestockEventSchema } from "@/lib/livestock-event-schema";
-import { LIVESTOCK_EVENT_TYPE_OPTIONS } from "@/lib/livestock-event-types";
+import { LIVESTOCK_EVENT_TYPE_OPTIONS, isLivestockEventType, type LivestockEventType } from "@/lib/livestock-event-types";
 import EventForm from "./event-form";
 import styles from "./page.module.css";
 
@@ -28,11 +28,32 @@ type EventGroupOption = {
   updatedAt: string | Date | null;
 };
 
+type InitialGroupingAction = "split_group" | "merge_group";
+
 const accentStyle = (color: string): CSSProperties => ({ "--accent": color } as CSSProperties);
 const speciesColors = ["#1f7a4a", "#2563eb", "#b45309", "#7c3aed", "#0f766e", "#be123c"];
 
 function singleParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function normalizeInitialType(value: string | string[] | undefined): LivestockEventType | undefined {
+  const raw = singleParam(value);
+  return isLivestockEventType(raw) ? raw : undefined;
+}
+
+function normalizeInitialGroupingAction(value: string | string[] | undefined): InitialGroupingAction | undefined {
+  const raw = singleParam(value);
+  if (raw === "tach_nhom" || raw === "split_group") return "split_group";
+  if (raw === "ghep_nhom" || raw === "merge_group") return "merge_group";
+  return undefined;
+}
+
+function eventGroupHref(groupId: string, initialType: LivestockEventType | undefined, initialGroupingAction: InitialGroupingAction | undefined) {
+  const params = new URLSearchParams({ groupId });
+  if (initialType) params.set("loai", initialType);
+  if (initialGroupingAction) params.set("kieu", initialGroupingAction === "split_group" ? "tach_nhom" : "ghep_nhom");
+  return `/dashboard/vat-nuoi/su-kien?${params.toString()}`;
 }
 
 function cleanText(value: unknown) {
@@ -125,8 +146,6 @@ async function loadCurrentUserName(ownerId: string) {
       `select coalesce(
           (select nullif(ho_ten, '') from du_lieu.nguoi_dung where id::text = $1 limit 1),
           (select nullif(email, '') from du_lieu.nguoi_dung where id::text = $1 limit 1),
-          (select nullif(full_name, '') from du_lieu.chu_so_huu where id::text = $1 limit 1),
-          (select nullif(email, '') from du_lieu.chu_so_huu where id::text = $1 limit 1),
           'Người dùng hiện tại'
         ) as name`,
       [ownerId]
@@ -143,8 +162,11 @@ export default async function LivestockEventPage({ searchParams }: PageProps) {
 
   const data = await getDashboardOverview(ownerId);
   if (!data.farmId) redirect("/register/farm");
+  if (!data.access.canWrite) redirect("/dashboard/vat-nuoi");
 
   const selectedGroupId = singleParam(searchParams?.groupId);
+  const initialType = normalizeInitialType(searchParams?.loai);
+  const initialGroupingAction = normalizeInitialGroupingAction(searchParams?.kieu);
   const groups = await loadEventGroups(data.farmId);
   const selectedDetail = selectedGroupId ? await loadLivestockGroupDetail(ownerId, selectedGroupId) : null;
   if (selectedGroupId && !selectedDetail) notFound();
@@ -238,7 +260,7 @@ export default async function LivestockEventPage({ searchParams }: PageProps) {
                 return (
                   <Link
                     key={group.id}
-                    href={`/dashboard/vat-nuoi/su-kien?groupId=${group.id}`}
+                    href={eventGroupHref(group.id, initialType, initialGroupingAction)}
                     className={active ? `${styles.groupCard} ${styles.groupCardActive}` : styles.groupCard}
                     style={accentStyle(speciesColor(group.species, index))}
                   >
@@ -270,6 +292,16 @@ export default async function LivestockEventPage({ searchParams }: PageProps) {
             groupZoneId={selectedDetail.zone?.id ?? ""}
             currentUserName={currentUserName}
             recentEvents={eventSupport.events}
+            groupOptions={groups.map((group) => ({
+              id: group.id,
+              name: group.name,
+              species: group.species,
+              breed: group.breed,
+              count: group.count,
+              zoneName: group.zoneName,
+            }))}
+            initialType={initialType}
+            initialGroupingAction={initialGroupingAction}
             closeHref="/dashboard/vat-nuoi/su-kien"
           />
         ) : (

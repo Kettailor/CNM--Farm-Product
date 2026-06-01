@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import CowLoading from "@/components/cow-loading";
 
 export default function LoginPage() {
@@ -11,6 +12,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -18,9 +20,12 @@ export default function LoginPage() {
   }, []);
 
   const onLogin = async () => {
+    if (submittingRef.current) return;
     setError("");
     if (!email.trim() || !password) return setError("Vui lòng nhập đầy đủ thông tin đăng nhập.");
+    submittingRef.current = true;
     setLoading(true);
+    let shouldResetLoading = true;
     try {
       const res = await fetch("/api/login", {
         method: "POST",
@@ -29,12 +34,17 @@ export default function LoginPage() {
       });
       const data = (await res.json()) as { message?: string; nextPath?: string };
       if (!res.ok) return setError(data.message || "Đăng nhập thất bại.");
+      shouldResetLoading = false;
+      window.dispatchEvent(new Event("farm:navigation-loading"));
       router.push(data.nextPath || nextPath);
       router.refresh();
     } catch {
       setError("Không thể kết nối máy chủ.");
     } finally {
-      setLoading(false);
+      if (shouldResetLoading) {
+        submittingRef.current = false;
+        setLoading(false);
+      }
     }
   };
 
@@ -43,7 +53,7 @@ export default function LoginPage() {
       <section className="auth-card card">
         <div className="auth-visual">
           <div className="auth-brand-row">
-            <img src="/favicon.ico" alt="KetKat-EcoFarm" className="auth-logo" />
+            <Image src="/favicon.ico" alt="KetKat-EcoFarm" width={46} height={46} className="auth-logo" />
             <div>
               <p className="auth-brand-label">KetKat-EcoFarm</p>
               <strong>Nền tảng quản lý nông trại</strong>

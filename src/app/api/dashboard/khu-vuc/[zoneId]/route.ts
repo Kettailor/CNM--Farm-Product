@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { layOwnerIdTuServerCookie } from "@/lib/auth";
+import { getAccessibleFarmId } from "@/lib/farm-access";
 import { WAREHOUSE_TYPE_VALUES, type WarehouseType } from "@/lib/warehouse-types";
 import { ensureZoneSchema } from "@/lib/zone-schema";
 import { ensureLivestockSchema } from "@/lib/livestock-schema";
@@ -179,7 +180,7 @@ const snapshotJson = (zone: ZoneSnapshot | null) => {
   };
 };
 
-async function loadCurrentZone(zoneId: string, ownerId: string) {
+async function loadCurrentZone(zoneId: string, farmId: string) {
   const rs = await db.query(
     `select
       k.id::text as id,
@@ -191,22 +192,20 @@ async function loadCurrentZone(zoneId: string, ownerId: string) {
       k.chu_vi_m,
       k.hinh_hoc_geojson
      from du_lieu.khu_vuc k
-     join du_lieu.trang_trai t on t.id = k.trang_trai_id
-     where t.chu_so_huu_id::text = $1 and (k.id::text = $2 or k.ma_khu_vuc::text = $2)
+     where k.trang_trai_id::text = $1 and (k.id::text = $2 or k.ma_khu_vuc::text = $2)
      limit 1`,
-    [ownerId, zoneId]
+    [farmId, zoneId]
   );
   return (rs.rows[0] as ZoneSnapshot | undefined) ?? null;
 }
 
-async function getCancelBlockers(zoneId: string, ownerId: string) {
-  const params = [ownerId, zoneId, INACTIVE_LIVESTOCK_STATUSES, INACTIVE_GRAZING_STATUSES];
+async function getCancelBlockers(zoneId: string, farmId: string) {
+  const params = [farmId, zoneId, INACTIVE_LIVESTOCK_STATUSES, INACTIVE_GRAZING_STATUSES];
   const result = await db.query(
     `with target_zone as (
        select k.id
        from du_lieu.khu_vuc k
-       join du_lieu.trang_trai t on t.id = k.trang_trai_id
-       where t.chu_so_huu_id::text = $1
+       where k.trang_trai_id::text = $1
          and (k.id::text = $2 or k.ma_khu_vuc::text = $2)
        limit 1
      )
@@ -256,16 +255,18 @@ export async function PUT(request: Request, { params }: { params: { zoneId: stri
     const ownerId = layOwnerIdTuServerCookie();
     if (!ownerId) return NextResponse.json({ message: "Bạn chưa đăng nhập." }, { status: 401 });
     await ensureZoneSchema();
+    const farmId = await getAccessibleFarmId(ownerId, "write");
+    if (!farmId) return NextResponse.json({ message: "Không có quyền chỉnh sửa khu vực." }, { status: 403 });
 
     const body = (await request.json()) as ZoneUpdatePayload;
     const zoneId = params.zoneId;
-    const current = await loadCurrentZone(zoneId, ownerId);
+    const current = await loadCurrentZone(zoneId, farmId);
     if (!current) return NextResponse.json({ message: "Không tìm thấy khu vực hoặc không có quyền chỉnh sửa." }, { status: 404 });
     const cancelRequested = isCancelRequest(body);
 
     if (cancelRequested) {
       await Promise.all([ensureLivestockSchema(), ensureGrazingSchema()]);
-      const blockers = await getCancelBlockers(zoneId, ownerId);
+      const blockers = await getCancelBlockers(zoneId, farmId);
       const reasons = [
         blockers.liveLivestockCount > 0 ? `${blockers.liveLivestockCount} vật nuôi còn sống đang gắn với khu vực` : "",
         blockers.activeGroupCount > 0 ? `${blockers.activeGroupCount} nhóm vật nuôi còn số lượng đang gắn với khu vực` : "",
@@ -337,12 +338,10 @@ export async function PUT(request: Request, { params }: { params: { zoneId: stri
              thong_tin_loai = coalesce(k.thong_tin_loai, '{}'::jsonb) || $10::jsonb,
              nhom_luu_tru_kho = case when coalesce(nullif($12, ''), loai_khu_vuc) = 'storage' then $13::text[] else '{}'::text[] end,
              updated_at = now()
-        from du_lieu.trang_trai t
-       where k.trang_trai_id = t.id
-         and t.chu_so_huu_id::text = $8
+       where k.trang_trai_id::text = $8
          and (k.id::text = $9 or k.ma_khu_vuc::text = $9)
        returning k.id::text as id`,
-      [body.name ?? "", body.status ?? "", body.description ?? "", body.color ?? "", JSON.stringify(polygon), body.areaHa ?? "", body.perimeterM ?? "", ownerId, zoneId, JSON.stringify(typeSpecific), body.capacity ?? "", zoneTypeKey ?? "", warehouseTypes]
+      [body.name ?? "", body.status ?? "", body.description ?? "", body.color ?? "", JSON.stringify(polygon), body.areaHa ?? "", body.perimeterM ?? "", farmId, zoneId, JSON.stringify(typeSpecific), body.capacity ?? "", zoneTypeKey ?? "", warehouseTypes]
     );
 
     if (!updateResult.rows[0]) {
@@ -351,7 +350,7 @@ export async function PUT(request: Request, { params }: { params: { zoneId: stri
 
     if (zoneTypeKey) await insertTypeSnapshot(updateResult.rows[0].id, zoneTypeKey, typeSpecific, warehouseTypes);
 
-    const updated = await loadCurrentZone(zoneId, ownerId);
+    const updated = await loadCurrentZone(zoneId, farmId);
     const logPayload = {
       before,
       after: snapshotJson(updated) ?? after,

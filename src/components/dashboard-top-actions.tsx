@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./dashboard-top-actions.module.css";
 
@@ -11,7 +12,6 @@ type Action = {
 
 const ACTIONS: Action[] = [
   { id: "language", label: "Ngôn ngữ", href: "/dashboard/settings?tab=language" },
-  { id: "notifications", label: "Thông báo", href: "/dashboard/map" },
   { id: "analytics", label: "Biểu đồ", href: "/dashboard/map" },
   { id: "account", label: "CNM", href: "/dashboard/settings" },
 ];
@@ -33,10 +33,29 @@ function ActionIcon({ id }: { id: string }) {
 
 export default function DashboardTopActions() {
   const router = useRouter();
+  const [showSettings, setShowSettings] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/me", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (cancelled) return;
+        const access = payload?.access;
+        setShowSettings(Boolean(access?.canManageSettings || access?.canManageUsers || access?.canManageDocuments));
+      })
+      .catch(() => {
+        if (!cancelled) setShowSettings(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const actions = ACTIONS.filter((action) => showSettings || !action.href?.startsWith("/dashboard/settings"));
 
   return (
     <div className={styles.topActions}>
-      {ACTIONS.map((action) => (
+      {actions.map((action) => (
         <button
           key={action.id}
           type="button"

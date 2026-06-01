@@ -1,5 +1,4 @@
 import DashboardShell from "@/components/dashboard-shell";
-import DashboardTopActions from "@/components/dashboard-top-actions";
 import MapViewSwitcher from "@/components/dashboard-map-view-switcher";
 import { layOwnerIdTuServerCookie } from "@/lib/auth";
 import { getDashboardOverview } from "@/lib/dashboard-overview";
@@ -25,7 +24,6 @@ export default async function DashboardPage() {
               <h1>{data.farmName}</h1>
             </div>
           </div>
-          <DashboardTopActions />
         </section>
 
         <section className={styles.heroStrip}>

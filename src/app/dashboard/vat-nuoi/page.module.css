@@ -130,6 +130,42 @@
   cursor: pointer;
 }
 
+.dropdownItem > span:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+}
+
+.menuSwitch {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex: 0 0 38px;
+  border-radius: 999px;
+  background: #e4e7ec;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.menuSwitch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+  transition: transform 0.16s ease;
+}
+
+.menuSwitch[data-checked="true"] {
+  background: #f97316;
+}
+
+.menuSwitch[data-checked="true"]::after {
+  transform: translateX(16px);
+}
+
 .dropdownItem:last-child {
   border-bottom: 0;
 }
@@ -160,6 +196,125 @@
 .dropdownItem[data-tone="sky"] .menuIcon {
   color: #1f7a4a;
   background: #ecfdf3;
+}
+
+.settingsBackdrop {
+  position: fixed;
+  z-index: 90;
+  inset: 0;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(15, 23, 42, 0.46);
+}
+
+.settingsPanel {
+  width: min(360px, 100%);
+  min-height: 100%;
+  overflow: auto;
+  background: #f4f4f6;
+  border-left: 1px solid rgba(15, 23, 42, 0.14);
+  box-shadow: -22px 0 50px rgba(15, 23, 42, 0.2);
+  padding: 14px 12px;
+}
+
+.settingsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.settingsHeader strong {
+  color: #101828;
+  font-size: 15px;
+}
+
+.settingsHeader button {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #65a30d;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.settingsSection {
+  display: grid;
+  gap: 1px;
+  margin-bottom: 18px;
+}
+
+.settingsSection h3 {
+  margin: 0 0 7px;
+  color: #344054;
+  font-size: 13px;
+}
+
+.settingsRow {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  padding: 7px 8px;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.settingsRow:first-of-type {
+  border-radius: 6px 6px 0 0;
+}
+
+.settingsRow:last-of-type {
+  border-radius: 0 0 6px 6px;
+}
+
+.settingsRow span:first-child {
+  min-width: 0;
+  flex: 1;
+}
+
+.settingsRow input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.settingsSwitch {
+  position: relative;
+  width: 34px;
+  height: 19px;
+  flex: 0 0 34px;
+  border-radius: 999px;
+  background: #d0d5dd;
+}
+
+.settingsSwitch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+  transition: transform 0.16s ease;
+}
+
+.settingsSwitch[data-checked="true"] {
+  background: #65a30d;
+}
+
+.settingsSwitch[data-checked="true"]::after {
+  transform: translateX(15px);
 }
 
 .titleBlock {
@@ -492,6 +647,12 @@
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.deceasedPill {
+  color: #b42318;
+  background: #fff1f0;
+  border-color: rgba(217, 45, 32, 0.2);
 }
 
 .emptyState {

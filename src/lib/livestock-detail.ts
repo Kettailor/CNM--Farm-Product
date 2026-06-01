@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { getAccessibleFarmId } from "@/lib/farm-access";
 import { ensureLivestockEventSchema } from "@/lib/livestock-event-schema";
 import { ensureLivestockSchema } from "@/lib/livestock-schema";
 import { ensureLivestockTreatmentSchema } from "@/lib/livestock-treatment-schema";
@@ -79,6 +80,22 @@ export type LivestockDetail = {
     title: string | null;
     eventDate: string | null;
     animalCount: number;
+    note: string | null;
+    createdAt: string | null;
+  }>;
+  treatments: Array<{
+    id: string;
+    code: string | null;
+    type: string | null;
+    name: string | null;
+    treatmentDate: string | null;
+    treatedCount: number;
+    dosage: number | null;
+    dosageUnit: string | null;
+    method: string | null;
+    withdrawalEndDate: string | null;
+    nextDueDate: string | null;
+    status: string | null;
     note: string | null;
     createdAt: string | null;
   }>;
@@ -200,6 +217,9 @@ function isHexColor(value: unknown) {
 export async function loadLivestockGroupDetail(ownerId: string, groupId: string): Promise<LivestockDetail | null> {
   await ensureLivestockSchema();
   await ensureLivestockEventSchema();
+  await ensureLivestockTreatmentSchema();
+  const farmId = await getAccessibleFarmId(ownerId, "read");
+  if (!farmId) return null;
 
   const groupRs = await db.query(
     `select n.id::text, n.trang_trai_id::text, n.khu_vuc_id::text, n.ma_nhom, n.ten_nhom,
@@ -219,15 +239,15 @@ export async function loadLivestockGroupDetail(ownerId: string, groupId: string)
      join du_lieu.trang_trai t on t.id = n.trang_trai_id
      left join du_lieu.vi_tri_trang_trai vt on vt.trang_trai_id = t.id
      left join du_lieu.khu_vuc k on k.id = n.khu_vuc_id and coalesce(lower(k.trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')
-     where n.id::text = $1 and t.chu_so_huu_id = $2
+     where n.id::text = $1 and n.trang_trai_id::text = $2
      limit 1`,
-    [groupId, ownerId]
+    [groupId, farmId]
   );
 
   const row = groupRs.rows[0];
   if (!row) return null;
 
-  const [animalRs, eventRs] = await Promise.all([
+  const [animalRs, eventRs, treatmentRs] = await Promise.all([
     db.query(
       `select id::text, ma_vat_nuoi, ma_qr, the_nhan_dien, trang_thai, mo_ta, created_at, updated_at
        from du_lieu.vat_nuoi
@@ -240,6 +260,16 @@ export async function loadLivestockGroupDetail(ownerId: string, groupId: string)
        from du_lieu.su_kien_vat_nuoi
        where nhom_vat_nuoi_id::text = $1
        order by ngay_su_kien desc nulls last, created_at desc
+       limit 12`,
+      [groupId]
+    ),
+    db.query(
+      `select id::text, ma_dieu_tri, loai_dieu_tri, ten_dieu_tri, ngay_dieu_tri,
+              so_luong_vat_nuoi, lieu_luong_moi_con, don_vi_lieu_luong, phuong_phap,
+              ngay_ket_thuc_cach_ly, ngay_nhac_lai, trang_thai, ghi_chu, created_at
+       from du_lieu.dieu_tri_vat_nuoi
+       where nhom_vat_nuoi_id::text = $1
+       order by ngay_dieu_tri desc nulls last, created_at desc
        limit 12`,
       [groupId]
     ),
@@ -329,6 +359,22 @@ export async function loadLivestockGroupDetail(ownerId: string, groupId: string)
       note: cleanText(event.ghi_chu),
       createdAt: asIsoDate(event.created_at),
     })),
+    treatments: treatmentRs.rows.map((treatment) => ({
+      id: String(treatment.id),
+      code: cleanText(treatment.ma_dieu_tri),
+      type: cleanText(treatment.loai_dieu_tri),
+      name: cleanText(treatment.ten_dieu_tri),
+      treatmentDate: asIsoDate(treatment.ngay_dieu_tri),
+      treatedCount: Number(treatment.so_luong_vat_nuoi ?? 0),
+      dosage: treatment.lieu_luong_moi_con == null ? null : Number(treatment.lieu_luong_moi_con),
+      dosageUnit: cleanText(treatment.don_vi_lieu_luong),
+      method: cleanText(treatment.phuong_phap),
+      withdrawalEndDate: asIsoDate(treatment.ngay_ket_thuc_cach_ly),
+      nextDueDate: asIsoDate(treatment.ngay_nhac_lai),
+      status: cleanText(treatment.trang_thai),
+      note: cleanText(treatment.ghi_chu),
+      createdAt: asIsoDate(treatment.created_at),
+    })),
   };
 }
 
@@ -336,6 +382,8 @@ export async function loadLivestockAnimalDetail(ownerId: string, groupId: string
   await ensureLivestockSchema();
   await ensureLivestockEventSchema();
   await ensureLivestockTreatmentSchema();
+  const farmId = await getAccessibleFarmId(ownerId, "read");
+  if (!farmId) return null;
 
   const animalRs = await db.query(
     `select v.id::text, v.trang_trai_id::text, v.khu_vuc_id::text, v.nhom_vat_nuoi_id::text,
@@ -351,9 +399,9 @@ export async function loadLivestockAnimalDetail(ownerId: string, groupId: string
      join du_lieu.trang_trai t on t.id = v.trang_trai_id
      left join du_lieu.vi_tri_trang_trai vt on vt.trang_trai_id = t.id
      left join du_lieu.khu_vuc k on k.id = coalesce(v.khu_vuc_id, n.khu_vuc_id) and coalesce(lower(k.trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')
-     where v.id::text = $1 and n.id::text = $2 and t.chu_so_huu_id = $3
+     where v.id::text = $1 and n.id::text = $2 and v.trang_trai_id::text = $3
      limit 1`,
-    [animalId, groupId, ownerId]
+    [animalId, groupId, farmId]
   );
 
   const row = animalRs.rows[0];

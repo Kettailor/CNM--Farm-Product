@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import type { PoolClient } from "pg";
 import { layOwnerIdTuRequest } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getAccessibleFarmId } from "@/lib/farm-access";
 import { ensureLivestockSchema } from "@/lib/livestock-schema";
+import { notifyFarmUsers } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -148,17 +150,9 @@ export async function POST(request: NextRequest) {
 
     await ensureLivestockSchema();
 
-    const farmRs = await db.query(
-      `select id
-       from du_lieu.trang_trai
-       where chu_so_huu_id = $1
-       order by created_at desc
-       limit 1`,
-      [ownerId]
-    );
-    const farmId = farmRs.rows[0]?.id as string | undefined;
+    const farmId = await getAccessibleFarmId(ownerId, "write");
     if (!farmId) {
-      return NextResponse.json({ message: "Chưa có trang trại để thêm nhóm vật nuôi." }, { status: 404 });
+      return NextResponse.json({ message: "Không có quyền thêm nhóm vật nuôi." }, { status: 403 });
     }
 
     const body = (await request.json()) as GroupPayload;
@@ -360,6 +354,16 @@ export async function POST(request: NextRequest) {
       }
 
       await client.query("commit");
+      await notifyFarmUsers({
+        farmId,
+        excludeUserId: ownerId,
+        title: "Nhóm vật nuôi mới",
+        body: `${groupName} · ${headCount} con`,
+        tone: "success",
+        module: "Vật nuôi",
+        href: `/dashboard/vat-nuoi/${groupId}`,
+        metadata: { groupId, groupCode, headCount },
+      }).catch(() => undefined);
       return NextResponse.json({
         message: "Đã lưu nhóm vật nuôi.",
         groupId,
@@ -402,16 +406,20 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ message: "Vui lòng nhập giống vật nuôi." }, { status: 400 });
     }
 
+    const farmId = await getAccessibleFarmId(ownerId, "write");
+    if (!farmId) {
+      return NextResponse.json({ message: "Không có quyền cập nhật nhóm vật nuôi." }, { status: 403 });
+    }
+
     const currentRs = await db.query(
       `select n.id, n.trang_trai_id, n.khu_vuc_id, n.ma_nhom, n.ten_nhom, n.loai_vat_nuoi,
               n.giong, n.gioi_tinh, n.giai_doan_sinh_truong, n.trang_thai_suc_khoe,
               n.muc_dich_san_xuat, n.nguon_goc, n.ngay_sinh, n.ma_me, n.ma_bo,
               n.mau_long, n.trang_thai_sinh_san
        from du_lieu.nhom_vat_nuoi n
-       join du_lieu.trang_trai t on t.id = n.trang_trai_id
-       where n.id::text = $1 and t.chu_so_huu_id = $2
+       where n.id::text = $1 and n.trang_trai_id::text = $2
        limit 1`,
-      [groupId, ownerId]
+      [groupId, farmId]
     );
 
     const current = currentRs.rows[0];

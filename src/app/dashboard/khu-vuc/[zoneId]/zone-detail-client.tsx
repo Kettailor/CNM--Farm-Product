@@ -20,6 +20,8 @@ type VegetationPayload = {
 type Props = {
   zone: ZoneDetail;
   vegetation: VegetationPayload["vegetation"];
+  canWrite: boolean;
+  canOpenSettings: boolean;
 };
 
 const chartColors: Record<string, string> = {
@@ -90,7 +92,7 @@ function MultiLineChart({ samples }: { samples: VegetationPayload["vegetation"][
   );
 }
 
-export default function ZoneDetailClient({ zone, vegetation: initialVegetation }: Props) {
+export default function ZoneDetailClient({ zone, vegetation: initialVegetation, canWrite, canOpenSettings }: Props) {
   const [vegetation, setVegetation] = useState(initialVegetation);
   const [vegetationUpdatedAt, setVegetationUpdatedAt] = useState<string | null>(null);
 
@@ -140,7 +142,7 @@ export default function ZoneDetailClient({ zone, vegetation: initialVegetation }
           </div>
         </div>
         <div className={styles.heroActions}>
-          <ZoneActionMenu context="detail" zoneId={zone.id} zoneStatus={zone.status} backHref="/dashboard/khu-vuc" />
+          <ZoneActionMenu context="detail" zoneId={zone.id} zoneStatus={zone.status} backHref="/dashboard/khu-vuc" canWrite={canWrite} canOpenSettings={canOpenSettings} />
         </div>
       </section>
 

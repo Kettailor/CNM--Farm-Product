@@ -103,10 +103,12 @@ export default async function ChemicalDetailPage({ params }: PageProps) {
               <span><WarehouseIcon name="back" /></span>
               Quay lại
             </Link>
+            {overview.access.canWrite && (
             <Link className={styles.actionButton} href="/dashboard/quan-ly-kho/chinh-sua">
               <span><WarehouseIcon name="edit" /></span>
               Tác vụ
             </Link>
+            )}
           </div>
         </section>
 

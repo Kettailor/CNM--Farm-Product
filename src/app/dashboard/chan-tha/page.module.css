@@ -112,6 +112,7 @@
   padding: 9px 13px;
   font-size: 13px;
   font-weight: 900;
+  text-decoration: none;
 }
 
 .backButton,
@@ -444,7 +445,7 @@
 
 .dataTable {
   width: 100%;
-  min-width: 980px;
+  min-width: 1280px;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -477,6 +478,40 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.sequenceBadge,
+.dependencyPill,
+.readyPill,
+.waitingPill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 22px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.sequenceBadge {
+  color: #1f7a4a;
+  background: #e8f8ef;
+  border: 1px solid rgba(31, 122, 74, 0.18);
+}
+
+.dependencyPill,
+.waitingPill {
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid rgba(180, 83, 9, 0.2);
+}
+
+.readyPill {
+  color: #1f7a4a;
+  background: #ecfdf3;
+  border: 1px solid rgba(31, 122, 74, 0.16);
 }
 
 .collapseButton {
@@ -648,13 +683,13 @@
 }
 
 .ganttGrid {
-  --left-name: 230px;
-  --left-small: 72px;
+  --left-name: 360px;
+  --left-small: 68px;
   --slot-width: 56px;
   --time-units: var(--chart-days);
   --timeline-width: 560px;
   display: grid;
-  grid-template-columns: var(--left-name) var(--left-small) var(--left-small) 96px var(--timeline-width);
+  grid-template-columns: var(--left-name) var(--left-small) var(--left-small) var(--timeline-width);
   width: 100%;
   max-width: 100%;
   max-height: min(660px, calc(100vh - 260px));
@@ -693,7 +728,7 @@
   position: sticky;
   top: 0;
   z-index: 4;
-  min-height: 54px;
+  min-height: 62px;
   display: flex;
   align-items: end;
   border-bottom: 1px solid rgba(15, 23, 42, 0.14);
@@ -716,11 +751,6 @@
 .ganttLeftHead > strong:nth-child(3) {
   left: calc(var(--left-name) + var(--left-small));
   z-index: 6;
-}
-
-.ganttLeftHead > strong:nth-child(4) {
-  left: calc(var(--left-name) + var(--left-small) * 2);
-  z-index: 6;
   box-shadow: 8px 0 14px rgba(15, 23, 42, 0.08);
 }
 
@@ -730,8 +760,8 @@
   z-index: 3;
   width: var(--timeline-width);
   min-width: var(--timeline-width);
-  min-height: 54px;
-  grid-column: 5;
+  min-height: 62px;
+  grid-column: 4;
   display: block;
   border-left: 3px solid rgba(15, 23, 42, 0.1);
   border-bottom: 1px solid rgba(15, 23, 42, 0.14);
@@ -740,20 +770,71 @@
     linear-gradient(#f8fafc, #fff);
 }
 
-.ganttScale span {
+.ganttMonthRow,
+.ganttDayRow,
+.ganttWeekdayRow {
   position: absolute;
-  bottom: 9px;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+}
+
+.ganttMonthRow {
+  top: 0;
+  height: 22px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+.ganttDayRow {
+  top: 22px;
+  height: 21px;
+}
+
+.ganttWeekdayRow {
+  top: 43px;
+  height: 18px;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.ganttMonthRow span,
+.ganttDayRow span,
+.ganttWeekdayRow span {
+  position: absolute;
   color: #667085;
   font-size: 10px;
   font-weight: 800;
   white-space: nowrap;
 }
 
+.ganttMonthRow span {
+  top: 4px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border-left: 1px solid rgba(15, 23, 42, 0.12);
+  color: #8a94a6;
+  transform: none;
+}
+
+.ganttDayRow span,
+.ganttWeekdayRow span {
+  transform: translateX(-50%);
+}
+
+.ganttDayRow span {
+  top: 4px;
+  color: #64748b;
+}
+
+.ganttWeekdayRow span {
+  top: 2px;
+  color: #8a94a6;
+  font-size: 9px;
+}
+
 .ganttLabel,
 .ganttMetric,
 .ganttCanvas {
-  min-height: 30px;
+  min-height: 72px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.07);
 }
 
@@ -768,31 +849,69 @@
   background: #fff;
   color: #101828;
   font-size: 13px;
-  overflow-x: auto;
+  overflow: hidden;
   overflow-y: hidden;
   scrollbar-width: thin;
 }
 
-.ganttLabel span {
+.ganttLabelTitle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  width: max-content;
-  min-width: 100%;
-  overflow: visible;
-  text-overflow: clip;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.ganttLabelTitle strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.ganttLabel .sequenceBadge {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 44px;
+  justify-content: center;
+  padding-inline: 7px;
+}
+
 .ganttLabel small {
-  width: max-content;
-  min-width: 100%;
+  display: none;
+  width: fit-content;
+  min-width: 0;
   color: #b45309;
   font-size: 10px;
   font-weight: 800;
-  overflow: visible;
-  text-overflow: clip;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ganttLabel .ganttDependency,
+.ganttLabel .ganttReady {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+.ganttLabel .ganttDependency {
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid rgba(180, 83, 9, 0.18);
+}
+
+.ganttLabel .ganttReady {
+  color: #1f7a4a;
+  background: #ecfdf3;
+  border: 1px solid rgba(31, 122, 74, 0.14);
 }
 
 .ganttLabelPlan {
@@ -806,7 +925,7 @@
 }
 
 .ganttLabelEvent {
-  padding-left: 28px;
+  padding-left: 30px;
 }
 
 .ganttLabelGroup {
@@ -830,10 +949,6 @@
 
 .ganttMetric:nth-child(3) {
   left: calc(var(--left-name) + var(--left-small));
-}
-
-.ganttMetric:nth-child(4) {
-  left: calc(var(--left-name) + var(--left-small) * 2);
   box-shadow: 8px 0 14px rgba(15, 23, 42, 0.06);
 }
 
@@ -850,29 +965,106 @@
 
 .ganttBar {
   position: absolute;
-  top: 7px;
-  height: 16px;
-  min-width: 42px;
-  display: grid;
-  place-items: center;
+  z-index: 3;
+  top: 24px;
+  height: 26px;
+  min-width: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   border-radius: 999px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--bar-color) 88%, #fff), var(--bar-color));
   color: #fff;
   box-shadow: 0 3px 8px rgba(15, 23, 42, 0.24);
-  padding: 0 8px;
+  padding: 0;
   font-size: 10px;
   font-weight: 900;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
   white-space: nowrap;
   transform: translateX(2px);
 }
 
+.ganttBarText {
+  min-width: 0;
+  max-width: 220px;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  border-radius: inherit;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bar-color) 88%, #fff), var(--bar-color));
+  padding: 0 9px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: inherit;
+}
+
+.ganttDependencyArrow {
+  position: absolute;
+  left: 0;
+  z-index: 1;
+  width: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.ganttDependencyArrow path {
+  fill: none;
+  stroke: rgba(180, 83, 9, 0.7);
+  stroke-width: 0.52;
+  stroke-dasharray: 2.8 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.ganttDependencyArrow circle {
+  fill: #ffffff;
+  stroke: rgba(180, 83, 9, 0.78);
+  stroke-width: 0.42;
+  vector-effect: non-scaling-stroke;
+}
+
+.ganttDependencyArrow polygon {
+  fill: rgba(180, 83, 9, 0.9);
+}
+
+.ganttBar em {
+  display: none;
+}
+
+.ganttBarEvent:hover em {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  z-index: 6;
+  display: block;
+  transform: translateX(-50%);
+  border-radius: 6px;
+  background: #111827;
+  color: #fff;
+  padding: 5px 8px;
+  font-size: 10px;
+  font-style: normal;
+  white-space: nowrap;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.22);
+}
+
 .ganttBarPlan {
   height: 15px;
+  top: 20px;
   border-radius: 0;
   background: linear-gradient(180deg, #f6bf26, #d99a00);
   color: #667085;
+}
+
+.ganttBarPlan .ganttBarText {
+  justify-content: center;
+  max-width: 100%;
+  width: 100%;
+  color: #475467;
+  background: transparent;
+  box-shadow: none;
 }
 
 .ganttBarPlan::before,
@@ -897,17 +1089,61 @@
 
 .ganttBarPaddock {
   height: 15px;
+  top: 21px;
   border-radius: 0;
   opacity: 0.9;
 }
 
+.ganttBarPaddockSegment {
+  top: 14px;
+  height: 17px;
+  min-width: 82px;
+  border-radius: 0;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bar-color) 86%, #fff), var(--bar-color));
+  color: #f8fafc;
+  opacity: 0.95;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+}
+
+.ganttBarPaddockSegment .ganttBarText {
+  max-width: 150px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ganttBarPaddockSegment::before,
+.ganttBarPaddockSegment::after {
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  width: 0;
+  height: 0;
+  border-top: 7px solid color-mix(in srgb, var(--bar-color) 76%, #111827);
+}
+
+.ganttBarPaddockSegment::before {
+  left: 0;
+  border-right: 7px solid transparent;
+}
+
+.ganttBarPaddockSegment::after {
+  right: 0;
+  border-left: 7px solid transparent;
+}
+
 .ganttBarEvent {
-  top: 6px;
-  height: 18px;
+  top: 24px;
+  height: 26px;
+  min-width: 118px;
+}
+
+.ganttBarEvent .ganttBarText {
+  width: max-content;
+  max-width: none;
 }
 
 .ganttBarGroup {
-  max-width: 110px;
   background: linear-gradient(180deg, #52525b, #27272a);
 }
 
@@ -1303,6 +1539,7 @@
 .eventStep {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
 .eventStep > label {
@@ -1333,6 +1570,8 @@
 }
 
 .paddockEventCard {
+  max-width: 100%;
+  min-width: 0;
   border: 1px solid rgba(15, 23, 42, 0.12);
   border-radius: 8px;
   overflow: hidden;
@@ -1412,20 +1651,47 @@
 .eventList {
   display: grid;
   gap: 0;
+  max-height: min(430px, 58vh);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: #98a2b3 #eef2f6;
+  scrollbar-width: thin;
+}
+
+.eventList::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.eventList::-webkit-scrollbar-track {
+  background: #eef2f6;
+  border-radius: 999px;
+}
+
+.eventList::-webkit-scrollbar-thumb {
+  background: #98a2b3;
+  border: 2px solid #eef2f6;
+  border-radius: 999px;
 }
 
 .eventLine {
   display: grid;
-  grid-template-columns: 16px minmax(130px, 0.8fr) minmax(150px, 1fr) minmax(132px, 0.7fr) minmax(132px, 0.7fr) minmax(170px, 1fr) auto;
+  grid-template-columns: 16px minmax(130px, 0.8fr) minmax(150px, 1fr) minmax(172px, 0.85fr) minmax(172px, 0.85fr) minmax(118px, auto) minmax(96px, auto) minmax(190px, 1fr) auto;
   gap: 8px;
   align-items: center;
+  min-width: 1180px;
   min-height: 46px;
   padding: 7px 10px;
   border-top: 1px solid rgba(15, 23, 42, 0.06);
 }
 
 .eventLineCompact {
-  grid-template-columns: 16px minmax(170px, 0.9fr) minmax(132px, 0.7fr) minmax(132px, 0.7fr) minmax(170px, 1fr) auto;
+  grid-template-columns: 16px minmax(170px, 0.9fr) minmax(172px, 0.85fr) minmax(172px, 0.85fr) minmax(118px, auto) minmax(96px, auto) minmax(190px, 1fr) auto;
+  min-width: 1120px;
+}
+
+.eventLine > * {
+  min-width: 0;
 }
 
 .eventDot {
@@ -1433,6 +1699,31 @@
   height: 11px;
   border-radius: 3px;
   background: var(--event-color);
+}
+
+.durationChip,
+.repeatToggle {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #344054;
+  padding: 7px 9px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.repeatToggle {
+  gap: 7px;
+  background: #fff;
+}
+
+.repeatToggle input {
+  width: 16px;
+  height: 16px;
 }
 
 @media (max-width: 1180px) {
@@ -1468,6 +1759,11 @@
   .diagramLane,
   .eventLine {
     grid-template-columns: 1fr;
+  }
+
+  .eventLine,
+  .eventLineCompact {
+    min-width: 0;
   }
 
   .stepRail {

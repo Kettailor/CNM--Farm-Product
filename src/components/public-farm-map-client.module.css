@@ -102,6 +102,10 @@
 .avatar,
 .avatarSmall,
 .markerAvatar {
+  display: block;
+  background-color: #e6f4ea;
+  background-position: center;
+  background-size: cover;
   object-fit: cover;
   flex: 0 0 auto;
 }

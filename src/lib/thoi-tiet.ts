@@ -64,6 +64,7 @@ export type DuLieuThoiTiet = {
 
 const THOI_GIAN_CACHE_PHUT = 30;
 const FORECAST_DAYS = 7;
+const HOURLY_FORECAST_HOURS = FORECAST_DAYS * 24;
 const CACHE_DB_UNAVAILABLE = "weather_cache_db_unavailable";
 
 type OpenMeteoHourly = {
@@ -252,7 +253,7 @@ function docTheoGio(data: OpenMeteoResponse): DiemThoiTietTheoGio[] {
   const hourly = data?.hourly ?? {};
   const times: string[] = Array.isArray(hourly.time) ? hourly.time : [];
 
-  return times.slice(0, 48).map((time, index) => {
+  return times.slice(0, HOURLY_FORECAST_HOURS).map((time, index) => {
     const visibilityM = soHoacNull(hourly.visibility?.[index]);
     return {
       thoi_gian: time,

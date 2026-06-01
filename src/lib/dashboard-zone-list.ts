@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { getAccessibleFarm } from "@/lib/farm-access";
 import { ensureZoneSchema } from "@/lib/zone-schema";
 import { getZoneTypeInfo, normalizeText } from "@/lib/zone-type-utils";
 
@@ -32,6 +33,9 @@ const centroid = (points: Array<{ lat: number; lng: number }>) => { if (!points.
 const polygonFromJson = (geo: unknown) => { const polygon = Array.isArray((geo as { geo?: { polygon?: unknown } } | null)?.geo?.polygon) ? ((geo as { geo?: { polygon?: Array<{ lat?: number | string; lng?: number | string }> } } | null)?.geo?.polygon ?? []) : []; return polygon.filter((p) => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng))).map((p) => ({ lat: Number(p.lat), lng: Number(p.lng) })); };
 
 export async function getFarmLocation(ownerId: string): Promise<FarmLocation | null> {
+  const access = await getAccessibleFarm(ownerId);
+  if (!access?.farmId) return null;
+
   const rs = await db.query(
     `select t.ten_trang_trai as farm_name,
             coalesce(v.ten_dia_diem, t.ten_trang_trai, 'Trang trại') as location_name,
@@ -49,10 +53,9 @@ export async function getFarmLocation(ownerId: string): Promise<FarmLocation | n
        order by vv.created_at desc nulls last, vv.id desc
        limit 1
      ) v on true
-     where t.chu_so_huu_id = $1
-     order by t.created_at desc
+     where t.id = $1
      limit 1`,
-    [ownerId]
+    [access.farmId]
   );
   const row = rs.rows[0];
   if (!row) return null;
@@ -70,6 +73,11 @@ export async function getFarmLocation(ownerId: string): Promise<FarmLocation | n
 export async function getZoneList(ownerId: string): Promise<{ farmName: string; zones: ZoneListItem[]; filters: ZoneTypeFilter[]; location: FarmLocation | null }> {
   await ensureZoneSchema();
   const location = await getFarmLocation(ownerId);
+  const access = await getAccessibleFarm(ownerId);
+  if (!access?.farmId) {
+    return { farmName: "Trang trại", zones: [], filters: [{ slug: "tat-ca", label: "Tất cả", count: 0 }], location };
+  }
+
   const rs = await db.query(
     `select
         t.ten_trang_trai as farm_name,
@@ -88,10 +96,10 @@ export async function getZoneList(ownerId: string): Promise<{ farmName: string; 
      from du_lieu.khu_vuc kv
      join du_lieu.trang_trai t on t.id = kv.trang_trai_id
      left join du_lieu.danh_muc_loai_khu_vuc loai on loai.id = kv.loai_khu_vuc_id
-     where t.chu_so_huu_id = $1
+     where t.id = $1
      order by kv.created_at desc nulls last, kv.id desc
      limit 200`,
-    [ownerId]
+    [access.farmId]
   );
 
   const farmName = String(rs.rows[0]?.farm_name ?? location?.farmName ?? "Trang trại");

@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import CowLoading from "@/components/cow-loading";
 import DashboardShell from "@/components/dashboard-shell";
@@ -22,6 +22,10 @@ type SettingsSummary = {
   pendingDocumentCount: number;
   expiringDocumentCount: number;
   currentRoleName: string | null;
+  canWriteFarm?: boolean;
+  canManageSettings?: boolean;
+  canManageUsers?: boolean;
+  canManageDocuments?: boolean;
 };
 
 type SettingsStandardUnits = {
@@ -50,8 +54,28 @@ type SettingsUserAccount = {
   role_code?: string | null;
   role_name?: string | null;
   role_permissions?: Record<string, unknown>;
+  invite_status?: string | null;
+  invite_accepted?: boolean;
+  is_invite?: boolean;
   is_owner?: boolean;
   is_current_user?: boolean;
+};
+
+type SettingsDocument = {
+  id: string;
+  code: string;
+  name: string;
+  type?: string | null;
+  number?: string | null;
+  issued_at?: string | null;
+  expires_at?: string | null;
+  status?: string | null;
+  file_url?: string | null;
+  note?: string | null;
+  is_shared?: boolean;
+  file_name?: string | null;
+  file_type?: string | null;
+  created_at?: string | null;
 };
 
 type Profile = {
@@ -80,6 +104,7 @@ type Profile = {
   is_map_shared?: boolean;
   standard_units?: SettingsStandardUnits;
   users?: SettingsUserAccount[];
+  documents?: SettingsDocument[];
   settings_summary?: SettingsSummary;
 };
 
@@ -102,6 +127,7 @@ type FarmForm = {
 };
 
 type RoleCode = "none" | "viewer" | "editor" | "admin";
+type DisplayRoleCode = RoleCode | "owner";
 
 type AddUserForm = {
   first_name: string;
@@ -113,6 +139,32 @@ type AddUserForm = {
   email: string;
   base_role: RoleCode;
   farm_role: RoleCode;
+};
+
+type EditUserForm = AddUserForm & {
+  member_id: string;
+  user_id: string;
+  status: "active" | "disabled";
+};
+
+type DocumentForm = {
+  name: string;
+  type: string;
+  number: string;
+  issued_at: string;
+  expires_at: string;
+  note: string;
+  is_shared: boolean;
+  file: File | null;
+};
+
+type ContactCheckResponse = {
+  available?: boolean;
+  message?: string;
+  fields?: {
+    email?: string;
+    phone?: string;
+  };
 };
 
 type IconName = "settings" | "farm" | "users" | "userAdd" | "document" | "map" | "back" | "check" | "lock" | "edit" | "trash" | "save" | "close";
@@ -156,11 +208,42 @@ const EMPTY_ADD_USER_FORM: AddUserForm = {
   farm_role: "none",
 };
 
-const ROLE_LABELS: Record<RoleCode, string> = {
+const EMPTY_EDIT_USER_FORM: EditUserForm = {
+  ...EMPTY_ADD_USER_FORM,
+  member_id: "",
+  user_id: "",
+  status: "active",
+};
+
+const EMPTY_DOCUMENT_FORM: DocumentForm = {
+  name: "",
+  type: "giay_kiem_nghiem",
+  number: "",
+  issued_at: "",
+  expires_at: "",
+  note: "",
+  is_shared: false,
+  file: null,
+};
+
+const ADD_USER_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const DOCUMENT_TYPE_OPTIONS = [
+  { value: "giay_kiem_nghiem", label: "Giấy kiểm nghiệm" },
+  { value: "giay_phep_kinh_doanh", label: "Giấy phép kinh doanh" },
+  { value: "bang_khen", label: "Bằng khen" },
+  { value: "giay_kiem_dinh", label: "Giấy kiểm định" },
+  { value: "ban_anh", label: "Bản ảnh" },
+  { value: "ban_dien_tu", label: "Bản điện tử" },
+  { value: "khac", label: "Chứng từ khác" },
+];
+
+const ROLE_LABELS: Record<DisplayRoleCode, string> = {
   none: "Không có quyền",
   viewer: "Chỉ xem",
   editor: "Biên tập",
   admin: "Quản trị",
+  owner: "Chủ sở hữu",
 };
 
 const TABS: Array<{ section: SettingsSection; href: string; label: string }> = [
@@ -344,9 +427,33 @@ function displayStatus(value: string | null | undefined) {
 function displayRoleName(value: string | null | undefined) {
   const cleanValue = String(value ?? "").trim();
   if (!cleanValue) return "Chưa phân quyền";
-  const roleCode = cleanValue.toLowerCase() as RoleCode;
+  const roleCode = cleanValue.toLowerCase() as DisplayRoleCode;
   if (roleCode in ROLE_LABELS) return ROLE_LABELS[roleCode];
+  if (cleanValue.toLowerCase() === "chủ trang trại") return ROLE_LABELS.owner;
+  if (cleanValue.toLowerCase() === "owner") return ROLE_LABELS.owner;
   return cleanValue;
+}
+
+function displayInviteStatus(value: string | null | undefined, accepted?: boolean) {
+  if (accepted) return "Đã chấp nhận";
+  const cleanValue = String(value ?? "").trim().toLowerCase();
+  if (cleanValue === "pending") return "Chưa giải quyết";
+  if (cleanValue === "accepted") return "Đã chấp nhận";
+  if (cleanValue === "expired") return "Đã hết hạn";
+  if (cleanValue === "revoked" || cleanValue === "cancelled") return "Đã hủy";
+  return cleanValue ? valueOrEmpty(value) : "Chưa giải quyết";
+}
+
+function displayDocumentType(value: string | null | undefined) {
+  const cleanValue = String(value ?? "").trim();
+  return DOCUMENT_TYPE_OPTIONS.find((option) => option.value === cleanValue)?.label ?? valueOrEmpty(cleanValue, "Chứng từ");
+}
+
+function formatDateValue(value: string | null | undefined) {
+  if (!value) return "Chưa cập nhật";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("vi-VN");
 }
 
 function displayUserName(user: SettingsUserAccount) {
@@ -355,6 +462,53 @@ function displayUserName(user: SettingsUserAccount) {
 
 function displayUserCode(index: number) {
   return `ID ${index + 1}`;
+}
+
+function buildAddUserPhone(form: AddUserForm) {
+  const phoneNumber = form.phone_number.trim();
+  return phoneNumber ? [form.phone_country.trim(), phoneNumber].filter(Boolean).join(" ") : "";
+}
+
+function splitFullName(value: string | null | undefined) {
+  const parts = String(value ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return { firstName: parts[0] ?? "", lastName: "" };
+  return { firstName: parts.slice(0, -1).join(" "), lastName: parts[parts.length - 1] };
+}
+
+function splitPhone(value: string | null | undefined) {
+  const cleanValue = String(value ?? "").trim();
+  if (!cleanValue) return { country: "+84", number: "" };
+  const match = cleanValue.match(/^(\+\d{1,3})\s*(.*)$/);
+  if (!match) return { country: "+84", number: cleanValue };
+  return { country: match[1], number: match[2] ?? "" };
+}
+
+function userToEditForm(user: SettingsUserAccount): EditUserForm {
+  const name = splitFullName(user.full_name ?? user.email);
+  const phone = splitPhone(user.phone);
+  const roleCode = (user.role_code?.toLowerCase() ?? "none") as RoleCode;
+  const baseRole = normalizeEditableRole(user.base_role ?? roleCode);
+  const farmRole = normalizeEditableRole(user.farm_role ?? roleCode);
+
+  return {
+    member_id: user.member_id,
+    user_id: user.user_id,
+    first_name: name.firstName,
+    last_name: name.lastName,
+    language: user.language || "vi-VN",
+    account_enabled: String(user.status ?? "active").toLowerCase() !== "disabled",
+    phone_country: phone.country,
+    phone_number: phone.number,
+    email: user.email ?? "",
+    base_role: baseRole,
+    farm_role: farmRole,
+    status: String(user.status ?? "active").toLowerCase() === "disabled" ? "disabled" : "active",
+  };
+}
+
+function normalizeEditableRole(value: string | null | undefined): RoleCode {
+  const role = String(value ?? "").trim().toLowerCase();
+  return role === "viewer" || role === "editor" || role === "admin" ? role : "none";
 }
 
 function profileToFarmForm(profile: Profile): FarmForm {
@@ -400,9 +554,23 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
   const [confirmFarmDeletion, setConfirmFarmDeletion] = useState(false);
   const [confirmAccountDeletion, setConfirmAccountDeletion] = useState(false);
   const [addingUser, setAddingUser] = useState(false);
+  const [checkingAddUserContact, setCheckingAddUserContact] = useState(false);
+  const [addUserContactError, setAddUserContactError] = useState("");
   const [addUserModalOpen, setAddUserModalOpen] = useState(false);
   const [addUserStep, setAddUserStep] = useState<1 | 2 | 3>(1);
   const [addUserForm, setAddUserForm] = useState<AddUserForm>(EMPTY_ADD_USER_FORM);
+  const [editUserModalOpen, setEditUserModalOpen] = useState(false);
+  const [editUserStep, setEditUserStep] = useState<1 | 2 | 3>(1);
+  const [editUserForm, setEditUserForm] = useState<EditUserForm>(EMPTY_EDIT_USER_FORM);
+  const [editingUser, setEditingUser] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState("");
+  const [deleteUserModalOpen, setDeleteUserModalOpen] = useState(false);
+  const [deleteUserTarget, setDeleteUserTarget] = useState<SettingsUserAccount | null>(null);
+  const [confirmUserDeletion, setConfirmUserDeletion] = useState(false);
+  const [documentCreateModalOpen, setDocumentCreateModalOpen] = useState(false);
+  const [documentForm, setDocumentForm] = useState<DocumentForm>(EMPTY_DOCUMENT_FORM);
+  const [savingDocument, setSavingDocument] = useState(false);
+  const [sharingDocumentId, setSharingDocumentId] = useState("");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -453,6 +621,9 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
             role_code: null,
             role_name: summary?.currentRoleName,
             role_permissions: {},
+            invite_status: "accepted",
+            invite_accepted: true,
+            is_invite: false,
             is_owner: true,
             is_current_user: true,
           },
@@ -460,14 +631,34 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
       : [];
   const farmCount = summary?.farmCount ?? (profile.farm_id ? 1 : 0);
   const deletingFinalFarm = farmCount <= 1;
+  const canWriteFarm = summary?.canWriteFarm === true;
+  const canManageSettings = summary?.canManageSettings === true;
+  const canManageUsers = summary?.canManageUsers === true;
+  const canManageDocuments = summary?.canManageDocuments === true;
+  const availableTabs = TABS.filter((tab) => {
+    if (tab.section === "farm") return canManageSettings;
+    if (tab.section === "users") return canManageUsers;
+    if (tab.section === "documents") return canManageDocuments;
+    return false;
+  });
   const canDeleteFarm = confirmFarmDeletion && (!deletingFinalFarm || confirmAccountDeletion);
   const effectiveAddUserRole = addUserForm.farm_role !== "none" ? addUserForm.farm_role : addUserForm.base_role;
   const canSaveUser =
     Boolean(profile.farm_id) &&
-    addUserForm.email.trim().includes("@") &&
+    canManageUsers &&
+    ADD_USER_EMAIL_PATTERN.test(addUserForm.email.trim()) &&
     effectiveAddUserRole !== "none" &&
+    !addUserContactError &&
+    !checkingAddUserContact &&
     !addingUser;
-  const activeTab = TABS.find((tab) => tab.section === section) ?? TABS[0];
+  const effectiveEditUserRole = editUserForm.farm_role !== "none" ? editUserForm.farm_role : editUserForm.base_role;
+  const canSaveEditedUser =
+    Boolean(profile.farm_id) &&
+    canManageUsers &&
+    Boolean(editUserForm.member_id) &&
+    effectiveEditUserRole !== "none" &&
+    !editingUser;
+  const activeTab = availableTabs.find((tab) => tab.section === section) ?? availableTabs[0] ?? TABS[0];
   const farmCode = profile.farm_code || (profile.farm_id ? profile.farm_id.slice(0, 8).toUpperCase() : "N/A");
   const coordinates = `${formatCoordinate(profile.latitude)}, ${formatCoordinate(profile.longitude)}`;
   const standardUnits = UNIT_FIELDS.map((unit) => ({
@@ -505,10 +696,22 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
   };
 
   const updateAddUserForm = <K extends keyof AddUserForm>(field: K, value: AddUserForm[K]) => {
+    if (field === "email" || field === "phone_country" || field === "phone_number") {
+      setAddUserContactError("");
+    }
     setAddUserForm((current) => ({ ...current, [field]: value }));
   };
 
+  const updateEditUserForm = <K extends keyof EditUserForm>(field: K, value: EditUserForm[K]) => {
+    setEditUserForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateDocumentForm = <K extends keyof DocumentForm>(field: K, value: DocumentForm[K]) => {
+    setDocumentForm((current) => ({ ...current, [field]: value }));
+  };
+
   const openFarmEditor = () => {
+    if (!canWriteFarm) return;
     setFarmForm(profileToFarmForm(profile));
     setEditStep(1);
     setMessage("");
@@ -516,7 +719,7 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
   };
 
   const openDeleteModal = () => {
-    if (!profile.farm_id || deletingFarm) return;
+    if (!profile.farm_id || deletingFarm || !canWriteFarm) return;
     setConfirmFarmDeletion(false);
     setConfirmAccountDeletion(false);
     setMessage("");
@@ -531,9 +734,11 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
   };
 
   const openAddUserModal = () => {
-    if (!profile.farm_id || addingUser) return;
+    if (!profile.farm_id || addingUser || !canManageUsers) return;
     setAddUserForm(EMPTY_ADD_USER_FORM);
     setAddUserStep(1);
+    setAddUserContactError("");
+    setCheckingAddUserContact(false);
     setMessage("");
     setAddUserModalOpen(true);
   };
@@ -543,7 +748,146 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
     setAddUserModalOpen(false);
     setAddUserForm(EMPTY_ADD_USER_FORM);
     setAddUserStep(1);
+    setAddUserContactError("");
+    setCheckingAddUserContact(false);
   };
+
+  const openEditUserModal = (user: SettingsUserAccount) => {
+    if (!profile.farm_id || !canManageUsers || user.is_owner) return;
+    setEditUserForm(userToEditForm(user));
+    setEditUserStep(1);
+    setMessage("");
+    setEditUserModalOpen(true);
+  };
+
+  const closeEditUserModal = () => {
+    if (editingUser) return;
+    setEditUserModalOpen(false);
+    setEditUserStep(1);
+    setEditUserForm(EMPTY_EDIT_USER_FORM);
+  };
+
+  const openDeleteUserModal = (user: SettingsUserAccount) => {
+    if (!profile.farm_id || deletingUserId || !canManageUsers || user.is_owner || user.is_invite || user.is_current_user) return;
+    setDeleteUserTarget(user);
+    setConfirmUserDeletion(false);
+    setMessage("");
+    setDeleteUserModalOpen(true);
+  };
+
+  const closeDeleteUserModal = () => {
+    if (deletingUserId) return;
+    setDeleteUserModalOpen(false);
+    setDeleteUserTarget(null);
+    setConfirmUserDeletion(false);
+  };
+
+  const openDocumentCreateModal = () => {
+    if (!profile.farm_id || !canManageDocuments || savingDocument) return;
+    setDocumentForm(EMPTY_DOCUMENT_FORM);
+    setMessage("");
+    setDocumentCreateModalOpen(true);
+  };
+
+  const closeDocumentCreateModal = () => {
+    if (savingDocument) return;
+    setDocumentCreateModalOpen(false);
+    setDocumentForm(EMPTY_DOCUMENT_FORM);
+  };
+
+  const checkAddUserContact = useCallback(
+    async ({ signal, requireEmail = false }: { signal?: AbortSignal; requireEmail?: boolean } = {}) => {
+      if (!profile.farm_id) {
+        setAddUserContactError("Không tìm thấy trang trại để kiểm tra liên hệ.");
+        return false;
+      }
+
+      const email = addUserForm.email.trim();
+      const phoneNumber = addUserForm.phone_number.trim();
+      const phone = phoneNumber ? [addUserForm.phone_country.trim(), phoneNumber].filter(Boolean).join(" ") : "";
+      if (requireEmail && !email) {
+        setAddUserContactError("Vui lòng nhập email trước khi tiếp tục.");
+        return false;
+      }
+      if (email && !ADD_USER_EMAIL_PATTERN.test(email)) {
+        setAddUserContactError("Email không hợp lệ.");
+        return false;
+      }
+      if (!email && !phone) {
+        setAddUserContactError("");
+        return !requireEmail;
+      }
+
+      setCheckingAddUserContact(true);
+      try {
+        const response = await fetch("/api/settings/users/check-contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ farm_id: profile.farm_id, email, phone }),
+          signal,
+        });
+        const data = (await response.json()) as ContactCheckResponse;
+        if (!response.ok || data.available === false) {
+          const errorMessage = data.fields?.email || data.fields?.phone || data.message || "Thông tin liên hệ đã tồn tại trong hệ thống.";
+          setAddUserContactError(errorMessage);
+          return false;
+        }
+
+        setAddUserContactError("");
+        return true;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return false;
+        setAddUserContactError(error instanceof Error ? error.message : "Không thể kiểm tra thông tin liên hệ.");
+        return false;
+      } finally {
+        setCheckingAddUserContact(false);
+      }
+    },
+    [addUserForm.email, addUserForm.phone_country, addUserForm.phone_number, profile.farm_id]
+  );
+
+  const continueFromAddUserContact = async () => {
+    if (checkingAddUserContact) return;
+    const available = await checkAddUserContact({ requireEmail: true });
+    if (available) setAddUserStep(3);
+  };
+
+  useEffect(() => {
+    if (!addUserModalOpen || addUserStep !== 2 || !profile.farm_id) return;
+
+    const email = addUserForm.email.trim();
+    const phoneNumber = addUserForm.phone_number.trim();
+    const phone = phoneNumber ? [addUserForm.phone_country.trim(), phoneNumber].filter(Boolean).join(" ") : "";
+    if (!email && !phone) {
+      setAddUserContactError("");
+      setCheckingAddUserContact(false);
+      return;
+    }
+
+    if (email && !ADD_USER_EMAIL_PATTERN.test(email)) {
+      setAddUserContactError("Email không hợp lệ.");
+      setCheckingAddUserContact(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void checkAddUserContact({ signal: controller.signal });
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [
+    addUserForm.email,
+    addUserForm.phone_country,
+    addUserForm.phone_number,
+    addUserModalOpen,
+    addUserStep,
+    checkAddUserContact,
+    profile.farm_id,
+  ]);
 
   const toggleSharing = async () => {
     if (!profile.farm_id || savingShare) return;
@@ -663,8 +1007,7 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
     setMessage("");
 
     try {
-      const phoneNumber = addUserForm.phone_number.trim();
-      const phone = phoneNumber ? [addUserForm.phone_country.trim(), phoneNumber].filter(Boolean).join(" ") : "";
+      const phone = buildAddUserPhone(addUserForm);
       const response = await fetch("/api/settings/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -687,7 +1030,9 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
       setAddUserModalOpen(false);
       setAddUserForm(EMPTY_ADD_USER_FORM);
       setAddUserStep(1);
-      setMessage("Đã thêm người dùng và phân quyền.");
+      setAddUserContactError("");
+      setCheckingAddUserContact(false);
+      setMessage(data.message || "Đã thêm người dùng, phân quyền và gửi email lời mời.");
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Không thể thêm người dùng.");
@@ -696,8 +1041,155 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
     }
   };
 
-  const notifyUserManagementAction = (action: string) => {
-    setMessage(`${action} sẽ được bổ sung ở bước chức năng tiếp theo.`);
+  const saveEditUser = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!canSaveEditedUser || !profile.farm_id) {
+      setMessage("Vui lòng nhập email và chọn vai trò trước khi lưu.");
+      return;
+    }
+
+    setEditingUser(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/settings/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          farm_id: profile.farm_id,
+          member_id: editUserForm.member_id,
+          user_id: editUserForm.user_id,
+          first_name: editUserForm.first_name.trim(),
+          last_name: editUserForm.last_name.trim(),
+          language: editUserForm.language,
+          status: editUserForm.status,
+          account_enabled: editUserForm.status === "active",
+          base_role: editUserForm.base_role,
+          farm_role: editUserForm.farm_role,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Không thể cập nhật người dùng.");
+
+      setProfile(data.profile ?? profile);
+      setEditUserModalOpen(false);
+      setEditUserStep(1);
+      setEditUserForm(EMPTY_EDIT_USER_FORM);
+      setMessage(data.message || "Đã cập nhật người dùng và phân quyền.");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Không thể cập nhật người dùng.");
+    } finally {
+      setEditingUser(false);
+    }
+  };
+
+  const deleteUser = async () => {
+    const user = deleteUserTarget;
+    if (!profile.farm_id || !user || deletingUserId || !canManageUsers || user.is_owner || user.is_invite || user.is_current_user) return;
+    if (!confirmUserDeletion) {
+      setMessage("Vui lòng đánh dấu xác nhận trước khi xóa người dùng.");
+      return;
+    }
+
+    setDeletingUserId(user.member_id);
+    setMessage("");
+    try {
+      const response = await fetch("/api/settings/users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          farm_id: profile.farm_id,
+          member_id: user.member_id,
+          user_id: user.user_id,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Không thể xóa người dùng.");
+
+      setProfile(data.profile ?? profile);
+      setDeleteUserModalOpen(false);
+      setDeleteUserTarget(null);
+      setConfirmUserDeletion(false);
+      setMessage(data.message || "Đã xóa quyền truy cập của người dùng.");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Không thể xóa người dùng.");
+    } finally {
+      setDeletingUserId("");
+    }
+  };
+
+  const saveDocument = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!profile.farm_id || !canManageDocuments || savingDocument) return;
+    if (!documentForm.name.trim()) {
+      setMessage("Vui lòng nhập tên chứng từ.");
+      return;
+    }
+    if (!documentForm.file) {
+      setMessage("Vui lòng chọn ảnh chứng từ để tải lên.");
+      return;
+    }
+
+    setSavingDocument(true);
+    setMessage("");
+    try {
+      const body = new FormData();
+      body.set("farm_id", profile.farm_id);
+      body.set("name", documentForm.name.trim());
+      body.set("type", documentForm.type);
+      body.set("number", documentForm.number.trim());
+      body.set("issued_at", documentForm.issued_at);
+      body.set("expires_at", documentForm.expires_at);
+      body.set("note", documentForm.note.trim());
+      body.set("is_shared", String(documentForm.is_shared));
+      body.set("file", documentForm.file);
+
+      const response = await fetch("/api/settings/documents", {
+        method: "POST",
+        body,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Không thể tải lên chứng từ.");
+
+      setProfile(data.profile ?? profile);
+      setDocumentForm(EMPTY_DOCUMENT_FORM);
+      setDocumentCreateModalOpen(false);
+      setMessage(data.message || "Đã tải lên chứng từ.");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Không thể tải lên chứng từ.");
+    } finally {
+      setSavingDocument(false);
+    }
+  };
+
+  const toggleDocumentSharing = async (document: SettingsDocument) => {
+    if (!profile.farm_id || !canManageDocuments || sharingDocumentId) return;
+    setSharingDocumentId(document.id);
+    setMessage("");
+    try {
+      const response = await fetch("/api/settings/documents", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          farm_id: profile.farm_id,
+          document_id: document.id,
+          is_shared: !document.is_shared,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Không thể cập nhật chia sẻ chứng từ.");
+
+      setProfile(data.profile ?? profile);
+      setMessage(data.message || "Đã cập nhật chia sẻ chứng từ.");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Không thể cập nhật chia sẻ chứng từ.");
+    } finally {
+      setSharingDocumentId("");
+    }
   };
 
   const renderShareSwitch = () => (
@@ -709,7 +1201,7 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
         type="button"
         className={`${styles.switchButton} ${profile.is_map_shared ? "" : styles.switchButtonOff}`}
         onClick={toggleSharing}
-        disabled={loading || savingShare || !profile.farm_id}
+        disabled={loading || savingShare || !profile.farm_id || !canWriteFarm}
         aria-pressed={Boolean(profile.is_map_shared)}
         aria-label="Bật tắt chia sẻ trang trại"
       >
@@ -754,11 +1246,11 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
       </div>
 
       <div className={styles.farmActions}>
-        <button type="button" className={styles.editAction} onClick={openFarmEditor} disabled={loading || !profile.farm_id}>
+        <button type="button" className={styles.editAction} onClick={openFarmEditor} disabled={loading || !profile.farm_id || !canWriteFarm}>
           <Icon name="edit" />
           Chỉnh sửa
         </button>
-        <button type="button" className={styles.deleteAction} onClick={openDeleteModal} disabled={loading || deletingFarm || !profile.farm_id}>
+        <button type="button" className={styles.deleteAction} onClick={openDeleteModal} disabled={loading || deletingFarm || !profile.farm_id || !canWriteFarm}>
           <Icon name="trash" />
           {deletingFarm ? "Đang xóa..." : "Xóa"}
         </button>
@@ -956,7 +1448,7 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
           <section className={styles.deleteSection}>
             <h4>Xác nhận xóa trang trại</h4>
             <p>
-              Xóa trang trại sẽ xóa toàn bộ dữ liệu liên quan như khu vực, vật nuôi, chứng từ, kho, sự kiện, kế hoạch và bản ghi vận hành. Bạn sẽ không còn quyền truy cập vào trang trại này.
+              Xóa trang trại sẽ xóa toàn bộ dữ liệu liên quan như khu vực, vật nuôi, chứng từ, kho, sự kiện, kế hoạch chăn thả, công việc và bản ghi vận hành. Bạn sẽ không còn quyền truy cập vào trang trại này.
             </p>
             <label className={styles.deleteCheckbox}>
               <input
@@ -1019,7 +1511,7 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
                   <span>Ngôn ngữ:</span>
                   <select value={addUserForm.language} onChange={(event) => updateAddUserForm("language", event.target.value)}>
                     <option value="vi-VN">Tiếng Việt (Việt Nam)</option>
-                    <option value="en-US">English (United States)</option>
+                    <option value="en-US">Tiếng Anh (Mỹ)</option>
                   </select>
                 </label>
                 <div className={styles.modalField}>
@@ -1067,8 +1559,10 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
                   <span>Email:</span>
                   <input type="email" value={addUserForm.email} onChange={(event) => updateAddUserForm("email", event.target.value)} />
                 </label>
+                {checkingAddUserContact && <p className={styles.stepNote}>Đang kiểm tra email và số điện thoại...</p>}
+                {addUserContactError && <p className={`${styles.stepNote} ${styles.stepError}`}>{addUserContactError}</p>}
                 <div className={styles.stepActions}>
-                  <button type="button" className={styles.continueAction} onClick={() => setAddUserStep(3)}>
+                  <button type="button" className={styles.continueAction} onClick={continueFromAddUserContact} disabled={checkingAddUserContact}>
                     Tiếp tục
                   </button>
                   <button type="button" className={styles.cancelAction} onClick={() => setAddUserStep(1)}>
@@ -1106,7 +1600,7 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
 
                   <span>{farmName}:</span>
                   <div className={styles.roleOptions}>
-                    {(["none", "viewer", "editor"] as RoleCode[]).map((role) => (
+                    {(["none", "viewer", "editor", "admin"] as RoleCode[]).map((role) => (
                       <label key={role}>
                         <input
                           type="radio"
@@ -1115,7 +1609,7 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
                           checked={addUserForm.farm_role === role}
                           onChange={() => updateAddUserForm("farm_role", role)}
                         />
-                        {ROLE_LABELS[role]}{role === "viewer" ? " (chỉ xem)" : role === "editor" ? " (xem/sửa)" : ""}
+                        {ROLE_LABELS[role]}{role === "viewer" ? " (chỉ xem)" : role === "editor" ? " (xem/sửa)" : role === "admin" ? " (toàn quyền)" : ""}
                       </label>
                     ))}
                   </div>
@@ -1145,6 +1639,290 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
             {addingUser ? "Đang lưu..." : "Lưu"}
           </button>
           <button type="button" className={styles.cancelAction} onClick={closeAddUserModal} disabled={addingUser}>
+            <Icon name="close" />
+            Hủy
+          </button>
+        </footer>
+      </form>
+    </div>
+  );
+
+  const renderEditUserModal = () => {
+    const stepStatus = (step: 1 | 2 | 3) => {
+      if (editUserStep > step) return <span className={styles.stepDone}><Icon name="check" /></span>;
+      if (editUserStep === step) return <span className={styles.stepActive}>{step}</span>;
+      return <span className={styles.stepMuted}>{step}</span>;
+    };
+
+    return (
+    <div className={styles.modalBackdrop} role="presentation">
+      <form className={styles.userModal} onSubmit={saveEditUser}>
+        <header className={styles.modalHeader}>
+          <h3>CHỈNH SỬA NGƯỜI DÙNG</h3>
+          <button type="button" onClick={closeEditUserModal} disabled={editingUser} aria-label="Đóng">
+            <Icon name="close" />
+          </button>
+        </header>
+
+        <div className={styles.stepLayout}>
+          <section className={`${styles.stepBlock} ${editUserStep === 1 ? styles.stepOpen : ""}`}>
+            <div className={styles.stepTitle}>
+              {stepStatus(1)}
+              <strong>Thông tin</strong>
+            </div>
+            {editUserStep === 1 && (
+            <div className={styles.stepContent}>
+              <p className={styles.stepHelp}>Cập nhật thông tin hiển thị của người dùng.</p>
+              <label className={styles.modalField}>
+                <span>Tên:</span>
+                <input value={editUserForm.first_name} onChange={(event) => updateEditUserForm("first_name", event.target.value)} />
+              </label>
+              <label className={styles.modalField}>
+                <span>Họ:</span>
+                <input value={editUserForm.last_name} onChange={(event) => updateEditUserForm("last_name", event.target.value)} />
+              </label>
+              <label className={styles.modalField}>
+                <span>Ngôn ngữ:</span>
+                <select value={editUserForm.language} onChange={(event) => updateEditUserForm("language", event.target.value)}>
+                  <option value="vi-VN">Tiếng Việt (Việt Nam)</option>
+                  <option value="en-US">Tiếng Anh (Mỹ)</option>
+                </select>
+              </label>
+              <label className={styles.modalField}>
+                <span>Trạng thái:</span>
+                <select value={editUserForm.status} onChange={(event) => updateEditUserForm("status", event.target.value as EditUserForm["status"])}>
+                  <option value="active">Đang hoạt động</option>
+                  <option value="disabled">Đã khóa</option>
+                </select>
+              </label>
+              <p className={styles.stepNote}>
+                <strong>Lưu ý:</strong> Họ tên, ngôn ngữ và trạng thái có thể chỉnh tại đây. Email và số điện thoại chỉ được xem ở bước Liên hệ, không cho phép thay đổi.
+              </p>
+              <button type="button" className={styles.continueAction} onClick={() => setEditUserStep(2)}>
+                Tiếp tục
+              </button>
+            </div>
+            )}
+          </section>
+
+          <section className={`${styles.stepBlock} ${editUserStep === 2 ? styles.stepOpen : ""}`}>
+            <div className={styles.stepTitle}>
+              {stepStatus(2)}
+              <strong>Liên hệ</strong>
+            </div>
+            {editUserStep === 2 && (
+            <div className={styles.stepContent}>
+              <p className={styles.stepHelp}>Email và số điện thoại là thông tin định danh, chỉ hiển thị để đối chiếu.</p>
+              <label className={styles.modalField}>
+                <span>Số điện thoại:</span>
+                <div className={styles.phoneInputGroup}>
+                  <select value={editUserForm.phone_country} disabled>
+                    <option value="+84">+84</option>
+                    <option value="+1">+1</option>
+                    <option value="+61">+61</option>
+                  </select>
+                  <input inputMode="tel" value={editUserForm.phone_number || "Chưa cập nhật"} disabled />
+                </div>
+              </label>
+              <label className={styles.modalField}>
+                <span>Email:</span>
+                <input type="email" value={editUserForm.email || "Chưa cập nhật"} disabled />
+              </label>
+              <p className={styles.stepNote}>
+                <strong>Lưu ý:</strong> Không thể thay đổi email hoặc số điện thoại trong màn hình phân quyền. Nếu cần đổi thông tin liên hệ, người dùng phải tự cập nhật trong hồ sơ cá nhân.
+              </p>
+              <div className={styles.stepActions}>
+                <button type="button" className={styles.continueAction} onClick={() => setEditUserStep(3)}>
+                  Tiếp tục
+                </button>
+                <button type="button" className={styles.cancelAction} onClick={() => setEditUserStep(1)}>
+                  Quay lại
+                </button>
+              </div>
+            </div>
+            )}
+          </section>
+
+          <section className={`${styles.stepBlock} ${editUserStep === 3 ? styles.stepOpen : ""}`}>
+            <div className={styles.stepTitle}>
+              {stepStatus(3)}
+              <strong>Vai trò</strong>
+            </div>
+            {editUserStep === 3 && (
+            <div className={styles.stepContent}>
+              <p className={styles.stepHelp}>Chọn vai trò truy cập của người dùng cho trang trại.</p>
+              <div className={styles.roleMatrix}>
+                <span>Vai trò gốc:</span>
+                <div className={styles.roleOptions}>
+                  {(["none", "viewer", "editor", "admin"] as RoleCode[]).map((role) => (
+                    <label key={role}>
+                      <input
+                        type="radio"
+                        name="edit_base_role"
+                        value={role}
+                        checked={editUserForm.base_role === role}
+                        onChange={() => updateEditUserForm("base_role", role)}
+                      />
+                      {ROLE_LABELS[role]}
+                    </label>
+                  ))}
+                </div>
+
+                <span>{farmName}:</span>
+                <strong className={styles.readonlyRoleValue}>{displayRoleName(effectiveEditUserRole)}</strong>
+              </div>
+              <ul className={styles.roleHintList}>
+                <li><strong>Quản trị:</strong> xem, chỉnh sửa dữ liệu và quản lý người dùng.</li>
+                <li><strong>Không có quyền:</strong> không truy cập được trang trại đã chọn.</li>
+                <li><strong>Chỉ xem:</strong> chỉ xem nội dung trong trang trại.</li>
+                <li><strong>Biên tập:</strong> xem và chỉnh sửa nội dung trong trang trại.</li>
+              </ul>
+              <div className={styles.stepActions}>
+                <button type="button" className={styles.continueAction} onClick={() => setEditUserStep(3)}>
+                  Hoàn tất
+                </button>
+                <button type="button" className={styles.cancelAction} onClick={() => setEditUserStep(2)}>
+                  Quay lại
+                </button>
+              </div>
+            </div>
+            )}
+          </section>
+        </div>
+
+        <footer className={styles.modalFooter}>
+          <button type="submit" className={styles.modalPrimaryAction} disabled={!canSaveEditedUser}>
+            <Icon name="save" />
+            {editingUser ? "Đang lưu..." : "Cập nhật"}
+          </button>
+          <button type="button" className={styles.cancelAction} onClick={closeEditUserModal} disabled={editingUser}>
+            <Icon name="close" />
+            Hủy
+          </button>
+        </footer>
+      </form>
+    </div>
+    );
+  };
+
+  const renderDeleteUserModal = () => {
+    const userName = deleteUserTarget ? displayUserName(deleteUserTarget) : "người dùng";
+    const firstName = userName.split(" ")[0] || "người dùng";
+    const deletingSelectedUser = deleteUserTarget ? deletingUserId === deleteUserTarget.member_id : false;
+
+    return (
+      <div className={styles.modalBackdrop} role="presentation">
+        <div className={styles.deleteModal} role="dialog" aria-modal="true" aria-labelledby="delete-user-title">
+          <header className={styles.modalHeader}>
+            <h3 id="delete-user-title">Xác nhận việc xóa bỏ {userName}</h3>
+            <button type="button" onClick={closeDeleteUserModal} disabled={Boolean(deletingUserId)} aria-label="Đóng">
+              <Icon name="close" />
+            </button>
+          </header>
+
+          <div className={styles.deleteModalBody}>
+            <p className={styles.deleteLead}>
+              Bạn có chắc chắn muốn tiếp tục xóa {userName} khỏi hồ sơ trang trại của mình không?
+            </p>
+            <p className={styles.deleteLead}>
+              Việc này sẽ dẫn đến việc <strong>mất vĩnh viễn</strong> quyền truy cập, phân quyền và các thông tin liên quan đến người dùng này trong trang trại.
+            </p>
+            <p className={styles.deleteLead}>
+              Vui lòng đánh dấu vào ô xác nhận bên dưới để xác nhận rằng hành động này là cuối cùng và <strong>không thể đảo ngược</strong>.
+            </p>
+
+            <label className={styles.deleteCheckbox}>
+              <input
+                type="checkbox"
+                checked={confirmUserDeletion}
+                onChange={(event) => setConfirmUserDeletion(event.target.checked)}
+                disabled={Boolean(deletingUserId)}
+              />
+              <span>
+                Tôi hiểu rằng hành động này là không thể đảo ngược và tất cả dữ liệu liên quan đến {firstName} trong hồ sơ trang trại sẽ bị xóa vĩnh viễn.
+              </span>
+            </label>
+          </div>
+
+          <footer className={styles.modalFooter}>
+            <button type="button" className={styles.dangerPrimaryAction} onClick={deleteUser} disabled={deletingSelectedUser || !confirmUserDeletion}>
+              <Icon name="trash" />
+              {deletingSelectedUser ? "Đang xóa..." : "Xóa bỏ"}
+            </button>
+            <button type="button" className={styles.cancelAction} onClick={closeDeleteUserModal} disabled={Boolean(deletingUserId)}>
+              <Icon name="close" />
+              Hủy bỏ
+            </button>
+          </footer>
+        </div>
+      </div>
+    );
+  };
+
+  const renderDocumentCreateModal = () => (
+    <div className={styles.modalBackdrop} role="presentation">
+      <form className={styles.farmModal} onSubmit={saveDocument}>
+        <header className={styles.modalHeader}>
+          <h3>Thêm chứng từ mới</h3>
+          <button type="button" onClick={closeDocumentCreateModal} disabled={savingDocument} aria-label="Đóng">
+            <Icon name="close" />
+          </button>
+        </header>
+
+        <div className={styles.documentUploadForm}>
+          <div className={styles.documentUploadHeader}>
+            <div>
+              <h3>Tải chứng từ hình ảnh</h3>
+              <p>Hỗ trợ giấy kiểm nghiệm, giấy phép kinh doanh, bằng khen, giấy kiểm định, bản ảnh và bản điện tử.</p>
+            </div>
+          </div>
+
+          <div className={styles.documentFormGrid}>
+            <label className={styles.formField}>
+              <span>Tên chứng từ</span>
+              <input value={documentForm.name} onChange={(event) => updateDocumentForm("name", event.target.value)} placeholder="Ví dụ: Giấy kiểm nghiệm rau hữu cơ" />
+            </label>
+            <label className={styles.formField}>
+              <span>Loại chứng từ</span>
+              <select value={documentForm.type} onChange={(event) => updateDocumentForm("type", event.target.value)}>
+                {DOCUMENT_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className={styles.formField}>
+              <span>Số chứng từ</span>
+              <input value={documentForm.number} onChange={(event) => updateDocumentForm("number", event.target.value)} placeholder="Không bắt buộc" />
+            </label>
+            <label className={styles.formField}>
+              <span>Ngày ban hành</span>
+              <input type="date" value={documentForm.issued_at} onChange={(event) => updateDocumentForm("issued_at", event.target.value)} />
+            </label>
+            <label className={styles.formField}>
+              <span>Ngày hết hạn</span>
+              <input type="date" value={documentForm.expires_at} onChange={(event) => updateDocumentForm("expires_at", event.target.value)} />
+            </label>
+            <label className={styles.formField}>
+              <span>Ảnh chứng từ</span>
+              <input type="file" accept="image/*" onChange={(event) => updateDocumentForm("file", event.target.files?.[0] ?? null)} />
+            </label>
+            <label className={`${styles.formField} ${styles.formFieldWide}`}>
+              <span>Ghi chú</span>
+              <textarea rows={3} value={documentForm.note} onChange={(event) => updateDocumentForm("note", event.target.value)} placeholder="Thông tin bổ sung về chứng từ" />
+            </label>
+            <label className={styles.documentShareOption}>
+              <input type="checkbox" checked={documentForm.is_shared} onChange={(event) => updateDocumentForm("is_shared", event.target.checked)} />
+              <span>Cho phép chia sẻ chứng từ này trên hồ sơ/bản đồ công khai khi cần.</span>
+            </label>
+          </div>
+        </div>
+
+        <footer className={styles.modalFooter}>
+          <button type="submit" className={styles.modalPrimaryAction} disabled={savingDocument || !profile.farm_id}>
+            <Icon name="save" />
+            {savingDocument ? "Đang tải..." : "Tải lên"}
+          </button>
+          <button type="button" className={styles.cancelAction} onClick={closeDocumentCreateModal} disabled={savingDocument}>
             <Icon name="close" />
             Hủy
           </button>
@@ -1209,12 +1987,17 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
             const userName = displayUserName(user);
             const baseRoleName = displayRoleName(user.base_role ?? user.role_code ?? user.role_name);
             const farmRoleName = displayRoleName(user.farm_role ?? user.role_code ?? user.role_name);
+            const inviteStatusName = displayInviteStatus(user.invite_status, user.invite_accepted);
 
             return (
               <article key={user.member_id} className={styles.userRecordCard}>
                 <header className={styles.userRecordHeader}>
                   <div>
                     <div className={styles.badgeRow}>
+                      <span className={`${styles.userTag} ${user.invite_accepted ? styles.userTagAccepted : styles.userTagPending}`}>
+                        {inviteStatusName}
+                      </span>
+                      {!user.is_owner && <span className={styles.userTagRole}>{farmRoleName}</span>}
                       {user.is_owner && <span className={styles.primaryBadge}>Chủ sở hữu</span>}
                       {user.is_current_user && <span className={styles.meBadge}>Tôi</span>}
                     </div>
@@ -1240,21 +2023,24 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
                       <div><dt>Điện thoại:</dt><dd>{valueOrEmpty(user.phone)}</dd></div>
                       <div><dt>Ngôn ngữ:</dt><dd>{user.language || "vi-VN"}</dd></div>
                       <div><dt>Trạng thái:</dt><dd>{displayStatus(user.status)}</dd></div>
+                      <div><dt>Lời mời:</dt><dd>{inviteStatusName}</dd></div>
                     </dl>
 
                     <div className={styles.userActions}>
-                      <button type="button" className={styles.editAction} onClick={() => notifyUserManagementAction("Chỉnh sửa người dùng")}>
+                      <button type="button" className={styles.editAction} onClick={() => openEditUserModal(user)} disabled={!canManageUsers || user.is_owner || user.is_invite || editingUser}>
                         <Icon name="edit" />
                         Chỉnh sửa
                       </button>
-                      <button type="button" className={styles.deleteAction} onClick={() => notifyUserManagementAction(`Xóa ${userName}`)}>
+                      <button type="button" className={styles.deleteAction} onClick={() => openDeleteUserModal(user)} disabled={!canManageUsers || user.is_owner || user.is_invite || user.is_current_user || deletingUserId === user.member_id}>
                         <Icon name="trash" />
-                        Xóa {userName.split(" ")[0] || "người dùng"}
+                        {deletingUserId === user.member_id ? "Đang xóa..." : `Xóa ${userName.split(" ")[0] || "người dùng"}`}
                       </button>
+                      {canManageUsers && (
                       <button type="button" className={styles.addAction} onClick={openAddUserModal} disabled={!profile.farm_id || addingUser}>
                         <Icon name="userAdd" />
                         Thêm
                       </button>
+                      )}
                     </div>
                   </div>
 
@@ -1274,25 +2060,151 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
 
       {message && <p className={styles.notice}>{message}</p>}
       {addUserModalOpen && renderAddUserModal()}
+      {editUserModalOpen && renderEditUserModal()}
+      {deleteUserModalOpen && renderDeleteUserModal()}
     </>
   );
 
-  const renderDocumentsPage = () => (
-    <>
-      <section className={styles.metricGrid}>
-        <article className={styles.metricCard}><span>Chứng từ</span><strong>{summary?.documentCount ?? 0}</strong><small>Đang lưu</small></article>
-        <article className={styles.metricCard}><span>Chờ duyệt</span><strong>{summary?.pendingDocumentCount ?? 0}</strong><small>Cần xử lý</small></article>
-        <article className={styles.metricCard}><span>Sắp hết hạn</span><strong>{summary?.expiringDocumentCount ?? 0}</strong><small>Trong 30 ngày</small></article>
-        <article className={styles.metricCard}><span>Trang trại</span><strong>{profile.farm_id ? 1 : 0}</strong><small>{farmName}</small></article>
-      </section>
+  const renderDocumentsPage = () => {
+    const documents = profile.documents ?? [];
 
-      <article className={styles.emptyState}>
-        <span className={styles.inlineIcon}><Icon name="document" /></span>
-        <h3>Chưa có chứng từ</h3>
-        <p>CSDL chứng từ đã sẵn sàng. Các bản ghi giấy tờ, hồ sơ pháp lý và tài liệu đối soát sẽ hiển thị tại đây.</p>
-      </article>
-    </>
-  );
+    return (
+      <>
+        <section className={styles.metricGrid}>
+          <article className={styles.metricCard}><span>Chứng từ</span><strong>{summary?.documentCount ?? documents.length}</strong><small>Đang lưu</small></article>
+          <article className={styles.metricCard}><span>Chia sẻ</span><strong>{documents.filter((document) => document.is_shared).length}</strong><small>Đang bật</small></article>
+          <article className={styles.metricCard}><span>Sắp hết hạn</span><strong>{summary?.expiringDocumentCount ?? 0}</strong><small>Trong 30 ngày</small></article>
+          <article className={styles.metricCard}><span>Trang trại</span><strong>{profile.farm_id ? 1 : 0}</strong><small>{farmName}</small></article>
+        </section>
+
+        <section className={styles.documentViewerHeader}>
+          <div>
+            <h3>Danh sách chứng từ</h3>
+            <p>Xem ảnh chứng từ đã lưu và bật/tắt chia sẻ từng chứng từ.</p>
+          </div>
+          {canManageDocuments && (
+            <button type="button" className={styles.addAction} onClick={openDocumentCreateModal} disabled={!profile.farm_id || savingDocument}>
+              <Icon name="document" />
+              Thêm chứng từ
+            </button>
+          )}
+        </section>
+
+        {false && canManageDocuments && (
+          <form className={styles.documentUploadForm} onSubmit={saveDocument}>
+            <div className={styles.documentUploadHeader}>
+              <div>
+                <h3>Tải chứng từ hình ảnh</h3>
+                <p>Hỗ trợ giấy kiểm nghiệm, giấy phép kinh doanh, bằng khen, giấy kiểm định, bản ảnh và bản điện tử.</p>
+              </div>
+              <button type="submit" className={styles.modalPrimaryAction} disabled={savingDocument || !profile.farm_id}>
+                <Icon name="save" />
+                {savingDocument ? "Đang tải..." : "Tải lên"}
+              </button>
+            </div>
+
+            <div className={styles.documentFormGrid}>
+              <label className={styles.formField}>
+                <span>Tên chứng từ</span>
+                <input value={documentForm.name} onChange={(event) => updateDocumentForm("name", event.target.value)} placeholder="Ví dụ: Giấy kiểm nghiệm rau hữu cơ" />
+              </label>
+              <label className={styles.formField}>
+                <span>Loại chứng từ</span>
+                <select value={documentForm.type} onChange={(event) => updateDocumentForm("type", event.target.value)}>
+                  {DOCUMENT_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className={styles.formField}>
+                <span>Số chứng từ</span>
+                <input value={documentForm.number} onChange={(event) => updateDocumentForm("number", event.target.value)} placeholder="Không bắt buộc" />
+              </label>
+              <label className={styles.formField}>
+                <span>Ngày ban hành</span>
+                <input type="date" value={documentForm.issued_at} onChange={(event) => updateDocumentForm("issued_at", event.target.value)} />
+              </label>
+              <label className={styles.formField}>
+                <span>Ngày hết hạn</span>
+                <input type="date" value={documentForm.expires_at} onChange={(event) => updateDocumentForm("expires_at", event.target.value)} />
+              </label>
+              <label className={styles.formField}>
+                <span>Ảnh chứng từ</span>
+                <input type="file" accept="image/*" onChange={(event) => updateDocumentForm("file", event.target.files?.[0] ?? null)} />
+              </label>
+              <label className={`${styles.formField} ${styles.formFieldWide}`}>
+                <span>Ghi chú</span>
+                <textarea rows={3} value={documentForm.note} onChange={(event) => updateDocumentForm("note", event.target.value)} placeholder="Thông tin bổ sung về chứng từ" />
+              </label>
+              <label className={styles.documentShareOption}>
+                <input type="checkbox" checked={documentForm.is_shared} onChange={(event) => updateDocumentForm("is_shared", event.target.checked)} />
+                <span>Cho phép chia sẻ chứng từ này trên hồ sơ/bản đồ công khai khi cần.</span>
+              </label>
+            </div>
+          </form>
+        )}
+
+        {documents.length === 0 ? (
+          <article className={styles.emptyState}>
+            <span className={styles.inlineIcon}><Icon name="document" /></span>
+            <h3>Chưa có chứng từ</h3>
+            <p>Tải ảnh giấy kiểm nghiệm, giấy phép kinh doanh, bằng khen, giấy kiểm định hoặc bản điện tử để lưu hồ sơ trang trại.</p>
+          </article>
+        ) : (
+          <div className={styles.documentGrid}>
+            {documents.map((document) => (
+              <article key={document.id} className={styles.documentCard}>
+                {document.file_url ? (
+                  <a
+                    className={`${styles.documentPreview} ${styles.documentPreviewImage}`}
+                    href={document.file_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Mở ảnh chứng từ ${document.name}`}
+                    style={{ backgroundImage: `url(${document.file_url})` }}
+                  >
+                    <span>{document.name}</span>
+                  </a>
+                ) : (
+                  <div className={styles.documentPreviewPlaceholder}><Icon name="document" /></div>
+                )}
+                <div className={styles.documentCardBody}>
+                  <div className={styles.badgeRow}>
+                    <span className={styles.userTagRole}>{displayDocumentType(document.type)}</span>
+                    <span className={`${styles.userTag} ${document.is_shared ? styles.userTagAccepted : styles.userTagPending}`}>
+                      {document.is_shared ? "Đang chia sẻ" : "Không chia sẻ"}
+                    </span>
+                  </div>
+                  <h3>{document.name}</h3>
+                  <dl className={styles.compactList}>
+                    <div><dt>Mã:</dt><dd>{document.code}</dd></div>
+                    <div><dt>Số:</dt><dd>{valueOrEmpty(document.number)}</dd></div>
+                    <div><dt>Ban hành:</dt><dd>{formatDateValue(document.issued_at)}</dd></div>
+                    <div><dt>Hết hạn:</dt><dd>{formatDateValue(document.expires_at)}</dd></div>
+                    <div><dt>Ghi chú:</dt><dd>{valueOrEmpty(document.note)}</dd></div>
+                  </dl>
+                  {canManageDocuments && (
+                    <button
+                      type="button"
+                      className={`${styles.smallSwitch} ${document.is_shared ? "" : styles.smallSwitchOff}`}
+                      onClick={() => toggleDocumentSharing(document)}
+                      disabled={sharingDocumentId === document.id}
+                      aria-pressed={Boolean(document.is_shared)}
+                    >
+                      <span>{document.is_shared ? "Chia sẻ" : "Không chia sẻ"}</span>
+                      <i />
+                    </button>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+
+        {documentCreateModalOpen && renderDocumentCreateModal()}
+      </>
+    );
+  };
 
   return (
     <DashboardShell farmName={farmName} activePath="/dashboard/settings">
@@ -1312,7 +2224,7 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
         </section>
 
         <nav className={styles.tabs} aria-label="Nhóm cài đặt">
-          {TABS.map((tab) => (
+          {availableTabs.map((tab) => (
             <a key={tab.section} href={tab.href} className={tab.section === section ? styles.tabActive : ""}>
               {tab.label}
             </a>
