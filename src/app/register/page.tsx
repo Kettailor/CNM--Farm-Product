@@ -5,12 +5,16 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import CowLoading from "@/components/cow-loading";
 
+type InviteStatus = "idle" | "checking" | "valid" | "expired" | "accepted" | "declined" | "not_found";
+
 export default function RegistrationPage() {
   const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [inviteToken, setInviteToken] = useState("");
+  const [inviteStatus, setInviteStatus] = useState<InviteStatus>("idle");
+  const [inviteStatusMessage, setInviteStatusMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const submittingRef = useRef(false);
@@ -21,11 +25,43 @@ export default function RegistrationPage() {
     const invitedEmail = params.get("email")?.trim() || "";
     setInviteToken(nextInviteToken);
     if (invitedEmail) setEmail(invitedEmail);
+    if (!nextInviteToken) {
+      setInviteStatus("idle");
+      return;
+    }
+
+    const controller = new AbortController();
+    setInviteStatus("checking");
+    setInviteStatusMessage("");
+    const statusUrl = new URL("/api/invitations/status", window.location.origin);
+    statusUrl.searchParams.set("token", nextInviteToken);
+    if (invitedEmail) statusUrl.searchParams.set("email", invitedEmail);
+
+    fetch(statusUrl.toString(), { signal: controller.signal })
+      .then(async (response) => {
+        const data = (await response.json()) as { status?: InviteStatus; message?: string; email?: string | null };
+        if (data.email) setEmail(data.email);
+        if (response.ok && data.status === "valid") {
+          setInviteStatus("valid");
+          return;
+        }
+        const nextStatus = data.status && data.status !== "idle" && data.status !== "checking" && data.status !== "valid" ? data.status : "expired";
+        setInviteStatus(nextStatus);
+        setInviteStatusMessage(data.message || "Lời mời đã hết hạn.");
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setInviteStatus("expired");
+        setInviteStatusMessage("Không thể kiểm tra lời mời. Vui lòng yêu cầu chủ sở hữu gửi lại lời mời.");
+      });
+
+    return () => controller.abort();
   }, []);
 
   const onCreateAccount = async () => {
     if (submittingRef.current) return;
     setError("");
+    if (inviteToken && inviteStatus !== "valid") return setError("Lời mời đã hết hạn hoặc không còn hiệu lực.");
     if (!fullName.trim() || !email.trim() || !password.trim()) return setError("Vui lòng nhập đầy đủ thông tin.");
     if (password.length < 8) return setError("Mật khẩu phải có ít nhất 8 ký tự.");
 
@@ -53,6 +89,23 @@ export default function RegistrationPage() {
       }
     }
   };
+
+  const inviteUnavailable = Boolean(inviteToken && inviteStatus !== "valid" && inviteStatus !== "checking");
+  const inviteUnavailableTitle =
+    inviteStatus === "accepted"
+      ? "Lời mời đã được chấp nhận"
+      : inviteStatus === "declined"
+        ? "Lời mời đã được từ chối"
+        : inviteStatus === "not_found"
+          ? "Không tìm thấy lời mời"
+          : "Lời mời đã hết hạn";
+  const inviteUnavailableMessage =
+    inviteStatusMessage ||
+    (inviteStatus === "accepted"
+      ? "Tài khoản này đã tham gia trang trại trước đó."
+      : inviteStatus === "declined"
+        ? "Lời mời này đã được từ chối và không còn hiệu lực."
+        : "Lời mời này đã hết hạn hoặc đã bị chủ sở hữu xóa.");
 
   return (
     <main className="page-shell auth-shell">
@@ -90,6 +143,27 @@ export default function RegistrationPage() {
         </aside>
 
         <div className="auth-panel">
+          {inviteToken && inviteStatus === "checking" ? (
+            <div className="auth-panel-head">
+              <p className="kicker">Đang kiểm tra</p>
+              <h2>Kiểm tra lời mời</h2>
+              <CowLoading label="Đang kiểm tra lời mời..." />
+            </div>
+          ) : inviteUnavailable ? (
+            <>
+              <div className="auth-panel-head">
+                <p className="kicker">Lời mời trang trại</p>
+                <h2>{inviteUnavailableTitle}</h2>
+                <p className="section-subtitle">{inviteUnavailableMessage}</p>
+              </div>
+
+              <div className="auth-links">
+                <a href="/login">Quay lại đăng nhập</a>
+                <a href="/">Xem trang giới thiệu</a>
+              </div>
+            </>
+          ) : (
+            <>
           <div className="auth-panel-head">
             <p className="kicker">Đăng ký</p>
             <h2>{inviteToken ? "Chấp nhận lời mời" : "Tạo tài khoản mới"}</h2>
@@ -121,6 +195,8 @@ export default function RegistrationPage() {
             <a href="/login">Đã có tài khoản? Đăng nhập</a>
             <a href="/">Xem trang giới thiệu</a>
           </div>
+            </>
+          )}
         </div>
       </section>
     </main>

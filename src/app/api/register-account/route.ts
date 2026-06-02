@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { cauHinhCookieXacThuc, taoMatKhauHash, taoTokenXacThuc, TEN_COOKIE_XAC_THUC } from "@/lib/auth";
+import { expireFarmInvitations, notifyFarmInvitationOwner } from "@/lib/farm-invitations";
+import { ensureSettingsSchema } from "@/lib/settings-schema";
 
 type Payload = {
   fullName: string;
@@ -21,21 +23,46 @@ class RegisterAccountError extends Error {
 }
 
 async function completeInviteRegistration(fullName: string, email: string, password: string, inviteToken: string) {
+  await ensureSettingsSchema();
+  await expireFarmInvitations();
+
+  let acceptedNotification: {
+    ownerId: string;
+    farmId: string;
+    farmName: string;
+    inviteId: string;
+  } | null = null;
+  let completedUser: { id: string; full_name: string; email: string } | null = null;
   const client = await db.connect();
   try {
     await client.query("begin");
 
     const invite = await client.query(
-      `select id::text, trang_trai_id::text, vai_tro_id::text
-       from du_lieu.loi_moi_trang_trai
-       where token = $1
-         and lower(email) = $2
-         and lower(trang_thai) = 'pending'
-         and (het_han_luc is null or het_han_luc > now())
+      `select lm.id::text,
+              lm.trang_trai_id::text,
+              lm.vai_tro_id::text,
+              lm.so_dien_thoai,
+              lm.ngon_ngu,
+              t.chu_so_huu_id::text as owner_id,
+              t.ten_trang_trai as farm_name
+       from du_lieu.loi_moi_trang_trai lm
+       join du_lieu.trang_trai t on t.id = lm.trang_trai_id
+       where lm.token = $1
+         and lower(lm.email) = $2
+         and lower(lm.trang_thai) = 'pending'
+         and (lm.het_han_luc is null or lm.het_han_luc > now())
        limit 1`,
       [inviteToken, email]
     );
-    const inviteRow = invite.rows[0] as { id?: string; trang_trai_id?: string; vai_tro_id?: string | null } | undefined;
+    const inviteRow = invite.rows[0] as {
+      id?: string;
+      trang_trai_id?: string;
+      vai_tro_id?: string | null;
+      so_dien_thoai?: string | null;
+      ngon_ngu?: string | null;
+      owner_id?: string;
+      farm_name?: string | null;
+    } | undefined;
     if (!inviteRow?.id || !inviteRow.trang_trai_id || !inviteRow.vai_tro_id) {
       throw new RegisterAccountError("Lời mời không hợp lệ hoặc đã hết hạn.", 400);
     }
@@ -50,22 +77,35 @@ async function completeInviteRegistration(fullName: string, email: string, passw
     );
 
     let userId = existing.rows[0]?.id ? String(existing.rows[0].id) : null;
+    const memberCount = await client.query(
+      `select count(*)::int as member_count
+       from du_lieu.thanh_vien_trang_trai
+       where trang_trai_id = $1
+         and ($2::uuid is null or nguoi_dung_id <> $2::uuid)`,
+      [inviteRow.trang_trai_id, userId]
+    );
+    if (Number(memberCount.rows[0]?.member_count ?? 0) >= 3) {
+      throw new RegisterAccountError("Trang trại đã đạt giới hạn 3 người dùng.", 409);
+    }
+
     if (userId) {
       await client.query(
         `update du_lieu.nguoi_dung
          set ho_ten = $2,
              mat_khau_hash = $3,
+             so_dien_thoai = coalesce(nullif(so_dien_thoai, ''), $4),
+             ngon_ngu = coalesce(nullif(ngon_ngu, ''), nullif($5, ''), ngon_ngu),
              trang_thai = 'active',
              updated_at = now()
          where id = $1`,
-        [userId, fullName, passwordHash]
+        [userId, fullName, passwordHash, inviteRow.so_dien_thoai ?? null, inviteRow.ngon_ngu ?? null]
       );
     } else {
       const created = await client.query(
-        `insert into du_lieu.nguoi_dung (ho_ten, email, mat_khau_hash, trang_thai)
-         values ($1, $2, $3, 'active')
+        `insert into du_lieu.nguoi_dung (ho_ten, email, mat_khau_hash, so_dien_thoai, ngon_ngu, trang_thai)
+         values ($1, $2, $3, $4, $5, 'active')
          returning id::text`,
-        [fullName, email, passwordHash]
+        [fullName, email, passwordHash, inviteRow.so_dien_thoai ?? null, inviteRow.ngon_ngu ?? "vi-VN"]
       );
       userId = String(created.rows[0].id);
     }
@@ -91,18 +131,39 @@ async function completeInviteRegistration(fullName: string, email: string, passw
     );
 
     await client.query("commit");
-
-    return {
-      id: userId,
-      full_name: fullName,
-      email,
+    acceptedNotification = {
+      ownerId: String(inviteRow.owner_id),
+      farmId: inviteRow.trang_trai_id,
+      farmName: String(inviteRow.farm_name || "trang trại"),
+      inviteId: inviteRow.id,
     };
+    completedUser = { id: userId, full_name: fullName, email };
   } catch (error) {
     await client.query("rollback");
     throw error;
   } finally {
     client.release();
   }
+
+  if (acceptedNotification) {
+    await notifyFarmInvitationOwner({
+      ownerId: acceptedNotification.ownerId,
+      farmId: acceptedNotification.farmId,
+      farmName: acceptedNotification.farmName,
+      email,
+      fullName,
+      decision: "accepted",
+      inviteId: acceptedNotification.inviteId,
+    }).catch((error) => {
+      console.warn("[farm_invitation_notification_failed]", error);
+    });
+  }
+
+  if (!completedUser) {
+    throw new RegisterAccountError("Không thể hoàn tất lời mời.", 500);
+  }
+
+  return completedUser;
 }
 
 export async function POST(request: NextRequest) {

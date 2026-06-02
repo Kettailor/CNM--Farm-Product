@@ -727,7 +727,7 @@
 .ganttLeftHead > strong {
   position: sticky;
   top: 0;
-  z-index: 4;
+  z-index: 8;
   min-height: 62px;
   display: flex;
   align-items: end;
@@ -740,24 +740,24 @@
 
 .ganttLeftHead > strong:nth-child(1) {
   left: 0;
-  z-index: 6;
+  z-index: 10;
 }
 
 .ganttLeftHead > strong:nth-child(2) {
   left: var(--left-name);
-  z-index: 6;
+  z-index: 10;
 }
 
 .ganttLeftHead > strong:nth-child(3) {
   left: calc(var(--left-name) + var(--left-small));
-  z-index: 6;
+  z-index: 10;
   box-shadow: 8px 0 14px rgba(15, 23, 42, 0.08);
 }
 
 .ganttScale {
   position: sticky;
   top: 0;
-  z-index: 3;
+  z-index: 7;
   width: var(--timeline-width);
   min-width: var(--timeline-width);
   min-height: 62px;
@@ -841,7 +841,7 @@
 .ganttLabel {
   position: sticky;
   left: 0;
-  z-index: 3;
+  z-index: 6;
   display: grid;
   align-content: center;
   gap: 2px;
@@ -935,7 +935,7 @@
 
 .ganttMetric {
   position: sticky;
-  z-index: 3;
+  z-index: 6;
   display: grid;
   place-items: center;
   background: #fff;
@@ -954,6 +954,7 @@
 
 .ganttCanvas {
   position: relative;
+  z-index: 1;
   width: var(--timeline-width);
   min-width: var(--timeline-width);
   border-left: 3px solid rgba(15, 23, 42, 0.1);
@@ -965,7 +966,7 @@
 
 .ganttBar {
   position: absolute;
-  z-index: 3;
+  z-index: 2;
   top: 24px;
   height: 26px;
   min-width: 70px;
@@ -975,7 +976,7 @@
   border-radius: 999px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--bar-color) 88%, #fff), var(--bar-color));
   color: #fff;
-  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.24);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16);
   padding: 0;
   font-size: 10px;
   font-weight: 900;
@@ -996,7 +997,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  box-shadow: inherit;
+  box-shadow: none;
 }
 
 .ganttDependencyArrow {
@@ -1102,7 +1103,7 @@
   background: linear-gradient(180deg, color-mix(in srgb, var(--bar-color) 86%, #fff), var(--bar-color));
   color: #f8fafc;
   opacity: 0.95;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.14);
 }
 
 .ganttBarPaddockSegment .ganttBarText {

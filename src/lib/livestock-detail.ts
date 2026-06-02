@@ -240,6 +240,7 @@ export async function loadLivestockGroupDetail(ownerId: string, groupId: string)
      left join du_lieu.vi_tri_trang_trai vt on vt.trang_trai_id = t.id
      left join du_lieu.khu_vuc k on k.id = n.khu_vuc_id and coalesce(lower(k.trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')
      where n.id::text = $1 and n.trang_trai_id::text = $2
+       and coalesce(lower(n.loai_vat_nuoi), '') not in ('cá', 'ca', 'fish')
      limit 1`,
     [groupId, farmId]
   );
@@ -400,6 +401,7 @@ export async function loadLivestockAnimalDetail(ownerId: string, groupId: string
      left join du_lieu.vi_tri_trang_trai vt on vt.trang_trai_id = t.id
      left join du_lieu.khu_vuc k on k.id = coalesce(v.khu_vuc_id, n.khu_vuc_id) and coalesce(lower(k.trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')
      where v.id::text = $1 and n.id::text = $2 and v.trang_trai_id::text = $3
+       and coalesce(lower(coalesce(v.loai_vat_nuoi, n.loai_vat_nuoi)), '') not in ('cá', 'ca', 'fish')
      limit 1`,
     [animalId, groupId, farmId]
   );

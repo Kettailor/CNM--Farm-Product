@@ -85,7 +85,6 @@ function speciesColor(species: string, index: number) {
   if (normalized.includes("de") || normalized.includes("goat")) return "#0f766e";
   if (normalized.includes("heo") || normalized.includes("lon") || normalized.includes("pig")) return "#db2777";
   if (normalized.includes("ga") || normalized.includes("vit") || normalized.includes("chicken") || normalized.includes("duck")) return "#d97706";
-  if (normalized.includes("ca") || normalized.includes("fish")) return "#2563eb";
   return speciesColors[index % speciesColors.length];
 }
 
@@ -122,6 +121,7 @@ async function loadTreatmentGroups(farmId: string): Promise<TreatmentGroupOption
      from du_lieu.nhom_vat_nuoi n
      left join du_lieu.khu_vuc k on k.id = n.khu_vuc_id and coalesce(lower(k.trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')
      where n.trang_trai_id = $1
+       and coalesce(lower(n.loai_vat_nuoi), '') not in ('cá', 'ca', 'fish')
      order by n.updated_at desc nulls last, n.created_at desc nulls last, n.id desc`,
     [farmId]
   );

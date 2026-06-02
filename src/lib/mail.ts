@@ -29,10 +29,12 @@ export type SendMailResult = {
 export type FarmInvitationEmailOptions = {
   appName?: string;
   inviteUrl: string;
+  declineUrl?: string | null;
   invitedEmail: string;
   inviterName: string;
   farmName: string;
   roleName: string;
+  expiresInDays?: number;
   supportEmail?: string | null;
   supportPhone?: string | null;
   logoUrl?: string | null;
@@ -344,6 +346,7 @@ export function buildFarmInvitationEmail(options: FarmInvitationEmailOptions) {
   const appName = options.appName || "KetKat-EcoFarm";
   const supportEmail = options.supportEmail || "support@ketkat-ecofarm.local";
   const supportPhone = options.supportPhone || "";
+  const expiresInDays = options.expiresInDays ?? 7;
   const subject = `${options.inviterName} mời bạn tham gia ${options.farmName} trên ${appName}`;
   const logoBlock = options.logoUrl
     ? `<img src="${escapeHtml(options.logoUrl)}" alt="${escapeHtml(appName)}" width="210" style="display:block;margin:0 auto;max-width:210px;height:auto;border:0;">`
@@ -371,7 +374,7 @@ export function buildFarmInvitationEmail(options: FarmInvitationEmailOptions) {
                 <h1 style="margin:0 0 24px;font-size:24px;line-height:1.3;color:#0f172a;">Bạn đã được mời tham gia ${escapeHtml(options.farmName)} trên ${escapeHtml(appName)}!</h1>
                 <p style="margin:0 0 20px;font-size:16px;line-height:1.6;">Xin chào,</p>
                 <p style="margin:0 0 20px;font-size:16px;line-height:1.6;">${escapeHtml(options.inviterName)} đã mời bạn tham gia trang trại <strong>${escapeHtml(options.farmName)}</strong> với vai trò <strong>${escapeHtml(options.roleName)}</strong>.</p>
-                <p style="margin:0 0 28px;font-size:16px;line-height:1.6;">Nhấn nút bên dưới để chấp nhận lời mời và hoàn tất tài khoản trước khi truy cập dữ liệu trang trại.</p>
+                <p style="margin:0 0 28px;font-size:16px;line-height:1.6;">Nhấn nút bên dưới để chấp nhận lời mời và hoàn tất tài khoản trước khi truy cập dữ liệu trang trại. Lời mời sẽ hết hạn sau ${expiresInDays} ngày.</p>
                 <table role="presentation" cellspacing="0" cellpadding="0" align="center" style="margin:0 auto 28px;">
                   <tr>
                     <td align="center" bgcolor="#56c900" style="border-radius:5px;">
@@ -379,6 +382,11 @@ export function buildFarmInvitationEmail(options: FarmInvitationEmailOptions) {
                     </td>
                   </tr>
                 </table>
+                ${
+                  options.declineUrl
+                    ? `<p style="margin:0 0 18px;font-size:14px;line-height:1.6;text-align:center;color:#64748b;">Không tham gia? <a href="${escapeHtml(options.declineUrl)}" style="color:#b42318;">Từ chối lời mời</a>.</p>`
+                    : ""
+                }
                 <p style="margin:0 0 12px;font-size:16px;line-height:1.6;">Hoặc sao chép đường dẫn sau vào trình duyệt:</p>
                 <p style="margin:0 0 28px;font-size:15px;line-height:1.6;word-break:break-all;"><a href="${escapeHtml(options.inviteUrl)}" style="color:#0b63ce;">${escapeHtml(options.inviteUrl)}</a></p>
                 <p style="margin:0 0 22px;font-size:16px;line-height:1.6;">Chúng tôi rất mong được đồng hành cùng bạn trong việc quản lý trang trại hằng ngày.</p>
@@ -417,9 +425,11 @@ export function buildFarmInvitationEmail(options: FarmInvitationEmailOptions) {
     "",
     `Vai trò: ${options.roleName}`,
     `Email nhận lời mời: ${options.invitedEmail}`,
+    `Hạn chấp nhận: ${expiresInDays} ngày`,
     "",
     "Mở đường dẫn sau để chấp nhận lời mời:",
     options.inviteUrl,
+    ...(options.declineUrl ? ["", "Nếu không tham gia, mở đường dẫn sau để từ chối:", options.declineUrl] : []),
     "",
     `The ${appName} Team`,
   ].join("\n");

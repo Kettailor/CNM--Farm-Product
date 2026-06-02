@@ -419,6 +419,8 @@ function displayStatus(value: string | null | undefined) {
   const cleanValue = String(value ?? "").trim().toLowerCase();
   if (cleanValue === "active") return "Đang hoạt động";
   if (cleanValue === "pending") return "Đang chờ";
+  if (cleanValue === "declined" || cleanValue === "rejected") return "Đã từ chối";
+  if (cleanValue === "expired") return "Đã hết hạn";
   if (cleanValue === "inactive") return "Tạm khóa";
   if (cleanValue === "disabled") return "Đã khóa";
   return cleanValue ? valueOrEmpty(value) : "Chưa cập nhật";
@@ -439,6 +441,7 @@ function displayInviteStatus(value: string | null | undefined, accepted?: boolea
   const cleanValue = String(value ?? "").trim().toLowerCase();
   if (cleanValue === "pending") return "Chưa giải quyết";
   if (cleanValue === "accepted") return "Đã chấp nhận";
+  if (cleanValue === "declined" || cleanValue === "rejected") return "Đã từ chối";
   if (cleanValue === "expired") return "Đã hết hạn";
   if (cleanValue === "revoked" || cleanValue === "cancelled") return "Đã hủy";
   return cleanValue ? valueOrEmpty(value) : "Chưa giải quyết";
@@ -635,9 +638,10 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
   const canManageSettings = summary?.canManageSettings === true;
   const canManageUsers = summary?.canManageUsers === true;
   const canManageDocuments = summary?.canManageDocuments === true;
+  const hasCurrentUserAccount = userAccounts.some((user) => user.is_current_user);
   const availableTabs = TABS.filter((tab) => {
     if (tab.section === "farm") return canManageSettings;
-    if (tab.section === "users") return canManageUsers;
+    if (tab.section === "users") return canManageUsers || hasCurrentUserAccount;
     if (tab.section === "documents") return canManageDocuments;
     return false;
   });
@@ -652,11 +656,12 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
     !checkingAddUserContact &&
     !addingUser;
   const effectiveEditUserRole = editUserForm.farm_role !== "none" ? editUserForm.farm_role : editUserForm.base_role;
+  const editingSelf = Boolean(editUserForm.user_id && profile.owner_id && editUserForm.user_id === profile.owner_id);
   const canSaveEditedUser =
     Boolean(profile.farm_id) &&
-    canManageUsers &&
+    (canManageUsers || editingSelf) &&
     Boolean(editUserForm.member_id) &&
-    effectiveEditUserRole !== "none" &&
+    (editingSelf || effectiveEditUserRole !== "none") &&
     !editingUser;
   const activeTab = availableTabs.find((tab) => tab.section === section) ?? availableTabs[0] ?? TABS[0];
   const farmCode = profile.farm_code || (profile.farm_id ? profile.farm_id.slice(0, 8).toUpperCase() : "N/A");
@@ -753,7 +758,8 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
   };
 
   const openEditUserModal = (user: SettingsUserAccount) => {
-    if (!profile.farm_id || !canManageUsers || user.is_owner) return;
+    const canEditTarget = canManageUsers || user.is_current_user;
+    if (!profile.farm_id || !canEditTarget || user.is_invite || (user.is_owner && !user.is_current_user)) return;
     setEditUserForm(userToEditForm(user));
     setEditUserStep(1);
     setMessage("");
@@ -768,7 +774,7 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
   };
 
   const openDeleteUserModal = (user: SettingsUserAccount) => {
-    if (!profile.farm_id || deletingUserId || !canManageUsers || user.is_owner || user.is_invite || user.is_current_user) return;
+    if (!profile.farm_id || deletingUserId || !canManageUsers || user.is_owner || user.is_current_user) return;
     setDeleteUserTarget(user);
     setConfirmUserDeletion(false);
     setMessage("");
@@ -1086,7 +1092,7 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
 
   const deleteUser = async () => {
     const user = deleteUserTarget;
-    if (!profile.farm_id || !user || deletingUserId || !canManageUsers || user.is_owner || user.is_invite || user.is_current_user) return;
+    if (!profile.farm_id || !user || deletingUserId || !canManageUsers || user.is_owner || user.is_current_user) return;
     if (!confirmUserDeletion) {
       setMessage("Vui lòng đánh dấu xác nhận trước khi xóa người dùng.");
       return;
@@ -1648,6 +1654,7 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
   );
 
   const renderEditUserModal = () => {
+    const isSelfEdit = Boolean(editUserForm.user_id && profile.owner_id && editUserForm.user_id === profile.owner_id);
     const stepStatus = (step: 1 | 2 | 3) => {
       if (editUserStep > step) return <span className={styles.stepDone}><Icon name="check" /></span>;
       if (editUserStep === step) return <span className={styles.stepActive}>{step}</span>;
@@ -1690,7 +1697,7 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
               </label>
               <label className={styles.modalField}>
                 <span>Trạng thái:</span>
-                <select value={editUserForm.status} onChange={(event) => updateEditUserForm("status", event.target.value as EditUserForm["status"])}>
+                <select value={editUserForm.status} onChange={(event) => updateEditUserForm("status", event.target.value as EditUserForm["status"])} disabled={isSelfEdit}>
                   <option value="active">Đang hoạt động</option>
                   <option value="disabled">Đã khóa</option>
                 </select>
@@ -1732,7 +1739,7 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
                 <strong>Lưu ý:</strong> Không thể thay đổi email hoặc số điện thoại trong màn hình phân quyền. Nếu cần đổi thông tin liên hệ, người dùng phải tự cập nhật trong hồ sơ cá nhân.
               </p>
               <div className={styles.stepActions}>
-                <button type="button" className={styles.continueAction} onClick={() => setEditUserStep(3)}>
+                <button type="button" className={styles.continueAction} onClick={() => setEditUserStep(3)} disabled={isSelfEdit}>
                   Tiếp tục
                 </button>
                 <button type="button" className={styles.cancelAction} onClick={() => setEditUserStep(1)}>
@@ -1761,6 +1768,7 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
                         name="edit_base_role"
                         value={role}
                         checked={editUserForm.base_role === role}
+                        disabled={isSelfEdit}
                         onChange={() => updateEditUserForm("base_role", role)}
                       />
                       {ROLE_LABELS[role]}
@@ -2027,11 +2035,11 @@ export default function SettingsSectionClient({ section }: { section: SettingsSe
                     </dl>
 
                     <div className={styles.userActions}>
-                      <button type="button" className={styles.editAction} onClick={() => openEditUserModal(user)} disabled={!canManageUsers || user.is_owner || user.is_invite || editingUser}>
+                      <button type="button" className={styles.editAction} onClick={() => openEditUserModal(user)} disabled={user.is_invite || editingUser || (!canManageUsers && !user.is_current_user) || (user.is_owner && !user.is_current_user)}>
                         <Icon name="edit" />
                         Chỉnh sửa
                       </button>
-                      <button type="button" className={styles.deleteAction} onClick={() => openDeleteUserModal(user)} disabled={!canManageUsers || user.is_owner || user.is_invite || user.is_current_user || deletingUserId === user.member_id}>
+                      <button type="button" className={styles.deleteAction} onClick={() => openDeleteUserModal(user)} disabled={!canManageUsers || user.is_owner || user.is_current_user || deletingUserId === user.member_id}>
                         <Icon name="trash" />
                         {deletingUserId === user.member_id ? "Đang xóa..." : `Xóa ${userName.split(" ")[0] || "người dùng"}`}
                       </button>

@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { getAccessibleFarm, getAccessibleFarmCount, type FarmAccess } from "@/lib/farm-access";
+import { expireFarmInvitations } from "@/lib/farm-invitations";
 import { ensureFarmSettingsDefaults, ensureSettingsSchema } from "@/lib/settings-schema";
 import type { PoolClient } from "pg";
 
@@ -414,47 +415,73 @@ async function getSettingsUsers(ownerId: string, farmId: string): Promise<Settin
     };
   });
 
-  const memberEmails = new Set(members.map((member) => member.email?.toLowerCase()).filter(Boolean));
   const invites = await db.query(
     `select
        lm.id::text as invite_id,
        lm.email,
+       lm.ho_ten as full_name,
+       lm.so_dien_thoai as phone,
+       lm.ngon_ngu as language,
        lm.trang_thai as invite_status,
        lm.created_at,
+       lm.updated_at,
        vt.ma_vai_tro as role_code,
        vt.ten_vai_tro as role_name,
        vt.quyen as role_permissions
      from du_lieu.loi_moi_trang_trai lm
      left join du_lieu.vai_tro_trang_trai vt on vt.id = lm.vai_tro_id
      where lm.trang_trai_id = $1
-       and lower(coalesce(lm.trang_thai, 'pending')) = 'pending'
-     order by lm.created_at desc nulls last`,
+       and coalesce(lm.metadata_json->>'deleted_by_owner', 'false') <> 'true'
+       and (
+         lower(coalesce(lm.trang_thai, 'pending')) = 'pending'
+         or (
+           lower(coalesce(lm.trang_thai, 'pending')) in ('expired', 'declined')
+           and lm.updated_at > now() - interval '1 month'
+         )
+       )
+     order by
+       case lower(coalesce(lm.trang_thai, 'pending'))
+         when 'pending' then 0
+         when 'declined' then 1
+         when 'expired' then 2
+         else 3
+       end,
+       lm.updated_at desc nulls last,
+       lm.created_at desc nulls last`,
     [farmId]
   );
+
+  const activeInviteEmails = new Set(invites.rows.map((row) => row.email ? String(row.email).toLowerCase() : "").filter(Boolean));
+  const visibleMembers = members.filter((member) => {
+    const email = member.email?.toLowerCase();
+    return !email || !activeInviteEmails.has(email);
+  });
+  const visibleMemberEmails = new Set(visibleMembers.map((member) => member.email?.toLowerCase()).filter(Boolean));
 
   const pendingInvites: SettingsUserAccount[] = invites.rows
     .filter((row) => {
       const email = row.email ? String(row.email).toLowerCase() : "";
-      return email && !memberEmails.has(email);
+      return email && !visibleMemberEmails.has(email);
     })
     .map((row) => {
       const email = row.email ? String(row.email) : null;
+      const inviteStatus = row.invite_status ? String(row.invite_status) : "pending";
       return {
         member_id: `invite-${String(row.invite_id)}`,
         user_id: "",
-        full_name: email ? email.split("@")[0] : null,
+        full_name: row.full_name ? String(row.full_name) : email ? email.split("@")[0] : null,
         email,
         avatar_url: null,
-        phone: null,
-        language: null,
-        status: "pending",
-        joined_at: row.created_at ? new Date(row.created_at).toISOString() : null,
+        phone: row.phone ? String(row.phone) : null,
+        language: row.language ? String(row.language) : null,
+        status: inviteStatus,
+        joined_at: row.updated_at ? new Date(row.updated_at).toISOString() : row.created_at ? new Date(row.created_at).toISOString() : null,
         base_role: row.role_code ? String(row.role_code) : null,
         farm_role: row.role_code ? String(row.role_code) : null,
         role_code: row.role_code ? String(row.role_code) : null,
         role_name: row.role_name ? String(row.role_name) : null,
         role_permissions: isRecord(row.role_permissions) ? row.role_permissions : {},
-        invite_status: row.invite_status ? String(row.invite_status) : "pending",
+        invite_status: inviteStatus,
         invite_accepted: false,
         is_invite: true,
         is_owner: false,
@@ -462,7 +489,7 @@ async function getSettingsUsers(ownerId: string, farmId: string): Promise<Settin
       };
     });
 
-  return [...members, ...pendingInvites];
+  return [...visibleMembers, ...pendingInvites];
 }
 
 async function getSettingsDocuments(farmId: string): Promise<SettingsDocument[]> {
@@ -514,8 +541,33 @@ async function getSettingsStats(ownerId: string, farmId: string, access: FarmAcc
        (select count(*)::int from du_lieu.khu_vuc where trang_trai_id = $2 and coalesce(lower(trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')) as paddock_count,
        (select count(*)::int from du_lieu.tai_san_rao where trang_trai_id = $2) as asset_count,
        (select count(*)::int from du_lieu.vat_nuoi where trang_trai_id = $2) as animal_count,
-       (select count(*)::int from du_lieu.thanh_vien_trang_trai where trang_trai_id = $2) as user_count,
-       (select count(*)::int from du_lieu.thanh_vien_trang_trai where trang_trai_id = $2 and lower(trang_thai) = 'active') as active_user_count,
+       (
+         select count(*)::int
+         from du_lieu.thanh_vien_trang_trai tv
+         join du_lieu.nguoi_dung u on u.id = tv.nguoi_dung_id
+         where tv.trang_trai_id = $2
+           and not exists (
+             select 1
+             from du_lieu.loi_moi_trang_trai lm
+             where lm.trang_trai_id = tv.trang_trai_id
+               and lower(lm.email) = lower(u.email)
+               and lower(coalesce(lm.trang_thai, 'pending')) = 'pending'
+           )
+       ) as user_count,
+       (
+         select count(*)::int
+         from du_lieu.thanh_vien_trang_trai tv
+         join du_lieu.nguoi_dung u on u.id = tv.nguoi_dung_id
+         where tv.trang_trai_id = $2
+           and lower(tv.trang_thai) = 'active'
+           and not exists (
+             select 1
+             from du_lieu.loi_moi_trang_trai lm
+             where lm.trang_trai_id = tv.trang_trai_id
+               and lower(lm.email) = lower(u.email)
+               and lower(coalesce(lm.trang_thai, 'pending')) = 'pending'
+           )
+       ) as active_user_count,
        (select count(*)::int from du_lieu.vai_tro_trang_trai where trang_trai_id = $2) as role_count,
        (select count(*)::int from du_lieu.loi_moi_trang_trai where trang_trai_id = $2) as invite_count,
        (select count(*)::int from du_lieu.loi_moi_trang_trai where trang_trai_id = $2 and lower(trang_thai) = 'pending') as pending_invite_count,
@@ -628,9 +680,14 @@ export async function loadSettingsProfile(ownerId: string): Promise<SettingsProf
     await ensureFarmSettingsDefaults(farmId, access.ownerId);
   }
 
-  const [summary, mapZones, users, documents] = farmId && access
+  if (farmId && access?.canManageUsers) {
+    await expireFarmInvitations(farmId);
+  }
+
+  const [summary, mapZones, settingsUsers, documents] = farmId && access
     ? await Promise.all([getSettingsStats(ownerId, farmId, access), getSettingsMapZones(farmId), getSettingsUsers(ownerId, farmId), getSettingsDocuments(farmId)])
     : [ZERO_SUMMARY, [] as SettingsMapZone[], [] as SettingsUserAccount[], [] as SettingsDocument[]];
+  const users = access?.canManageUsers ? settingsUsers : settingsUsers.filter((user) => user.is_current_user);
   const addressMetadata = getAddressMetadata(row.settings_metadata);
 
   return {

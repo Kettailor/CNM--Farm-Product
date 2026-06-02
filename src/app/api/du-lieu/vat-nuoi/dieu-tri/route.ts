@@ -182,6 +182,7 @@ async function loadOwnedGroup(client: PoolClient, farmId: string, groupId: strin
     `select n.id::text, n.trang_trai_id::text, n.so_luong
      from du_lieu.nhom_vat_nuoi n
      where n.id::text = $1 and n.trang_trai_id::text = $2
+       and coalesce(lower(n.loai_vat_nuoi), '') not in ('cá', 'ca', 'fish')
      limit 1`,
     [groupId, farmId]
   );

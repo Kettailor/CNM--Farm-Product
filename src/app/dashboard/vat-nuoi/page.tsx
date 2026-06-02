@@ -10,13 +10,15 @@ import { redirect } from "next/navigation";
 import type { CSSProperties } from "react";
 import styles from "./page.module.css";
 
-type SpeciesIcon = "cow" | "goat" | "sheep" | "pig" | "chicken" | "duck" | "buffalo" | "fish" | "other";
+type SpeciesIcon = "cow" | "goat" | "sheep" | "pig" | "chicken" | "duck" | "buffalo" | "other";
 
 type AnimalRow = {
   id: string;
   code: string | null;
   qrCode: string | null;
   identity: string | null;
+  species: string | null;
+  breed: string | null;
   status: string | null;
   description: string | null;
   groupId: string | null;
@@ -30,12 +32,43 @@ type AnimalGroupRow = {
   id: string;
   name: string;
   species: string;
+  description: string | null;
+  createFrom: string | null;
   breed: string | null;
   headCount: number;
   linkedCount: number;
   deceasedCount: number;
   healthStatus: string | null;
+  gender: string | null;
+  lifeStage: string | null;
+  purpose: string | null;
+  locationId: string | null;
   zoneName: string | null;
+  herdNotes: string | null;
+  origin: string | null;
+  price: string | null;
+  expenseAccount: string | null;
+  birthDate: string | null;
+  conceptionType: string | null;
+  averageBirthWeight: string | null;
+  birthNotes: string | null;
+  healthIssues: string | null;
+  maternityId: string | null;
+  paternityId: string | null;
+  colouring: string | null;
+  eyeColor: string | null;
+  earType: string | null;
+  hornType: string | null;
+  mouth: string | null;
+  bodyConditionScore: string | null;
+  traitNotes: string | null;
+  primaryIdentification: string | null;
+  reproductiveState: string | null;
+  reproductiveAvailability: string | null;
+  lifetimeAdg: string | null;
+  lifetimeMjDay: string | null;
+  targetLiveWeight: string | null;
+  targetWeightDate: string | null;
   updatedAt: string | Date | null;
   createdAt: string | Date | null;
 };
@@ -90,7 +123,6 @@ const speciesCatalog: Array<{ label: string; icon: SpeciesIcon; color: string; k
   { label: "Heo", icon: "pig", color: "#db2777", keywords: ["heo", "lon", "pig"] },
   { label: "Gà", icon: "chicken", color: "#d97706", keywords: ["ga", "chicken"] },
   { label: "Vịt", icon: "duck", color: "#0284c7", keywords: ["vit", "duck"] },
-  { label: "Cá", icon: "fish", color: "#2563eb", keywords: ["ca", "fish"] },
 ];
 
 const zonePalette = ["#2f855a", "#2563eb", "#d97706", "#dc2626", "#7c3aed", "#0891b2", "#4d7c0f"];
@@ -126,6 +158,14 @@ function formatDate(value: string | Date | null) {
   return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+function dateInputValue(value: unknown) {
+  if (!value) return null;
+  if (typeof value === "string") return value.slice(0, 10);
+  const date = new Date(value as string | Date);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+}
+
 function statusLabel(status: string | null) {
   const raw = cleanText(status);
   if (!raw) return "Chưa cập nhật";
@@ -152,7 +192,7 @@ function isDeceasedStatus(status: string | null) {
 }
 
 function resolveSpecies(row: AnimalRow) {
-  const haystack = normalizeSearch([row.identity, row.description, row.code].filter(Boolean).join(" "));
+  const haystack = normalizeSearch([row.species, row.breed, row.identity, row.description, row.code].filter(Boolean).join(" "));
   const matched = speciesCatalog.find((item) => item.keywords.some((keyword) => haystack.includes(keyword)));
   if (matched) return matched;
 
@@ -307,18 +347,29 @@ async function loadLivestockData(farmId: string) {
 
   const [animalRs, groupRs, zoneRs, countRs, alertRs] = await Promise.all([
     db.query(
-      `select v.id::text, v.ma_vat_nuoi, v.ma_qr, v.the_nhan_dien, v.trang_thai, v.mo_ta,
+      `select v.id::text, v.ma_vat_nuoi, v.ma_qr, v.the_nhan_dien, v.loai_vat_nuoi, v.giong, v.trang_thai, v.mo_ta,
               v.nhom_vat_nuoi_id::text,
               v.khu_vuc_id::text, v.created_at, v.updated_at, k.ten_khu_vuc
        from du_lieu.vat_nuoi v
+       left join du_lieu.nhom_vat_nuoi n on n.id = v.nhom_vat_nuoi_id
        left join du_lieu.khu_vuc k on k.id = v.khu_vuc_id and coalesce(lower(k.trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')
        where v.trang_trai_id = $1
+         and coalesce(lower(coalesce(v.loai_vat_nuoi, n.loai_vat_nuoi)), '') not in ('cá', 'ca', 'fish')
        order by v.updated_at desc nulls last, v.created_at desc nulls last, v.id desc`,
       [farmId]
     ),
     db.query(
-      `select n.id::text, n.ten_nhom, n.loai_vat_nuoi, n.giong, n.so_luong,
-              n.trang_thai_suc_khoe, n.created_at, n.updated_at, k.ten_khu_vuc,
+      `select n.id::text, n.ten_nhom, n.loai_vat_nuoi, n.mo_ta, n.cach_tao, n.giong, n.so_luong,
+              n.gioi_tinh, n.giai_doan_sinh_truong, n.trang_thai_suc_khoe,
+              n.muc_dich_san_xuat, n.khu_vuc_id::text, n.ghi_chu_dan, n.nguon_goc,
+              n.gia_tri_mua, n.tai_khoan_chi_phi, n.ngay_sinh, n.kieu_thu_thai,
+              n.trong_luong_so_sinh_kg, n.ghi_chu_sinh, n.van_de_suc_khoe,
+              n.ma_me, n.ma_bo, n.mau_long, n.mau_mat, n.kieu_tai, n.kieu_sung,
+              n.tinh_trang_mieng, n.diem_the_trang, n.ghi_chu_dac_diem,
+              n.nhan_dien_chinh, n.trang_thai_sinh_san, n.kha_nang_sinh_san,
+              n.tang_trong_binh_quan_ngay, n.nang_luong_megajoule_ngay,
+              n.trong_luong_muc_tieu_kg, n.ngay_can_muc_tieu,
+              n.created_at, n.updated_at, k.ten_khu_vuc,
               (select count(*)::int from du_lieu.vat_nuoi v where v.nhom_vat_nuoi_id = n.id) as linked_count,
               (select count(*)::int
                  from du_lieu.vat_nuoi v
@@ -330,13 +381,18 @@ async function loadLivestockData(farmId: string) {
        from du_lieu.nhom_vat_nuoi n
        left join du_lieu.khu_vuc k on k.id = n.khu_vuc_id and coalesce(lower(k.trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')
        where n.trang_trai_id = $1
+         and coalesce(lower(n.loai_vat_nuoi), '') not in ('cá', 'ca', 'fish')
        order by n.updated_at desc nulls last, n.created_at desc nulls last, n.id desc`,
       [farmId]
     ),
     db.query(
       `select k.id::text, k.ten_khu_vuc, k.trang_thai, coalesce(k.dien_tich_ha, 0)::float8 as dien_tich_ha,
               k.hinh_hoc_geojson, k.mau_sac,
-              (select count(*)::int from du_lieu.vat_nuoi v where v.khu_vuc_id = k.id) as animal_count,
+              (select count(*)::int
+                from du_lieu.vat_nuoi v
+                left join du_lieu.nhom_vat_nuoi n on n.id = v.nhom_vat_nuoi_id
+               where v.khu_vuc_id = k.id
+                  and coalesce(lower(coalesce(v.loai_vat_nuoi, n.loai_vat_nuoi)), '') not in ('cá', 'ca', 'fish')) as animal_count,
               (select d.so_luong from du_lieu.dem_dong_vat d where d.khu_vuc_id = k.id order by d.created_at desc limit 1) as latest_count,
               (select d.created_at from du_lieu.dem_dong_vat d where d.khu_vuc_id = k.id order by d.created_at desc limit 1) as latest_count_at
        from du_lieu.khu_vuc k
@@ -384,6 +440,8 @@ async function loadLivestockData(farmId: string) {
     code: cleanText(row.ma_vat_nuoi),
     qrCode: cleanText(row.ma_qr),
     identity: cleanText(row.the_nhan_dien),
+    species: cleanText(row.loai_vat_nuoi),
+    breed: cleanText(row.giong),
     status: cleanText(row.trang_thai),
     description: cleanText(row.mo_ta),
     groupId: cleanText(row.nhom_vat_nuoi_id),
@@ -397,12 +455,43 @@ async function loadLivestockData(farmId: string) {
     id: String(row.id),
     name: cleanText(row.ten_nhom) || "Nhóm vật nuôi chưa đặt tên",
     species: cleanText(row.loai_vat_nuoi) || "Chưa phân loại",
+    description: cleanText(row.mo_ta),
+    createFrom: cleanText(row.cach_tao),
     breed: cleanText(row.giong),
     headCount: Number(row.so_luong ?? 0),
     linkedCount: Number(row.linked_count ?? 0),
     deceasedCount: Number(row.deceased_count ?? 0),
     healthStatus: cleanText(row.trang_thai_suc_khoe),
+    gender: cleanText(row.gioi_tinh),
+    lifeStage: cleanText(row.giai_doan_sinh_truong),
+    purpose: cleanText(row.muc_dich_san_xuat),
+    locationId: cleanText(row.khu_vuc_id),
     zoneName: cleanText(row.ten_khu_vuc),
+    herdNotes: cleanText(row.ghi_chu_dan),
+    origin: cleanText(row.nguon_goc),
+    price: cleanText(row.gia_tri_mua),
+    expenseAccount: cleanText(row.tai_khoan_chi_phi),
+    birthDate: dateInputValue(row.ngay_sinh),
+    conceptionType: cleanText(row.kieu_thu_thai),
+    averageBirthWeight: cleanText(row.trong_luong_so_sinh_kg),
+    birthNotes: cleanText(row.ghi_chu_sinh),
+    healthIssues: cleanText(row.van_de_suc_khoe),
+    maternityId: cleanText(row.ma_me),
+    paternityId: cleanText(row.ma_bo),
+    colouring: cleanText(row.mau_long),
+    eyeColor: cleanText(row.mau_mat),
+    earType: cleanText(row.kieu_tai),
+    hornType: cleanText(row.kieu_sung),
+    mouth: cleanText(row.tinh_trang_mieng),
+    bodyConditionScore: cleanText(row.diem_the_trang),
+    traitNotes: cleanText(row.ghi_chu_dac_diem),
+    primaryIdentification: cleanText(row.nhan_dien_chinh),
+    reproductiveState: cleanText(row.trang_thai_sinh_san),
+    reproductiveAvailability: cleanText(row.kha_nang_sinh_san),
+    lifetimeAdg: cleanText(row.tang_trong_binh_quan_ngay),
+    lifetimeMjDay: cleanText(row.nang_luong_megajoule_ngay),
+    targetLiveWeight: cleanText(row.trong_luong_muc_tieu_kg),
+    targetWeightDate: dateInputValue(row.ngay_can_muc_tieu),
     updatedAt: row.updated_at ?? null,
     createdAt: row.created_at ?? null,
   }));
@@ -502,14 +591,6 @@ function AnimalIcon({ type }: { type: SpeciesIcon }) {
           <path d="M24 47v7m12-7v7" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
         </svg>
       );
-    case "fish":
-      return (
-        <svg viewBox="0 0 64 64" aria-hidden="true">
-          <path d="M12 33c8-10 22-14 36-4l6-6v20l-6-6c-14 10-28 6-36-4Z" fill="currentColor" opacity="0.18" />
-          <circle cx="24" cy="31" r="2.3" fill="currentColor" />
-          <path d="M37 27c-3 4-3 8 0 12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        </svg>
-      );
     default:
       return (
         <svg viewBox="0 0 64 64" aria-hidden="true">
@@ -570,6 +651,8 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
       kind: "vat_nuoi",
       geometry: { type: "Point" as const, coordinates: [zone.center!.lng, zone.center!.lat] as [number, number] },
     }));
+  const recordedAnimalOptions = visibleAnimals.filter((animal) => !animal.groupId && !isDeceasedStatus(animal.status));
+  const copyGroupOptions = savedGroups.filter((group) => !isDeceasedStatus(group.healthStatus));
 
   const statCards = [
     { label: "Tổng vật nuôi", value: formatNumber(visibleAnimals.length), icon: "stable" as const },
@@ -595,6 +678,8 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
           <div className={styles.headerActions}>
             <LivestockPageTools
               zones={zones.map((zone) => ({ id: zone.id, name: zone.name }))}
+              recordedAnimals={recordedAnimalOptions}
+              copyGroups={copyGroupOptions}
               canWrite={data.access.canWrite}
               showDeceasedGroups={showDeceasedGroups}
               showDeceasedAnimals={showDeceasedAnimals}

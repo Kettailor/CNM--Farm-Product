@@ -20,6 +20,12 @@ alter table du_lieu.khu_vuc
 alter table du_lieu.khu_vuc
   add column if not exists nhom_luu_tru_kho text[] not null default '{}'::text[];
 
+alter table du_lieu.khu_vuc
+  add column if not exists tam_vi_do numeric;
+
+alter table du_lieu.khu_vuc
+  add column if not exists tam_kinh_do numeric;
+
 alter table du_lieu.khu_vuc_kho_luong_thuc
   add column if not exists nhom_luu_tru text[] not null default '{}'::text[];
 

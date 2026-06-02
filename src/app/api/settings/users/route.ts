@@ -1,8 +1,14 @@
 import { randomBytes } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { layOwnerIdTuServerCookie, taoMatKhauHash } from "@/lib/auth";
+import { layOwnerIdTuServerCookie } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { requireFarmAccess } from "@/lib/farm-access";
+import {
+  FARM_INVITATION_EXPIRY_DAYS,
+  FARM_INVITATION_REINVITE_COOLDOWN_DAYS,
+  expireDeletedFarmAccessInvitations,
+  expireFarmInvitations,
+} from "@/lib/farm-invitations";
 import { buildFarmInvitationEmail, sendMail } from "@/lib/mail";
 import { loadSettingsProfile } from "@/lib/settings-overview";
 import { ensureFarmSettingsDefaults, ensureSettingsSchema } from "@/lib/settings-schema";
@@ -70,10 +76,6 @@ function buildFullName(firstName: string, lastName: string, email: string) {
   return fullName || email.split("@")[0] || "Nguoi dung";
 }
 
-function makeTemporaryPasswordHash() {
-  return taoMatKhauHash(randomBytes(24).toString("base64url"));
-}
-
 function getPhoneDigits(value: string) {
   return value.replace(/\D/g, "");
 }
@@ -104,11 +106,7 @@ function normalizePhoneForStorage(value: string) {
     throw new AddUserError("Số điện thoại không hợp lệ.", 400);
   }
 
-  if (rawDigits.startsWith("840") && rawDigits.length > 3) return `+84${rawDigits.slice(3)}`;
-  if (rawDigits.startsWith("84") && rawDigits.length > 2) return `+${rawDigits}`;
-  if (rawDigits.startsWith("0") && rawDigits.length > 1) return `+84${rawDigits.slice(1)}`;
-  if (value.trim().startsWith("+")) return `+${rawDigits}`;
-  return rawDigits;
+  return value.trim().replace(/\s+/g, " ");
 }
 
 function isPgUniqueViolation(error: unknown) {
@@ -133,6 +131,19 @@ function buildInvitationUrl(request: NextRequest, inviteToken: string, email: st
   url.searchParams.set("invite", inviteToken);
   url.searchParams.set("email", email);
   return url.toString();
+}
+
+function buildInvitationDeclineUrl(request: NextRequest, inviteToken: string) {
+  const url = new URL("/invitation/decline", getRequestOrigin(request));
+  url.searchParams.set("token", inviteToken);
+  return url.toString();
+}
+
+function formatInviteCooldownDate(value: unknown) {
+  if (!value) return null;
+  const date = new Date(value as string | Date);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("vi-VN");
 }
 
 export async function POST(request: NextRequest) {
@@ -176,6 +187,7 @@ export async function POST(request: NextRequest) {
       if (!access) {
         throw new AddUserError("Bạn không có quyền phân quyền cho trang trại này.", 403);
       }
+      await expireFarmInvitations(farmId);
 
       const farm = await client.query(
         `select t.id,
@@ -220,6 +232,29 @@ export async function POST(request: NextRequest) {
         throw new AddUserError("Email đã có lời mời đang chờ.", 409);
       }
 
+      const blockedInvite = await client.query(
+        `select trang_thai, updated_at, updated_at + interval '1 month' as available_at
+         from du_lieu.loi_moi_trang_trai
+         where trang_trai_id = $1
+           and lower(email) = $2
+           and lower(trang_thai) in ('expired', 'declined')
+           and updated_at > now() - interval '1 month'
+         order by updated_at desc nulls last
+         limit 1`,
+        [farmId, email]
+      );
+      if ((blockedInvite.rowCount ?? 0) > 0) {
+        const status = String(blockedInvite.rows[0]?.trang_thai ?? "").toLowerCase();
+        const statusText = status === "declined" ? "đã từ chối" : "đã hết hạn";
+        const availableAt = formatInviteCooldownDate(blockedInvite.rows[0]?.available_at);
+        throw new AddUserError(
+          availableAt
+            ? `Email này ${statusText} lời mời gần đây. Chỉ có thể mời lại từ ${availableAt}.`
+            : `Email này ${statusText} lời mời gần đây. Chỉ có thể mời lại sau ${FARM_INVITATION_REINVITE_COOLDOWN_DAYS} ngày.`,
+          409
+        );
+      }
+
       if (phoneLookupDigits.length > 0) {
         const duplicatedPhone = await client.query(
           `select id::text, email
@@ -235,46 +270,23 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const existingMember = existingUserId
-        ? await client.query(
-            `select id
-             from du_lieu.thanh_vien_trang_trai
-             where trang_trai_id = $1 and nguoi_dung_id = $2
-             limit 1`,
-            [farmId, existingUserId]
-          )
-        : { rowCount: 0 };
       const memberCount = await client.query(
-        `select count(*)::int as member_count
-         from du_lieu.thanh_vien_trang_trai
-         where trang_trai_id = $1`,
+        `select
+           (
+             (select count(*)::int from du_lieu.thanh_vien_trang_trai where trang_trai_id = $1)
+             +
+             (select count(*)::int
+              from du_lieu.loi_moi_trang_trai
+              where trang_trai_id = $1
+                and lower(coalesce(trang_thai, 'pending')) = 'pending')
+           ) as member_count`,
         [farmId]
       );
-      if (existingMember.rowCount === 0 && Number(memberCount.rows[0]?.member_count ?? 0) >= 3) {
-        throw new AddUserError("Trang trại đã đạt giới hạn 3 người dùng.", 409);
+      if (Number(memberCount.rows[0]?.member_count ?? 0) >= 3) {
+        throw new AddUserError("Trang trại đã đạt giới hạn 3 người dùng/lời mời.", 409);
       }
 
       const fullName = buildFullName(firstName, lastName, email);
-      let userId = existingUserId;
-      if (userId) {
-        await client.query(
-          `update du_lieu.nguoi_dung
-           set ho_ten = coalesce(nullif(ho_ten, ''), nullif($2, ''), ho_ten),
-               so_dien_thoai = coalesce(nullif(so_dien_thoai, ''), $3),
-               ngon_ngu = coalesce(nullif(ngon_ngu, ''), nullif($4, ''), ngon_ngu),
-               updated_at = now()
-           where id = $1`,
-          [userId, fullName, normalizedPhone, language]
-        );
-      } else {
-        const user = await client.query(
-          `insert into du_lieu.nguoi_dung (ho_ten, email, mat_khau_hash, so_dien_thoai, ngon_ngu, trang_thai)
-           values ($1, $2, $3, $4, $5, $6)
-           returning id`,
-          [fullName, email, makeTemporaryPasswordHash(), normalizedPhone, language, accountEnabled ? "active" : "disabled"]
-        );
-        userId = String(user.rows[0].id);
-      }
 
       const role = await client.query(
         `select id, ten_vai_tro
@@ -289,24 +301,6 @@ export async function POST(request: NextRequest) {
         throw new AddUserError("Vai trò được chọn chưa được cấu hình cho trang trại.", 400);
       }
 
-      await client.query(
-        `insert into du_lieu.thanh_vien_trang_trai
-           (trang_trai_id, nguoi_dung_id, vai_tro_id, trang_thai, metadata_json)
-         values ($1, $2, $3, $4, $5::jsonb)
-         on conflict (trang_trai_id, nguoi_dung_id) do update
-         set vai_tro_id = excluded.vai_tro_id,
-             trang_thai = excluded.trang_thai,
-             metadata_json = excluded.metadata_json,
-             updated_at = now()`,
-        [
-          farmId,
-          userId,
-          roleId,
-          accountEnabled ? "active" : "disabled",
-          JSON.stringify({ base_role: baseRole, farm_role: farmRole, source: "settings" }),
-        ]
-      );
-
       const inviteToken = randomBytes(32).toString("base64url");
       await client.query(
         `update du_lieu.loi_moi_trang_trai
@@ -319,18 +313,32 @@ export async function POST(request: NextRequest) {
       );
       await client.query(
         `insert into du_lieu.loi_moi_trang_trai
-           (trang_trai_id, email, vai_tro_id, trang_thai, token, nguoi_moi_id, het_han_luc)
-         values ($1, $2, $3, 'pending', $4, $5, now() + interval '14 days')`,
-        [farmId, email, roleId, inviteToken, ownerId]
+           (trang_trai_id, email, ho_ten, so_dien_thoai, ngon_ngu, vai_tro_id, trang_thai, token, nguoi_moi_id, het_han_luc, metadata_json)
+         values ($1, $2, $3, $4, $5, $6, 'pending', $7, $8, now() + ($9::int * interval '1 day'), $10::jsonb)`,
+        [
+          farmId,
+          email,
+          fullName,
+          normalizedPhone,
+          language,
+          roleId,
+          inviteToken,
+          ownerId,
+          FARM_INVITATION_EXPIRY_DAYS,
+          JSON.stringify({ base_role: baseRole, farm_role: farmRole, account_enabled: accountEnabled }),
+        ]
       );
 
       const inviteUrl = buildInvitationUrl(request, inviteToken, email);
+      const declineUrl = buildInvitationDeclineUrl(request, inviteToken);
       const emailContent = buildFarmInvitationEmail({
         inviteUrl,
+        declineUrl,
         invitedEmail: email,
         inviterName: String(farmRow.owner_name || "KetKat-EcoFarm"),
         farmName: String(farmRow.farm_name || "trang trại"),
         roleName,
+        expiresInDays: FARM_INVITATION_EXPIRY_DAYS,
         supportEmail: process.env.SUPPORT_EMAIL?.trim() || null,
         supportPhone: process.env.SUPPORT_PHONE?.trim() || null,
         logoUrl: new URL("/assets/logo_ketkatecofarm.png", getRequestOrigin(request)).toString(),
@@ -352,10 +360,10 @@ export async function POST(request: NextRequest) {
 
     const profile = await loadSettingsProfile(ownerId);
     const message = inviteMailSent
-      ? "Đã thêm người dùng, phân quyền và gửi email lời mời."
+      ? "Đã tạo lời mời, lưu thông tin liên hệ và gửi email xác nhận."
       : inviteMailWarning
-        ? `Đã thêm người dùng và phân quyền, nhưng chưa gửi được email lời mời: ${inviteMailWarning}`
-        : "Đã thêm người dùng và phân quyền.";
+        ? `Đã tạo lời mời, nhưng chưa gửi được email xác nhận: ${inviteMailWarning}`
+        : "Đã tạo lời mời.";
 
     return NextResponse.json({ message, profile, inviteMailSent, inviteMailWarning });
   } catch (error) {
@@ -395,17 +403,14 @@ export async function PATCH(request: NextRequest) {
     if (!farmId || (!memberId && !userId)) {
       return NextResponse.json({ message: "Không tìm thấy thành viên để cập nhật." }, { status: 400 });
     }
-    if (!effectiveRole) {
-      return NextResponse.json({ message: "Vui lòng chọn vai trò cho người dùng." }, { status: 400 });
-    }
-
     const client = await db.connect();
     try {
       await client.query("begin");
 
       const access = await requireFarmAccess(ownerId, "users", farmId);
-      if (!access) {
-        throw new AddUserError("Bạn không có quyền cập nhật phân quyền cho trang trại này.", 403);
+      const readAccess = access ?? (await requireFarmAccess(ownerId, "read", farmId));
+      if (!readAccess) {
+        throw new AddUserError("Bạn không có quyền truy cập trang trại này.", 403);
       }
 
       const member = await client.query(
@@ -426,11 +431,31 @@ export async function PATCH(request: NextRequest) {
       if (!memberRow?.user_id) {
         throw new AddUserError("Không tìm thấy thành viên trong trang trại.", 404);
       }
+      const isSelfUpdate = memberRow.user_id === ownerId;
+      if (!access && !isSelfUpdate) {
+        throw new AddUserError("Bạn không có quyền cập nhật phân quyền cho trang trại này.", 403);
+      }
+
+      if (isSelfUpdate) {
+        await client.query(
+          `update du_lieu.nguoi_dung
+           set ho_ten = $2,
+               ngon_ngu = $3,
+               updated_at = now()
+           where id::text = $1`,
+          [memberRow.user_id, buildFullName(firstName, lastName, String(memberRow.email ?? "")), language]
+        );
+
+        await client.query("commit");
+        const profile = await loadSettingsProfile(ownerId);
+        return NextResponse.json({ message: "Đã cập nhật thông tin cá nhân.", profile });
+      }
+
+      if (!effectiveRole) {
+        throw new AddUserError("Vui lòng chọn vai trò cho người dùng.", 400);
+      }
       if (memberRow.farm_owner_id === memberRow.user_id) {
         throw new AddUserError("Không thể chỉnh sửa vai trò chủ trang trại tại màn hình này.", 400);
-      }
-      if (memberRow.user_id === ownerId && effectiveRole !== "admin") {
-        throw new AddUserError("Không thể tự hạ quyền tài khoản đang đăng nhập.", 400);
       }
 
       const role = await client.query(
@@ -505,9 +530,10 @@ export async function DELETE(request: NextRequest) {
     const memberId = cleanText(body.member_id);
     const userId = cleanText(body.user_id);
     if (!farmId || (!memberId && !userId)) {
-      return NextResponse.json({ message: "Không tìm thấy thành viên để xóa." }, { status: 400 });
+      return NextResponse.json({ message: "Không tìm thấy thành viên hoặc lời mời để xóa." }, { status: 400 });
     }
 
+    let deletedInvite = false;
     const client = await db.connect();
     try {
       await client.query("begin");
@@ -517,11 +543,27 @@ export async function DELETE(request: NextRequest) {
         throw new AddUserError("Bạn không có quyền xóa phân quyền cho trang trại này.", 403);
       }
 
+      const inviteId = memberId.startsWith("invite-") ? memberId.slice("invite-".length) : "";
+      if (inviteId && !userId) {
+        const expiredCount = await expireDeletedFarmAccessInvitations(client, {
+          farmId,
+          inviteId,
+          deletedByUserId: ownerId,
+          reason: "owner_deleted_invite",
+        });
+        if (expiredCount === 0) {
+          throw new AddUserError("Không tìm thấy lời mời trong trang trại.", 404);
+        }
+        deletedInvite = true;
+        await client.query("commit");
+      } else {
       const member = await client.query(
         `select tv.id::text as member_id,
                 tv.nguoi_dung_id::text as user_id,
+                u.email,
                 t.chu_so_huu_id::text as farm_owner_id
          from du_lieu.thanh_vien_trang_trai tv
+         join du_lieu.nguoi_dung u on u.id = tv.nguoi_dung_id
          join du_lieu.trang_trai t on t.id = tv.trang_trai_id
          where tv.trang_trai_id = $1
            and (($2::text <> '' and tv.id::text = $2::text) or ($3::text <> '' and tv.nguoi_dung_id::text = $3::text))
@@ -529,7 +571,7 @@ export async function DELETE(request: NextRequest) {
          for update`,
         [farmId, memberId, userId]
       );
-      const memberRow = member.rows[0] as { member_id?: string; user_id?: string; farm_owner_id?: string } | undefined;
+      const memberRow = member.rows[0] as { member_id?: string; user_id?: string; email?: string | null; farm_owner_id?: string } | undefined;
       if (!memberRow?.member_id || !memberRow.user_id) {
         throw new AddUserError("Không tìm thấy thành viên trong trang trại.", 404);
       }
@@ -546,7 +588,18 @@ export async function DELETE(request: NextRequest) {
         [memberRow.member_id, farmId]
       );
 
+      if (memberRow.email) {
+        await expireDeletedFarmAccessInvitations(client, {
+          farmId,
+          email: memberRow.email,
+          deletedByUserId: ownerId,
+          deletedMemberId: memberRow.member_id,
+          reason: "owner_deleted_member",
+        });
+      }
+
       await client.query("commit");
+      }
     } catch (error) {
       await client.query("rollback");
       throw error;
@@ -555,7 +608,10 @@ export async function DELETE(request: NextRequest) {
     }
 
     const profile = await loadSettingsProfile(ownerId);
-    return NextResponse.json({ message: "Đã xóa quyền truy cập của người dùng.", profile });
+    return NextResponse.json({
+      message: deletedInvite ? "Đã xóa lời mời và vô hiệu hóa liên kết email." : "Đã xóa quyền truy cập của người dùng.",
+      profile,
+    });
   } catch (error) {
     const status = error instanceof AddUserError ? error.status : 500;
     const message = error instanceof Error ? error.message : "Không thể xóa người dùng.";

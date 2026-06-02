@@ -15,6 +15,8 @@ type GroupPayload = {
   groupName?: unknown;
   description?: unknown;
   createFrom?: unknown;
+  sourceGroupId?: unknown;
+  selectedRecordedAnimalIds?: unknown;
   breed?: unknown;
   headCount?: unknown;
   gender?: unknown;
@@ -49,7 +51,11 @@ type GroupPayload = {
   targetWeightDate?: unknown;
 };
 
-const SPECIES = new Set(["Bò", "Trâu", "Dê", "Cừu", "Heo", "Gà", "Vịt", "Cá"]);
+const SPECIES = new Set(["Bò", "Trâu", "Dê", "Cừu", "Heo", "Gà", "Vịt"]);
+const CREATE_FROM_NEW = "Tạo nhóm mới";
+const CREATE_FROM_RECORDED = "Thêm vật nuôi đã ghi nhận";
+const CREATE_FROM_COPY = "Sao chép nhóm hiện có";
+const CREATE_FROM_OPTIONS = new Set([CREATE_FROM_NEW, CREATE_FROM_RECORDED, CREATE_FROM_COPY]);
 
 function cleanString(value: unknown, max = 240) {
   const text = String(value ?? "").trim();
@@ -61,6 +67,20 @@ function parsePositiveInt(value: unknown) {
   const parsed = Number(String(value ?? "").replace(/[^\d]/g, ""));
   if (!Number.isFinite(parsed)) return null;
   return Math.max(0, Math.floor(parsed));
+}
+
+function cleanStringArray(value: unknown, maxItems = 1000) {
+  if (!Array.isArray(value)) return [];
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    const text = cleanString(item, 80);
+    if (!text || seen.has(text)) continue;
+    seen.add(text);
+    result.push(text);
+    if (result.length >= maxItems) break;
+  }
+  return result;
 }
 
 function parseNumber(value: unknown) {
@@ -87,7 +107,6 @@ function makeGroupCode(species: string) {
       Heo: "HEO",
       Gà: "GA",
       Vịt: "VIT",
-      Cá: "CA",
     }[species] ?? "VN";
   return `NVN-${prefix}-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${randomUUID().slice(0, 6).toUpperCase()}`;
 }
@@ -106,22 +125,7 @@ async function findExistingQrCodes(client: PoolClient, codes: string[]) {
     [codes]
   );
 
-  const existing = new Set(animalRs.rows.map((row) => row.code));
-  const traceTableRs = await client.query<{ exists: boolean }>(
-    `select to_regclass('du_lieu.truy_xuat_san_pham_chuoi_khoi') is not null as exists`
-  );
-
-  if (traceTableRs.rows[0]?.exists) {
-    const traceRs = await client.query<{ code: string }>(
-      `select ma_truy_xuat as code
-       from du_lieu.truy_xuat_san_pham_chuoi_khoi
-       where ma_truy_xuat = any($1::text[])`,
-      [codes]
-    );
-    for (const row of traceRs.rows) existing.add(row.code);
-  }
-
-  return existing;
+  return new Set(animalRs.rows.map((row) => row.code));
 }
 
 async function makeUniqueAnimalQrCodes(client: PoolClient, count: number) {
@@ -159,16 +163,30 @@ export async function POST(request: NextRequest) {
     const species = cleanString(body.species, 40);
     const groupName = cleanString(body.groupName, 160);
     const breed = cleanString(body.breed, 120);
-    const headCount = parsePositiveInt(body.headCount);
+    const createFrom = cleanString(body.createFrom, 120) ?? CREATE_FROM_NEW;
+    const sourceGroupId = cleanString(body.sourceGroupId, 80);
+    const selectedRecordedAnimalIds = cleanStringArray(body.selectedRecordedAnimalIds);
+    const isRecordedAnimalImport = createFrom === CREATE_FROM_RECORDED;
+    const isCopyFromGroup = createFrom === CREATE_FROM_COPY;
+    const headCount = isRecordedAnimalImport ? selectedRecordedAnimalIds.length : parsePositiveInt(body.headCount);
 
     if (!species || !SPECIES.has(species)) {
       return NextResponse.json({ message: "Vui lòng chọn loài vật nuôi hợp lệ." }, { status: 400 });
+    }
+    if (!CREATE_FROM_OPTIONS.has(createFrom)) {
+      return NextResponse.json({ message: "Vui lòng chọn cách tạo nhóm hợp lệ." }, { status: 400 });
     }
     if (!groupName) {
       return NextResponse.json({ message: "Vui lòng nhập tên nhóm vật nuôi." }, { status: 400 });
     }
     if (!breed) {
       return NextResponse.json({ message: "Vui lòng chọn giống vật nuôi." }, { status: 400 });
+    }
+    if (isRecordedAnimalImport && selectedRecordedAnimalIds.length < 1) {
+      return NextResponse.json({ message: "Vui lòng chọn ít nhất một vật nuôi đã ghi nhận để thêm vào nhóm." }, { status: 400 });
+    }
+    if (isCopyFromGroup && !sourceGroupId) {
+      return NextResponse.json({ message: "Vui lòng chọn nhóm nguồn cần sao chép." }, { status: 400 });
     }
     if (!headCount || headCount < 1 || headCount > 1000) {
       return NextResponse.json({ message: "Số lượng đầu con phải nằm trong khoảng 1 đến 1000." }, { status: 400 });
@@ -186,6 +204,20 @@ export async function POST(request: NextRequest) {
       );
       if (zoneRs.rowCount === 0) {
         return NextResponse.json({ message: "Khu vực được chọn không thuộc trang trại hiện tại." }, { status: 400 });
+      }
+    }
+
+    if (sourceGroupId) {
+      const sourceGroupRs = await db.query(
+        `select id
+         from du_lieu.nhom_vat_nuoi
+         where id::text = $1 and trang_trai_id = $2
+           and coalesce(lower(loai_vat_nuoi), '') not in ('cá', 'ca', 'fish')
+         limit 1`,
+        [sourceGroupId, farmId]
+      );
+      if (sourceGroupRs.rowCount === 0) {
+        return NextResponse.json({ message: "Nhóm nguồn không thuộc trang trại hiện tại." }, { status: 400 });
       }
     }
 
@@ -214,7 +246,7 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .join("; ");
     const animalMetadata = JSON.stringify({
-      source: "new-group-wizard",
+      source: isRecordedAnimalImport ? "recorded-animal-grouping" : "new-group-wizard",
       individualTracking: true,
       groupSnapshot: {
         groupId,
@@ -232,6 +264,8 @@ export async function POST(request: NextRequest) {
         maternityId,
         paternityId,
         primaryIdentification,
+        createFrom,
+        sourceGroupId,
         targetLiveWeight: parseNumber(body.targetLiveWeight),
         targetWeightDate: dateOrNull(body.targetWeightDate),
       },
@@ -270,7 +304,7 @@ export async function POST(request: NextRequest) {
           groupName,
           species,
           cleanString(body.description, 2000),
-          cleanString(body.createFrom, 120),
+          createFrom,
           breed,
           headCount,
           gender,
@@ -302,46 +336,116 @@ export async function POST(request: NextRequest) {
           parseNumber(body.lifetimeMjDay),
           parseNumber(body.targetLiveWeight),
           dateOrNull(body.targetWeightDate),
-          JSON.stringify({ form: body, qrMode: "per-animal" }),
+          JSON.stringify({
+            form: { ...body, selectedRecordedAnimalIds },
+            qrMode: isRecordedAnimalImport ? "reuse-existing" : "per-animal",
+            sourceGroupId,
+          }),
         ]
       );
 
-      const animalCodes = Array.from({ length: headCount }, (_, index) => `${groupCode}-${String(index + 1).padStart(3, "0")}`);
-      const qrCodes = await makeUniqueAnimalQrCodes(client, headCount);
+      let createdQrCodeCount = 0;
 
-      await client.query(
-        `insert into du_lieu.vat_nuoi
-           (
-             trang_trai_id, khu_vuc_id, nhom_vat_nuoi_id, ma_vat_nuoi, ma_qr, the_nhan_dien,
-             trang_thai, mo_ta, loai_vat_nuoi, giong, gioi_tinh, giai_doan_sinh_truong,
-             ngay_sinh, nguon_goc, ma_me, ma_bo, mau_long, trang_thai_sinh_san, metadata_json
-           )
-         select
-           $1::uuid, $2::uuid, $3::uuid, animal.ma_vat_nuoi, animal.ma_qr, animal.ma_qr,
-           $6::text, $7::text, $8::text, $9::text, $10::text, $11::text,
-           $12::date, $13::text, $14::text, $15::text, $16::text, $17::text, $18::jsonb
-         from unnest($4::text[], $5::text[]) as animal(ma_vat_nuoi, ma_qr)`,
-        [
-          farmId,
-          locationId,
-          groupId,
-          animalCodes,
-          qrCodes,
-          animalStatus,
-          animalDescription,
-          species,
-          breed,
-          gender,
-          lifeStage,
-          birthDate,
-          origin,
-          maternityId,
-          paternityId,
-          colouring,
-          reproductiveState,
-          animalMetadata,
-        ]
-      );
+      if (isRecordedAnimalImport) {
+        const recordedAnimalRs = await client.query<{ id: string }>(
+          `select id::text
+           from du_lieu.vat_nuoi
+           where trang_trai_id = $1
+             and id::text = any($2::text[])
+             and nhom_vat_nuoi_id is null
+             and (nullif(loai_vat_nuoi, '') is null or loai_vat_nuoi = $3)
+             and coalesce(lower(trang_thai), '') not in ('đã tử vong', 'da tu vong', 'deceased', 'dead')
+           for update`,
+          [farmId, selectedRecordedAnimalIds, species]
+        );
+
+        if (recordedAnimalRs.rowCount !== selectedRecordedAnimalIds.length) {
+          await client.query("rollback");
+          return NextResponse.json(
+            { message: "Một số vật nuôi đã chọn không hợp lệ, đã thuộc nhóm khác hoặc khác loài vật nuôi." },
+            { status: 400 }
+          );
+        }
+
+        await client.query(
+          `update du_lieu.vat_nuoi
+              set nhom_vat_nuoi_id = $3::uuid,
+                  khu_vuc_id = coalesce($2::uuid, khu_vuc_id),
+                  loai_vat_nuoi = coalesce(nullif(loai_vat_nuoi, ''), $4::text),
+                  giong = coalesce(nullif(giong, ''), $5::text),
+                  gioi_tinh = coalesce(nullif(gioi_tinh, ''), $6::text),
+                  giai_doan_sinh_truong = coalesce(nullif(giai_doan_sinh_truong, ''), $7::text),
+                  trang_thai = coalesce(nullif(trang_thai, ''), $8::text),
+                  mo_ta = coalesce(nullif(mo_ta, ''), $9::text),
+                  ngay_sinh = coalesce(ngay_sinh, $10::date),
+                  nguon_goc = coalesce(nullif(nguon_goc, ''), $11::text),
+                  ma_me = coalesce(nullif(ma_me, ''), $12::text),
+                  ma_bo = coalesce(nullif(ma_bo, ''), $13::text),
+                  mau_long = coalesce(nullif(mau_long, ''), $14::text),
+                  trang_thai_sinh_san = coalesce(nullif(trang_thai_sinh_san, ''), $15::text),
+                  metadata_json = coalesce(metadata_json, '{}'::jsonb) || $16::jsonb,
+                  updated_at = now()
+            where trang_trai_id = $1
+              and id::text = any($17::text[])`,
+          [
+            farmId,
+            locationId,
+            groupId,
+            species,
+            breed,
+            gender,
+            lifeStage,
+            animalStatus,
+            animalDescription,
+            birthDate,
+            origin,
+            maternityId,
+            paternityId,
+            colouring,
+            reproductiveState,
+            animalMetadata,
+            selectedRecordedAnimalIds,
+          ]
+        );
+      } else {
+        const animalCodes = Array.from({ length: headCount }, (_, index) => `${groupCode}-${String(index + 1).padStart(3, "0")}`);
+        const qrCodes = await makeUniqueAnimalQrCodes(client, headCount);
+        createdQrCodeCount = qrCodes.length;
+
+        await client.query(
+          `insert into du_lieu.vat_nuoi
+             (
+               trang_trai_id, khu_vuc_id, nhom_vat_nuoi_id, ma_vat_nuoi, ma_qr, the_nhan_dien,
+               trang_thai, mo_ta, loai_vat_nuoi, giong, gioi_tinh, giai_doan_sinh_truong,
+               ngay_sinh, nguon_goc, ma_me, ma_bo, mau_long, trang_thai_sinh_san, metadata_json
+             )
+           select
+             $1::uuid, $2::uuid, $3::uuid, animal.ma_vat_nuoi, animal.ma_qr, animal.ma_qr,
+             $6::text, $7::text, $8::text, $9::text, $10::text, $11::text,
+             $12::date, $13::text, $14::text, $15::text, $16::text, $17::text, $18::jsonb
+           from unnest($4::text[], $5::text[]) as animal(ma_vat_nuoi, ma_qr)`,
+          [
+            farmId,
+            locationId,
+            groupId,
+            animalCodes,
+            qrCodes,
+            animalStatus,
+            animalDescription,
+            species,
+            breed,
+            gender,
+            lifeStage,
+            birthDate,
+            origin,
+            maternityId,
+            paternityId,
+            colouring,
+            reproductiveState,
+            animalMetadata,
+          ]
+        );
+      }
 
       if (locationId) {
         await client.query(
@@ -369,7 +473,7 @@ export async function POST(request: NextRequest) {
         groupId,
         groupCode,
         insertedAnimals: headCount,
-        createdQrCodes: qrCodes.length,
+        createdQrCodes: createdQrCodeCount,
       });
     } catch (error) {
       await client.query("rollback");
@@ -418,6 +522,7 @@ export async function PUT(request: NextRequest) {
               n.mau_long, n.trang_thai_sinh_san
        from du_lieu.nhom_vat_nuoi n
        where n.id::text = $1 and n.trang_trai_id::text = $2
+         and coalesce(lower(n.loai_vat_nuoi), '') not in ('cá', 'ca', 'fish')
        limit 1`,
       [groupId, farmId]
     );

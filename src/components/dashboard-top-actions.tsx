@@ -11,15 +11,12 @@ type Action = {
 };
 
 const ACTIONS: Action[] = [
-  { id: "language", label: "Ngôn ngữ", href: "/dashboard/settings?tab=language" },
   { id: "analytics", label: "Biểu đồ", href: "/dashboard/map" },
   { id: "account", label: "CNM", href: "/dashboard/settings" },
 ];
 
 function ActionIcon({ id }: { id: string }) {
   switch (id) {
-    case "language":
-      return <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 18h16M4 6h16M12 4c2.8 3.1 4.5 6.5 5 10-.5 3.5-2.2 6.9-5 10-2.8-3.1-4.5-6.5-5-10 .5-3.5 2.2-6.9 5-10Z" /><path d="M5 9h14M5 15h14" /></svg>;
     case "notifications":
       return <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 17H5l1.4-1.4A2 2 0 0 0 7 14.2V11a5 5 0 1 1 10 0v3.2c0 .5.2 1 .6 1.4L19 17h-4" /><path d="M10 17a2 2 0 0 0 4 0" /></svg>;
     case "analytics":

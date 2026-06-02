@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { layOwnerIdTuServerCookie } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { requireFarmAccess } from "@/lib/farm-access";
+import { FARM_INVITATION_REINVITE_COOLDOWN_DAYS, expireFarmInvitations } from "@/lib/farm-invitations";
 import { ensureSettingsSchema } from "@/lib/settings-schema";
 
 type ContactCheckPayload = {
@@ -62,6 +63,13 @@ function validatePhone(value: string) {
   }
 }
 
+function formatInviteCooldownDate(value: unknown) {
+  if (!value) return null;
+  const date = new Date(value as string | Date);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("vi-VN");
+}
+
 export async function POST(request: NextRequest) {
   try {
     const ownerId = layOwnerIdTuServerCookie();
@@ -82,6 +90,8 @@ export async function POST(request: NextRequest) {
     if (!access) {
       return NextResponse.json({ available: false, message: "Bạn không có quyền kiểm tra liên hệ cho trang trại này." }, { status: 403 });
     }
+
+    await expireFarmInvitations(farmId);
 
     const fieldErrors: { email?: string; phone?: string } = {};
 
@@ -111,6 +121,26 @@ export async function POST(request: NextRequest) {
         );
         if (!fieldErrors.email && (pendingInvite.rowCount ?? 0) > 0) {
           fieldErrors.email = "Email đã có lời mời đang chờ.";
+        }
+
+        const blockedInvite = await db.query(
+          `select trang_thai, updated_at, updated_at + interval '1 month' as available_at
+           from du_lieu.loi_moi_trang_trai
+           where trang_trai_id = $1
+             and lower(email) = $2
+             and lower(trang_thai) in ('expired', 'declined')
+             and updated_at > now() - interval '1 month'
+           order by updated_at desc nulls last
+           limit 1`,
+          [farmId, email]
+        );
+        if (!fieldErrors.email && (blockedInvite.rowCount ?? 0) > 0) {
+          const status = String(blockedInvite.rows[0]?.trang_thai ?? "").toLowerCase();
+          const statusText = status === "declined" ? "đã từ chối" : "đã hết hạn";
+          const availableAt = formatInviteCooldownDate(blockedInvite.rows[0]?.available_at);
+          fieldErrors.email = availableAt
+            ? `Email này ${statusText} lời mời gần đây. Chỉ có thể mời lại từ ${availableAt}.`
+            : `Email này ${statusText} lời mời gần đây. Chỉ có thể mời lại sau ${FARM_INVITATION_REINVITE_COOLDOWN_DAYS} ngày.`;
         }
       }
     }

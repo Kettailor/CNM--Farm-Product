@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import NewGroupWizard, { type LivestockZoneOption } from "./new-group-wizard";
+import NewGroupWizard, { type LivestockGroupCopyOption, type LivestockRecordedAnimalOption, type LivestockZoneOption } from "./new-group-wizard";
 import styles from "./page.module.css";
 
 type ToolItem = {
@@ -55,11 +55,15 @@ function ToolIcon({ name }: { name: ToolItem["icon"] }) {
 
 export default function LivestockPageTools({
   zones,
+  recordedAnimals,
+  copyGroups,
   canWrite,
   showDeceasedGroups,
   showDeceasedAnimals,
 }: {
   zones: LivestockZoneOption[];
+  recordedAnimals: LivestockRecordedAnimalOption[];
+  copyGroups: LivestockGroupCopyOption[];
   canWrite: boolean;
   showDeceasedGroups: boolean;
   showDeceasedAnimals: boolean;
@@ -197,7 +201,15 @@ export default function LivestockPageTools({
           </aside>
         </div>
       )}
-      {canWrite && <NewGroupWizard open={newGroupOpen} zones={zones} onClose={() => setNewGroupOpen(false)} />}
+      {canWrite && (
+        <NewGroupWizard
+          open={newGroupOpen}
+          zones={zones}
+          recordedAnimals={recordedAnimals}
+          copyGroups={copyGroups}
+          onClose={() => setNewGroupOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -37,6 +37,7 @@ type ChartRow = {
   segments?: ChartSegment[];
   collapseKey?: string;
   collapsible?: boolean;
+  suppressBar?: boolean;
 };
 
 type ChartSegment = {
@@ -567,6 +568,7 @@ export default function GrazingGanttChart({
           const paddockKey = `paddock:${plan.id}:${paddock.id}`;
           const paddockCollapsed = isCollapsed(paddockKey);
           const scheduledForPaddock = scheduledEventsInWindow.filter((item) => item.event.paddockId === paddock.id);
+          const showPaddockSegments = scheduledForPaddock.length > 0 && (paddockCollapsed || !isFeatureVisible("events"));
           const paddockStarts = scheduledForPaddock.map((item) => eventRangeMs(item).start).filter((value): value is number => value != null);
           const paddockEnds = scheduledForPaddock.map((item) => eventRangeMs(item).end).filter((value): value is number => value != null);
           const paddockStartMs = paddockStarts.length ? Math.min(...paddockStarts) : planStartMs;
@@ -582,7 +584,7 @@ export default function GrazingGanttChart({
             startDate: paddockStart,
             endDate: paddockEnd,
             label: `${paddock.name} (${durationText(paddockStart, paddockEnd)})`,
-            segments: scheduledForPaddock.length
+            segments: showPaddockSegments
               ? scheduledForPaddock.map((item) => ({
                   id: `${paddock.id}-${item.event.id}`,
                   label: `${item.sequence} - ${eventTitle(item.event)} (${item.durationLabel}) · ${formatDateTime(item.startDate, item.startTime)} - ${formatDateTime(item.endDate, item.endTime)}`,
@@ -593,6 +595,7 @@ export default function GrazingGanttChart({
                   color: eventColor(item.event.type),
                 }))
               : undefined,
+            suppressBar: scheduledForPaddock.length > 0 && !showPaddockSegments,
             collapseKey: paddockKey,
             collapsible: true,
           });
@@ -844,7 +847,7 @@ export default function GrazingGanttChart({
                       </span>
                     );
                   })}
-                  {!row.segments?.length && row.startDate && (
+                  {!row.suppressBar && !row.segments?.length && row.startDate && (
                     <span
                       className={`${styles.ganttBar} ${styles[`ganttBar${row.type[0].toUpperCase()}${row.type.slice(1)}`]}`}
                       style={makeBarStyle(row.startDate, row.endDate, color, row.startTime, row.endTime)}

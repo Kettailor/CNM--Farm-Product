@@ -56,6 +56,12 @@ const centroid = (points: Point[]) => {
   const sum = points.reduce((acc, point) => ({ lat: acc.lat + point.lat, lng: acc.lng + point.lng }), { lat: 0, lng: 0 });
   return { lat: sum.lat / points.length, lng: sum.lng / points.length };
 };
+const isCoord = (lat: number, lng: number) => lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+const centerFromStoredPoint = (latValue: unknown, lngValue: unknown, polygon: Point[]) => {
+  const lat = Number(latValue);
+  const lng = Number(lngValue);
+  return Number.isFinite(lat) && Number.isFinite(lng) && isCoord(lat, lng) ? { lat, lng } : centroid(polygon);
+};
 const displayText = (value: unknown) => (value === null || value === undefined || value === "" ? "" : String(value));
 const safeDate = (value: unknown) => (value ? new Date(String(value)).toLocaleString("vi-VN") : "");
 const normalizeZoneType = (raw: string, warehouseTypes?: unknown) => getZoneTypeInfo(raw, warehouseTypes);
@@ -69,7 +75,7 @@ const normalizeZoneStatus = (raw: unknown) => {
 };
 
 type ZoneRowDetail = {
-  id: string; farm_name?: string | null; name?: string | null; raw_type?: string | null; warehouse_types?: unknown; metadata_extra?: Record<string, unknown> | null; status?: string | null; area_ha?: number | string | null; perimeter_m?: number | string | null; capacity?: string | null; description?: string | null; created_at?: string | Date | null; updated_at?: string | Date | null; area_color?: string | null; geo?: { polygon?: unknown } | null; boundary_geojson?: { geo?: { polygon?: unknown } | null; polygon?: unknown } | null;
+  id: string; farm_name?: string | null; name?: string | null; raw_type?: string | null; warehouse_types?: unknown; metadata_extra?: Record<string, unknown> | null; status?: string | null; area_ha?: number | string | null; perimeter_m?: number | string | null; center_lat?: number | string | null; center_lng?: number | string | null; capacity?: string | null; description?: string | null; created_at?: string | Date | null; updated_at?: string | Date | null; area_color?: string | null; geo?: { polygon?: unknown } | null; boundary_geojson?: { geo?: { polygon?: unknown } | null; polygon?: unknown } | null;
 };
 type LivestockRow = { ma_vat_nuoi?: string | null; ma_qr?: string | null; trang_thai?: string | null; mo_ta?: string | null };
 type CountRow = { livestock_count?: number; water_asset_count?: number; note_count?: number };
@@ -91,7 +97,7 @@ async function queryRows<T>(sql: string, values: unknown[]): Promise<QueryRows<T
 
 async function fetchZoneRow(zoneId: string, farmId?: string | null) {
   await ensureZoneSchema();
-  const sql = `select k.id::text as id, coalesce(t.ten_trang_trai::text, '') as farm_name, coalesce(nullif(k.ten_khu_vuc::text, ''), '') as name, coalesce(nullif(k.loai_khu_vuc::text, ''), nullif(k.hinh_hoc_geojson->'metadata'->>'kind', ''), nullif(k.hinh_hoc_geojson->'metadata'->>'areaType', ''), nullif(k.hinh_hoc_geojson->'metadata'->>'usage', ''), nullif(loai.ten::text, ''), nullif(k.nguon_tao::text, ''), nullif(k.mo_ta::text, ''), nullif(k.hinh_hoc_geojson->'metadata'->>'farmType', ''), '') as raw_type, case when cardinality(coalesce(k.nhom_luu_tru_kho, '{}'::text[])) > 0 then to_jsonb(k.nhom_luu_tru_kho) else coalesce(k.hinh_hoc_geojson->'metadata'->'warehouseTypes', k.hinh_hoc_geojson->'metadata'->'extra'->'warehouseTypes', '[]'::jsonb) end as warehouse_types, coalesce(k.hinh_hoc_geojson->'metadata'->'extra', '{}'::jsonb) || coalesce(k.thong_tin_loai, '{}'::jsonb) as metadata_extra, coalesce(nullif(k.trang_thai::text, ''), '') as status, coalesce(k.dien_tich_ha::float8, 0)::float8 as area_ha, coalesce(k.chu_vi_m::float8, (k.hinh_hoc_geojson->'metadata'->>'perimeterM')::float8, null) as perimeter_m, nullif(coalesce(k.suc_chua::text, k.hinh_hoc_geojson->'metadata'->>'capacity', k.hinh_hoc_geojson->'metadata'->>'suc_chua'), '') as capacity, nullif(coalesce(k.mo_ta::text, k.hinh_hoc_geojson->'metadata'->>'description', k.hinh_hoc_geojson->'metadata'->>'notes'), '') as description, k.created_at, k.updated_at, k.hinh_hoc_geojson::jsonb as boundary_geojson, coalesce(k.mau_sac, k.hinh_hoc_geojson->'metadata'->>'areaColor', k.hinh_hoc_geojson->'metadata'->>'area_color') as area_color, coalesce(k.hinh_hoc_geojson->'geo', k.hinh_hoc_geojson) as geo from du_lieu.khu_vuc k join du_lieu.trang_trai t on t.id = k.trang_trai_id left join du_lieu.danh_muc_loai_khu_vuc loai on loai.id = k.loai_khu_vuc_id where (k.id::text = $1 or k.ma_khu_vuc::text = $1) ${farmId ? "and k.trang_trai_id::text = $2" : ""} limit 1`;
+  const sql = `select k.id::text as id, coalesce(t.ten_trang_trai::text, '') as farm_name, coalesce(nullif(k.ten_khu_vuc::text, ''), '') as name, coalesce(nullif(k.loai_khu_vuc::text, ''), nullif(k.hinh_hoc_geojson->'metadata'->>'kind', ''), nullif(k.hinh_hoc_geojson->'metadata'->>'areaType', ''), nullif(k.hinh_hoc_geojson->'metadata'->>'usage', ''), nullif(loai.ten::text, ''), nullif(k.nguon_tao::text, ''), nullif(k.mo_ta::text, ''), nullif(k.hinh_hoc_geojson->'metadata'->>'farmType', ''), '') as raw_type, case when cardinality(coalesce(k.nhom_luu_tru_kho, '{}'::text[])) > 0 then to_jsonb(k.nhom_luu_tru_kho) else coalesce(k.hinh_hoc_geojson->'metadata'->'warehouseTypes', k.hinh_hoc_geojson->'metadata'->'extra'->'warehouseTypes', '[]'::jsonb) end as warehouse_types, coalesce(k.hinh_hoc_geojson->'metadata'->'extra', '{}'::jsonb) || coalesce(k.thong_tin_loai, '{}'::jsonb) as metadata_extra, coalesce(nullif(k.trang_thai::text, ''), '') as status, coalesce(k.dien_tich_ha::float8, 0)::float8 as area_ha, coalesce(k.chu_vi_m::float8, (k.hinh_hoc_geojson->'metadata'->>'perimeterM')::float8, null) as perimeter_m, k.tam_vi_do::float8 as center_lat, k.tam_kinh_do::float8 as center_lng, nullif(coalesce(k.suc_chua::text, k.hinh_hoc_geojson->'metadata'->>'capacity', k.hinh_hoc_geojson->'metadata'->>'suc_chua'), '') as capacity, nullif(coalesce(k.mo_ta::text, k.hinh_hoc_geojson->'metadata'->>'description', k.hinh_hoc_geojson->'metadata'->>'notes'), '') as description, k.created_at, k.updated_at, k.hinh_hoc_geojson::jsonb as boundary_geojson, coalesce(k.mau_sac, k.hinh_hoc_geojson->'metadata'->>'areaColor', k.hinh_hoc_geojson->'metadata'->>'area_color') as area_color, coalesce(k.hinh_hoc_geojson->'geo', k.hinh_hoc_geojson) as geo from du_lieu.khu_vuc k join du_lieu.trang_trai t on t.id = k.trang_trai_id left join du_lieu.danh_muc_loai_khu_vuc loai on loai.id = k.loai_khu_vuc_id where (k.id::text = $1 or k.ma_khu_vuc::text = $1) ${farmId ? "and k.trang_trai_id::text = $2" : ""} limit 1`;
   return queryRows<ZoneRowDetail>(sql, farmId ? [zoneId, farmId] : [zoneId]);
 }
 
@@ -207,7 +213,7 @@ function buildTypeSpecificDetails(typeKey: ZoneTypeKey, values: Record<string, s
 function buildZoneDetail(row: ZoneRowDetail, linked?: LinkedZoneData): ZoneDetail {
   const boundary = row.boundary_geojson ?? {};
   const polygon = normalizePoints(row.geo?.polygon ?? boundary?.geo?.polygon ?? boundary?.polygon);
-  const center = centroid(polygon);
+  const center = centerFromStoredPoint(row.center_lat, row.center_lng, polygon);
   const typeInfo = normalizeZoneType(String(row.raw_type ?? ""), row.warehouse_types);
   const statusInfo = normalizeZoneStatus(row.status);
   const colorHex = /^#[0-9a-f]{6}$/i.test(String(row.area_color ?? "")) ? String(row.area_color) : DEFAULT_COLOR;

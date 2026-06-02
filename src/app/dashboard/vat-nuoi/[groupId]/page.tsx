@@ -94,15 +94,6 @@ function AnimalIcon({ species }: { species: string }) {
       </svg>
     );
   }
-  if (key.includes("ca")) {
-    return (
-      <svg viewBox="0 0 64 64" aria-hidden="true">
-        <path d="M12 33c8-10 22-14 36-4l6-6v20l-6-6c-14 10-28 6-36-4Z" fill="currentColor" opacity="0.18" />
-        <circle cx="24" cy="31" r="2.3" fill="currentColor" />
-        <path d="M37 27c-3 4-3 8 0 12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-      </svg>
-    );
-  }
   return (
     <svg viewBox="0 0 64 64" aria-hidden="true">
       <path d="M11 28c0-6 5-10 11-10h20c6 0 11 4 11 10v8c0 7-6 12-13 12H24c-7 0-13-5-13-12v-8Z" fill="currentColor" opacity="0.16" />

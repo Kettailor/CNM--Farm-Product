@@ -15,6 +15,8 @@ type ZoneUpdatePayload = {
   description?: string;
   color?: string;
   points?: Array<{ lat: number; lng: number }>;
+  latitude?: number | string;
+  longitude?: number | string;
   areaHa?: number | string;
   perimeterM?: number | string;
   capacity?: string;
@@ -78,6 +80,8 @@ type ZoneSnapshot = {
   mau_sac: string | null;
   dien_tich_ha: number | string | null;
   chu_vi_m: number | string | null;
+  tam_vi_do: number | string | null;
+  tam_kinh_do: number | string | null;
   hinh_hoc_geojson: {
     geo?: { polygon?: Array<{ lat: number; lng: number }> } | null;
     metadata?: Record<string, unknown> | null;
@@ -90,6 +94,16 @@ const normalizePolygon = (points: unknown) => {
     .filter((p): p is { lat: number; lng: number } => Number.isFinite(Number((p as { lat?: unknown }).lat)) && Number.isFinite(Number((p as { lng?: unknown }).lng)))
     .map((p) => ({ lat: Number((p as { lat: number | string }).lat), lng: Number((p as { lng: number | string }).lng) }));
 };
+
+const hasCoordinateValue = (value: unknown) => value !== undefined && value !== null && String(value).trim() !== "";
+
+const parseCoordinate = (value: unknown) => {
+  if (!hasCoordinateValue(value)) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+};
+
+const isCoord = (lat: number, lng: number) => lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
 
 const cleanJsonRecord = (value: unknown) => {
   const record = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -175,6 +189,8 @@ const snapshotJson = (zone: ZoneSnapshot | null) => {
     color: zone.mau_sac ?? "",
     areaHa: zone.dien_tich_ha ?? "",
     perimeterM: zone.chu_vi_m ?? "",
+    latitude: zone.tam_vi_do ?? "",
+    longitude: zone.tam_kinh_do ?? "",
     polygon,
     metadata: zone.hinh_hoc_geojson?.metadata ?? {},
   };
@@ -190,6 +206,8 @@ async function loadCurrentZone(zoneId: string, farmId: string) {
       k.mau_sac,
       k.dien_tich_ha,
       k.chu_vi_m,
+      k.tam_vi_do,
+      k.tam_kinh_do,
       k.hinh_hoc_geojson
      from du_lieu.khu_vuc k
      where k.trang_trai_id::text = $1 and (k.id::text = $2 or k.ma_khu_vuc::text = $2)
@@ -291,6 +309,16 @@ export async function PUT(request: Request, { params }: { params: { zoneId: stri
     }
 
     const polygon = normalizePolygon(body.points);
+    const hasLatitude = hasCoordinateValue(body.latitude);
+    const hasLongitude = hasCoordinateValue(body.longitude);
+    if (hasLatitude !== hasLongitude) {
+      return NextResponse.json({ message: "Vui lòng nhập đủ vĩ độ và kinh độ." }, { status: 400 });
+    }
+    const nextLatitude = parseCoordinate(body.latitude);
+    const nextLongitude = parseCoordinate(body.longitude);
+    if (hasLatitude && (!Number.isFinite(nextLatitude) || !Number.isFinite(nextLongitude) || !isCoord(Number(nextLatitude), Number(nextLongitude)))) {
+      return NextResponse.json({ message: "Tọa độ vị trí không hợp lệ." }, { status: 400 });
+    }
     const before = snapshotJson(current) ?? {};
     const typeSpecific = cleanJsonRecord(body.typeSpecific);
     const zoneTypeKey = isZoneTypeKey(typeSpecific.zoneTypeKey) ? typeSpecific.zoneTypeKey : null;
@@ -303,6 +331,8 @@ export async function PUT(request: Request, { params }: { params: { zoneId: stri
       color: body.color ?? current.mau_sac ?? "",
       areaHa: body.areaHa ?? current.dien_tich_ha ?? "",
       perimeterM: body.perimeterM ?? current.chu_vi_m ?? "",
+      latitude: nextLatitude ?? current.tam_vi_do ?? "",
+      longitude: nextLongitude ?? current.tam_kinh_do ?? "",
       capacity: body.capacity ?? (before as Record<string, unknown>).capacity ?? "",
       typeSpecific,
       polygon: polygon.length > 0 ? polygon : normalizePolygon(current.hinh_hoc_geojson?.geo?.polygon ?? []),
@@ -318,7 +348,9 @@ export async function PUT(request: Request, { params }: { params: { zoneId: stri
                jsonb_set(
                  coalesce(k.hinh_hoc_geojson, '{}'::jsonb),
                  '{geo}',
-                 case when jsonb_array_length($5::jsonb) >= 3 then jsonb_build_object('polygon', $5::jsonb) else coalesce(k.hinh_hoc_geojson->'geo', '{}'::jsonb) end,
+                 coalesce(k.hinh_hoc_geojson->'geo', '{}'::jsonb)
+                   || case when jsonb_array_length($5::jsonb) >= 3 then jsonb_build_object('polygon', $5::jsonb) else '{}'::jsonb end
+                   || case when $14::numeric is not null and $15::numeric is not null then jsonb_build_object('lat', $14::numeric, 'lng', $15::numeric) else '{}'::jsonb end,
                  true
                ),
               '{metadata}',
@@ -337,11 +369,13 @@ export async function PUT(request: Request, { params }: { params: { zoneId: stri
              loai_khu_vuc = coalesce(nullif($12, ''), loai_khu_vuc),
              thong_tin_loai = coalesce(k.thong_tin_loai, '{}'::jsonb) || $10::jsonb,
              nhom_luu_tru_kho = case when coalesce(nullif($12, ''), loai_khu_vuc) = 'storage' then $13::text[] else '{}'::text[] end,
+             tam_vi_do = coalesce($14::numeric, tam_vi_do),
+             tam_kinh_do = coalesce($15::numeric, tam_kinh_do),
              updated_at = now()
        where k.trang_trai_id::text = $8
          and (k.id::text = $9 or k.ma_khu_vuc::text = $9)
        returning k.id::text as id`,
-      [body.name ?? "", body.status ?? "", body.description ?? "", body.color ?? "", JSON.stringify(polygon), body.areaHa ?? "", body.perimeterM ?? "", farmId, zoneId, JSON.stringify(typeSpecific), body.capacity ?? "", zoneTypeKey ?? "", warehouseTypes]
+      [body.name ?? "", body.status ?? "", body.description ?? "", body.color ?? "", JSON.stringify(polygon), body.areaHa ?? "", body.perimeterM ?? "", farmId, zoneId, JSON.stringify(typeSpecific), body.capacity ?? "", zoneTypeKey ?? "", warehouseTypes, nextLatitude, nextLongitude]
     );
 
     if (!updateResult.rows[0]) {

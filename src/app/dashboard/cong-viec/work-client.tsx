@@ -251,6 +251,8 @@ const DEFAULT_DETAIL_FILTERS: DetailFilters = {
   recentlyUpdated: false,
 };
 
+const DETAIL_PAGE_SIZE = 100;
+
 function Icon({ name }: { name: string }) {
   switch (name) {
     case "calendar":
@@ -265,6 +267,12 @@ function Icon({ name }: { name: string }) {
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="m15 18-6-6 6-6" />
+        </svg>
+      );
+    case "forward":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m9 18 6-6-6-6" />
         </svg>
       );
     case "edit":
@@ -1122,9 +1130,27 @@ type DetailViewProps = {
 };
 
 function FarmdeckListView(props: DetailViewProps) {
-  const { task, visibleItems, columns, onEditItem, onDeleteItem, onToggleComplete, onChangeStatus, onUploadFiles, deletingItemId, updatingItemId, currentUserName, canWrite } = props;
+  const { task, visibleItems, filters, columns, onEditItem, onDeleteItem, onToggleComplete, onChangeStatus, onUploadFiles, deletingItemId, updatingItemId, currentUserName, canWrite } = props;
+  const [pageIndex, setPageIndex] = useState(0);
   const activeColumns = DETAIL_COLUMN_ORDER.filter((key) => columns[key]);
   const colSpan = activeColumns.length + (canWrite ? 3 : 0);
+  const totalItems = visibleItems.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / DETAIL_PAGE_SIZE));
+  const safePageIndex = Math.min(pageIndex, totalPages - 1);
+  const pageStart = safePageIndex * DETAIL_PAGE_SIZE;
+  const pagedItems = visibleItems.slice(pageStart, pageStart + DETAIL_PAGE_SIZE);
+  const rangeStart = totalItems === 0 ? 0 : pageStart + 1;
+  const rangeEnd = totalItems === 0 ? 0 : pageStart + pagedItems.length;
+  const canGoPrevious = safePageIndex > 0;
+  const canGoNext = safePageIndex < totalPages - 1;
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [task.id, filters.query, filters.zoneId, filters.status, filters.priority, filters.assignee, filters.onlyMine, filters.recentlyUpdated]);
+
+  useEffect(() => {
+    setPageIndex((current) => Math.min(current, totalPages - 1));
+  }, [totalPages]);
 
   return (
     <section className={styles.detailPanel}>
@@ -1143,7 +1169,7 @@ function FarmdeckListView(props: DetailViewProps) {
             </tr>
           </thead>
           <tbody>
-            {visibleItems.length > 0 ? visibleItems.map((item) => (
+            {pagedItems.length > 0 ? pagedItems.map((item) => (
               <tr key={item.id}>
                 {canWrite && <td className={styles.checkColumn}>
                   <input
@@ -1240,10 +1266,14 @@ function FarmdeckListView(props: DetailViewProps) {
       </div>
       <div className={styles.tableFooter}>
         <span>Số dòng mỗi trang:</span>
-        <strong>100</strong>
-        <span>{visibleItems.length > 0 ? `1-${visibleItems.length} / ${visibleItems.length}` : "0-0 / 0"}</span>
-        <button type="button" disabled aria-label="Trang trước"><Icon name="back" /></button>
-        <button type="button" disabled aria-label="Trang sau"><Icon name="back" /></button>
+        <strong>{DETAIL_PAGE_SIZE}</strong>
+        <span>{`${rangeStart}-${rangeEnd} / ${totalItems}`}</span>
+        <button type="button" disabled={!canGoPrevious} onClick={() => setPageIndex((current) => Math.max(0, current - 1))} aria-label="Trang trước">
+          <Icon name="back" />
+        </button>
+        <button type="button" disabled={!canGoNext} onClick={() => setPageIndex((current) => Math.min(totalPages - 1, current + 1))} aria-label="Trang sau">
+          <Icon name="forward" />
+        </button>
       </div>
     </section>
   );
