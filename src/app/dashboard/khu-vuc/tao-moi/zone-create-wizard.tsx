@@ -234,7 +234,7 @@ export default function ZoneCreateWizard({ initialLocation }: Props) {
           <p className={styles.kicker}>Quản lý khu vực</p>
           <h1>Tạo khu vực mới</h1>
         </div>
-        <ZoneActionMenu context="create" backHref="/dashboard/khu-vuc" />
+        <ZoneActionMenu context="create" backHref="/dashboard/khu-vuc" canWrite />
       </header>
       <div className={styles.body}>
         <div className={styles.stepHead}><div className={styles.stepBadge}>{step} / 5</div><div className={styles.stepMeta}><h2>{stepTitle}</h2><p>{stepSubtitle}</p></div></div>

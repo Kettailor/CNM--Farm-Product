@@ -381,6 +381,33 @@
   line-height: 1;
 }
 
+.userTag,
+.userTagRole {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.userTagAccepted {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.userTagPending {
+  color: #075985;
+  background: #dff3ff;
+}
+
+.userTagRole {
+  color: #365314;
+  background: #e5f9c7;
+}
+
 .userRecordBody {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) minmax(280px, 1fr);
@@ -571,6 +598,7 @@
 }
 
 .formField input,
+.formField select,
 .formField textarea {
   width: 100%;
   min-width: 0;
@@ -590,6 +618,7 @@
 }
 
 .formField input:focus,
+.formField select:focus,
 .formField textarea:focus {
   border-color: rgba(31, 122, 74, 0.48);
   box-shadow: 0 0 0 3px rgba(31, 122, 74, 0.1);
@@ -776,6 +805,16 @@
   border-bottom-color: var(--brand);
 }
 
+.modalField input:disabled,
+.modalField select:disabled {
+  color: #6b7280;
+  background: #f8fafc;
+  border: 1px solid #d8dee5;
+  border-radius: 4px;
+  padding: 7px 8px;
+  cursor: not-allowed;
+}
+
 .stepHelp,
 .stepNote {
   margin: 0;
@@ -787,6 +826,11 @@
 
 .stepNote strong {
   color: #374151;
+}
+
+.stepError {
+  color: #b91c1c;
+  font-weight: 700;
 }
 
 .smallSwitch {
@@ -864,6 +908,12 @@
   accent-color: #2563eb;
 }
 
+.readonlyRoleValue {
+  color: #374151;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
 .roleHintList {
   margin: 4px 0 0;
   padding-left: 16px;
@@ -891,6 +941,14 @@
   color: #111827;
   background: #ffe4e6;
   font-weight: 900;
+}
+
+.deleteModal .modalHeader h3 {
+  text-transform: none;
+}
+
+.deleteModal .modalFooter {
+  padding-top: 10px;
 }
 
 .deleteSection {
@@ -1086,6 +1144,137 @@
   font-weight: 700;
 }
 
+.documentUploadForm {
+  display: grid;
+  gap: 14px;
+  border-radius: 8px;
+  padding: 16px;
+  background: #f8fafc;
+}
+
+.documentUploadHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.documentUploadHeader h3,
+.documentCardBody h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.documentUploadHeader p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.documentViewerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: #f8fafc;
+}
+
+.documentViewerHeader h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.documentViewerHeader p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.documentFormGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.documentShareOption {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.documentShareOption input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--brand);
+}
+
+.documentGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.documentCard {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 12px;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.documentPreview,
+.documentPreviewPlaceholder {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #e2e8f0;
+}
+
+.documentPreviewImage {
+  background-position: center;
+  background-size: cover;
+  text-decoration: none;
+}
+
+.documentPreviewImage span {
+  width: 1px;
+  height: 1px;
+  position: absolute;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.documentPreviewPlaceholder svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: #64748b;
+  stroke-width: 1.8;
+}
+
+.documentCardBody {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
 .emptyState {
   min-height: 180px;
   display: grid;
@@ -1121,7 +1310,9 @@
   .topBar,
   .panelHead,
   .farmRecordHeader,
-  .shareHead {
+  .shareHead,
+  .documentUploadHeader,
+  .documentViewerHeader {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -1137,7 +1328,9 @@
 
   .farmRecordBody,
   .userRecordBody,
-  .farmFormGrid {
+  .farmFormGrid,
+  .documentFormGrid,
+  .documentCard {
     grid-template-columns: 1fr;
   }
 

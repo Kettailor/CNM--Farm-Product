@@ -77,11 +77,35 @@ create table if not exists du_lieu.loi_moi_trang_trai (
   id uuid primary key default gen_random_uuid(),
   trang_trai_id uuid not null references du_lieu.trang_trai(id) on delete cascade,
   email text not null,
+  ho_ten text,
+  so_dien_thoai text,
+  ngon_ngu text,
   vai_tro_id uuid references du_lieu.vai_tro_trang_trai(id) on delete set null,
   trang_thai text not null default 'pending',
   token text unique,
   nguoi_moi_id uuid references du_lieu.nguoi_dung(id) on delete set null,
   het_han_luc timestamptz,
+  metadata_json jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table du_lieu.loi_moi_trang_trai
+  add column if not exists ho_ten text,
+  add column if not exists so_dien_thoai text,
+  add column if not exists ngon_ngu text,
+  add column if not exists metadata_json jsonb not null default '{}'::jsonb;
+
+create table if not exists du_lieu.lien_he_marketing_loi_moi (
+  id uuid primary key default gen_random_uuid(),
+  loi_moi_id uuid unique references du_lieu.loi_moi_trang_trai(id) on delete set null,
+  trang_trai_id uuid references du_lieu.trang_trai(id) on delete set null,
+  nguoi_moi_id uuid references du_lieu.nguoi_dung(id) on delete set null,
+  ho_ten text,
+  email text not null,
+  so_dien_thoai text,
+  trang_thai_loi_moi text not null,
+  metadata_json jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -109,6 +133,7 @@ create index if not exists idx_thanh_vien_trang_trai_id on du_lieu.thanh_vien_tr
 create index if not exists idx_thanh_vien_nguoi_dung_id on du_lieu.thanh_vien_trang_trai(nguoi_dung_id);
 create index if not exists idx_loi_moi_trang_trai_id on du_lieu.loi_moi_trang_trai(trang_trai_id);
 create index if not exists idx_loi_moi_trang_thai on du_lieu.loi_moi_trang_trai(trang_thai);
+create index if not exists idx_lien_he_marketing_loi_moi_email on du_lieu.lien_he_marketing_loi_moi(lower(email));
 create index if not exists idx_chung_tu_trang_trai_id on du_lieu.chung_tu_trang_trai(trang_trai_id);
 create index if not exists idx_chung_tu_trang_thai on du_lieu.chung_tu_trang_trai(trang_thai);
 create index if not exists idx_chung_tu_ngay_het_han on du_lieu.chung_tu_trang_trai(ngay_het_han);
@@ -135,10 +160,10 @@ export async function ensureFarmSettingsDefaults(farmId: string, ownerId: string
     `insert into du_lieu.vai_tro_trang_trai
        (trang_trai_id, ma_vai_tro, ten_vai_tro, mo_ta, quyen, la_mac_dinh)
      values
-       ($1, 'owner', 'Chủ trang trại', 'Toàn quyền cấu hình và quản trị trang trại.', '{"settings": true, "users": true, "documents": true, "farm": true}'::jsonb, false),
-       ($1, 'admin', 'Quản trị', 'Quản trị vận hành và dữ liệu trang trại.', '{"settings": true, "users": true, "documents": true, "farm": true}'::jsonb, true),
-       ($1, 'editor', 'Biên tập', 'Xem và chỉnh sửa dữ liệu trang trại được phân quyền.', '{"settings": false, "users": false, "documents": true, "farm": true, "write": true}'::jsonb, false),
-       ($1, 'viewer', 'Chỉ xem', 'Chỉ xem dữ liệu được phân quyền.', '{"settings": false, "users": false, "documents": false, "farm": true, "write": false}'::jsonb, false)
+       ($1, 'owner', 'Chủ sở hữu', 'Toàn quyền cấu hình và quản trị trang trại.', '{"read": true, "settings": true, "users": true, "documents": true, "farm": true, "write": true}'::jsonb, false),
+       ($1, 'admin', 'Quản trị', 'Quản trị vận hành và dữ liệu trang trại.', '{"read": true, "settings": true, "users": true, "documents": true, "farm": true, "write": true}'::jsonb, true),
+       ($1, 'editor', 'Biên tập', 'Xem và chỉnh sửa dữ liệu trang trại được phân quyền.', '{"read": true, "settings": false, "users": false, "documents": true, "farm": true, "write": true}'::jsonb, false),
+       ($1, 'viewer', 'Chỉ xem', 'Chỉ xem dữ liệu được phân quyền.', '{"read": true, "settings": false, "users": false, "documents": false, "farm": true, "write": false}'::jsonb, false)
      on conflict (trang_trai_id, ma_vai_tro) do update
      set ten_vai_tro = excluded.ten_vai_tro,
          mo_ta = excluded.mo_ta,

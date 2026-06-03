@@ -1,5 +1,6 @@
 import DashboardShell from "@/components/dashboard-shell";
 import { layOwnerIdTuServerCookie } from "@/lib/auth";
+import { todayInBusinessTimeZone } from "@/lib/business-date";
 import { getDashboardOverview } from "@/lib/dashboard-overview";
 import { loadWarehouseZones } from "@/lib/warehouse-data";
 import { redirect } from "next/navigation";
@@ -14,6 +15,7 @@ export default async function WarehouseCreatePage() {
 
   const overview = await getDashboardOverview(ownerId);
   if (!overview.farmId) redirect("/register/farm");
+  if (!overview.access.canWrite) redirect("/dashboard/quan-ly-kho");
   const zones = await loadWarehouseZones(overview.farmId);
 
   return (
@@ -32,7 +34,7 @@ export default async function WarehouseCreatePage() {
         </section>
 
         <section>
-          <WarehouseForm zones={zones} />
+          <WarehouseForm zones={zones} initialReceivedDate={todayInBusinessTimeZone()} />
         </section>
       </div>
     </DashboardShell>

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 function FeatureIcon({ type }: { type: "zone" | "data" | "trace" }) {
@@ -53,7 +54,7 @@ export default function HomePage() {
       <section className="marketing-landing-header card">
         <div className="marketing-brand-block">
           <a href="/" className="marketing-brand marketing-brand-with-logo">
-            <img src="/assets/logo_ketkatecofarm.png" alt="KetKat-EcoFarm" className="marketing-brand-logo" />
+            <Image src="/assets/logo_ketkatecofarm.png" alt="KetKat-EcoFarm" width={42} height={42} className="marketing-brand-logo" />
             <span>KetKat-EcoFarm</span>
           </a>
           <p className="marketing-brand-subtitle">Nền tảng quản trị, bản đồ và truy xuất nông trại số</p>
@@ -64,9 +65,13 @@ export default function HomePage() {
           <a href="#truong-hop">Trường hợp sử dụng</a>
           <a href="#pham-vi">Phạm vi</a>
           <a href="#ung-dung">Ứng dụng</a>
+          <Link href="/public/vat-nuoi/quet-qr">Quét QR vật nuôi</Link>
        </nav>
 
         <div className="marketing-actions">
+          <Link href="/public/vat-nuoi/quet-qr" className="btn btn-secondary">
+            Quét QR vật nuôi
+          </Link>
           <Link href="/login" className="btn btn-secondary">
             Đăng nhập
           </Link>
@@ -76,12 +81,15 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="marketing-hero card">
+      <section className="marketing-hero">
         <div className="marketing-hero-copy">
           <p className="section-eyebrow">Giải pháp quản lý nông trại tập trung</p>
-          <h1>Giải pháp quản lý nông trại tập trung, rõ ràng và sẵn sàng cho vận hành thực tế</h1>
+          <h1>
+            <span>Giải pháp quản lý nông trại tập trung,</span>
+            <span>rõ ràng và sẵn sàng cho vận hành thực tế</span>
+          </h1>
           <p className="marketing-hero-description">
-            Giao diện này được xây dựng theo phong cách desktop marketing, nhưng toàn bộ nội dung, dữ liệu và chỉ số đều bám theo hệ thống KetKat-EcoFarm của bạn.
+            KetKat-EcoFarm gom bản đồ, khu vực sản xuất, dữ liệu vận hành và hồ sơ truy xuất vào một không gian quản trị sáng rõ cho đội ngũ nông trại.
           </p>
           <div className="marketing-hero-actions">
             <Link href="/register" className="btn btn-primary">
@@ -90,6 +98,11 @@ export default function HomePage() {
             <Link href="/login" className="btn btn-secondary">
               Đăng nhập
             </Link>
+          </div>
+          <div className="marketing-proof-row" aria-label="Điểm nổi bật của KetKat-EcoFarm">
+            <span><strong>01</strong> Bản đồ trực quan</span>
+            <span><strong>24/7</strong> Dữ liệu sẵn sàng</span>
+            <span><strong>3 lớp</strong> Quản trị truy xuất</span>
           </div>
         </div>
 
@@ -107,18 +120,26 @@ export default function HomePage() {
               <span className="marketing-rail-chip" />
             </aside>
 
-            <div className="marketing-map-panel card">
-              <div className="marketing-map-head">
-                <span>Bản đồ nông trại</span>
-                <span>Vị trí trung tâm</span>
+            <div className="marketing-dashboard-content">
+              <div className="marketing-map-panel card">
+                <div className="marketing-map-head">
+                  <span>Bản đồ nông trại</span>
+                  <span>Vị trí trung tâm</span>
+                </div>
+                <div className="marketing-map-canvas">
+                  <div className="marketing-field marketing-field-green" />
+                  <div className="marketing-field marketing-field-blue" />
+                  <div className="marketing-field marketing-field-accent" />
+                  <span className="marketing-pin pin-one" />
+                  <span className="marketing-pin pin-two" />
+                  <span className="marketing-pin pin-three" />
+                </div>
               </div>
-              <div className="marketing-map-canvas">
-                <div className="marketing-field marketing-field-green" />
-                <div className="marketing-field marketing-field-blue" />
-                <div className="marketing-field marketing-field-accent" />
-                <span className="marketing-pin pin-one" />
-                <span className="marketing-pin pin-two" />
-                <span className="marketing-pin pin-three" />
+
+              <div className="marketing-dashboard-stats">
+                <span><strong>12</strong>Khu vực</span>
+                <span><strong>86%</strong>Hoạt động ổn định</span>
+                <span><strong>42</strong>Hồ sơ truy xuất</span>
               </div>
             </div>
           </div>
@@ -171,7 +192,7 @@ export default function HomePage() {
           <h3>Phạm vi vận hành</h3>
           <p>Dashboard, bản đồ, khu vực, dữ liệu và các điểm chạm quản trị cốt lõi.</p>
         </article>
-        <article className="marketing-info card">
+        <article id="ung-dung" className="marketing-info card">
           <h3>Ứng dụng thực tế</h3>
           <p>Dùng cho quản lý nội bộ, theo dõi vận hành và làm nền cho mô hình truy xuất.</p>
         </article>

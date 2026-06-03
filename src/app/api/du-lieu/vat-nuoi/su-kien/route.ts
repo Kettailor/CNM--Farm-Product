@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { PoolClient } from "pg";
 import { layOwnerIdTuRequest } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getAccessibleFarmId } from "@/lib/farm-access";
 import { ensureLivestockEventSchema } from "@/lib/livestock-event-schema";
 import { getLivestockEventTypeOption, isLivestockEventType, type LivestockEventType } from "@/lib/livestock-event-types";
 
@@ -29,6 +30,42 @@ type GroupRow = {
   id: string;
   trang_trai_id: string;
   khu_vuc_id: string | null;
+  ma_nhom: string | null;
+  ten_nhom: string | null;
+  loai_vat_nuoi: string | null;
+  mo_ta: string | null;
+  cach_tao: string | null;
+  giong: string | null;
+  gioi_tinh: string | null;
+  giai_doan_sinh_truong: string | null;
+  trang_thai_suc_khoe: string | null;
+  muc_dich_san_xuat: string | null;
+  ghi_chu_dan: string | null;
+  nguon_goc: string | null;
+  gia_tri_mua: number | string | null;
+  tai_khoan_chi_phi: string | null;
+  ngay_sinh: string | Date | null;
+  kieu_thu_thai: string | null;
+  trong_luong_so_sinh_kg: number | string | null;
+  ghi_chu_sinh: string | null;
+  van_de_suc_khoe: string | null;
+  ma_me: string | null;
+  ma_bo: string | null;
+  mau_long: string | null;
+  mau_mat: string | null;
+  kieu_tai: string | null;
+  kieu_sung: string | null;
+  tinh_trang_mieng: string | null;
+  diem_the_trang: number | string | null;
+  ghi_chu_dac_diem: string | null;
+  nhan_dien_chinh: string | null;
+  trang_thai_sinh_san: string | null;
+  kha_nang_sinh_san: string | null;
+  tang_trong_binh_quan_ngay: number | string | null;
+  nang_luong_megajoule_ngay: number | string | null;
+  trong_luong_muc_tieu_kg: number | string | null;
+  ngay_can_muc_tieu: string | Date | null;
+  metadata_json: Record<string, unknown> | null;
   so_luong: number | string | null;
   linked_count: number | string | null;
 };
@@ -65,15 +102,15 @@ const MOVE_REQUIRED_METADATA: Partial<Record<MovementType, { key: string; label:
   transport_dispatch: [{ key: "dispatchDestination", label: "điểm đến/lệnh điều phối" }],
 };
 
-const ADJUSTMENT_TYPES = ["add_animals", "archive_animals", "archive_group", "remove_animals"] as const;
+const ADJUSTMENT_TYPES = ["deceased_animals", "deceased_group"] as const;
 
 type AdjustmentType = (typeof ADJUSTMENT_TYPES)[number];
 
-const ADJUSTMENT_REQUIRED_METADATA: Partial<Record<AdjustmentType, { key: string; label: string }[]>> = {
-  archive_animals: [{ key: "archiveReason", label: "lý do lưu trữ" }],
-  archive_group: [{ key: "archiveGroupReason", label: "lý do lưu trữ nhóm" }],
-  remove_animals: [{ key: "removalReason", label: "lý do loại bỏ" }],
-};
+const ADJUSTMENT_REQUIRED_METADATA: Partial<Record<AdjustmentType, { key: string; label: string }[]>> = {};
+
+const GROUPING_ACTIONS = ["split_group", "merge_group"] as const;
+
+type GroupingAction = (typeof GROUPING_ACTIONS)[number];
 
 const HEALTH_TYPES = [
   "castration",
@@ -139,6 +176,11 @@ type WeightSource = (typeof WEIGHT_SOURCES)[number];
 type WeightRecord = {
   animalId: string;
   value: number;
+};
+
+type GroupDeathCountRow = {
+  total_count: number | string | null;
+  deceased_count: number | string | null;
 };
 
 function cleanString(value: unknown, max = 240) {
@@ -233,7 +275,15 @@ function normalizeMovementType(value: unknown): MovementType {
 
 function normalizeAdjustmentType(value: unknown): AdjustmentType {
   const text = cleanString(value, 80);
-  return ADJUSTMENT_TYPES.includes(text as AdjustmentType) ? (text as AdjustmentType) : "add_animals";
+  return ADJUSTMENT_TYPES.includes(text as AdjustmentType) ? (text as AdjustmentType) : "deceased_animals";
+}
+
+function normalizeGroupingAction(value: unknown): GroupingAction | null {
+  const text = cleanString(value, 80);
+  if (GROUPING_ACTIONS.includes(text as GroupingAction)) return text as GroupingAction;
+  if (text === "tach_nhom" || text?.toLowerCase() === "tách nhóm") return "split_group";
+  if (text === "ghep_nhom" || text?.toLowerCase() === "gộp nhóm" || text?.toLowerCase() === "ghép nhóm") return "merge_group";
+  return null;
 }
 
 function normalizeHealthType(value: unknown): HealthType | null {
@@ -255,21 +305,79 @@ function makeEventCode(type: LivestockEventType) {
   return `SKVN-${EVENT_PREFIX[type]}-${today}-${randomUUID().slice(0, 6).toUpperCase()}`;
 }
 
+function makeSplitGroupCode(sourceCode: string | null) {
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const base = (sourceCode ?? "NHOM").replace(/[^a-zA-Z0-9-]/g, "").slice(0, 40) || "NHOM";
+  return `${base}-TACH-${today}-${randomUUID().slice(0, 5).toUpperCase()}`;
+}
+
 function numberFromDb(value: number | string | null) {
   if (value == null || value === "") return 0;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-async function loadOwnedGroup(client: PoolClient, ownerId: string, groupId: string) {
+function normalizeComparableText(value: unknown) {
+  const text = cleanString(value, 240);
+  return text ? text.normalize("NFC").toLowerCase() : "";
+}
+
+function isSameLivestockType(sourceType: unknown, targetType: unknown) {
+  const source = normalizeComparableText(sourceType);
+  const target = normalizeComparableText(targetType);
+  return Boolean(source && target && source === target);
+}
+
+function objectMetadata(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function groupSnapshot(group: GroupRow) {
+  return {
+    groupId: group.id,
+    groupCode: group.ma_nhom,
+    groupName: group.ten_nhom,
+    species: group.loai_vat_nuoi,
+    description: group.mo_ta,
+    createFrom: group.cach_tao,
+    breed: group.giong,
+    gender: group.gioi_tinh,
+    lifeStage: group.giai_doan_sinh_truong,
+    healthStatus: group.trang_thai_suc_khoe,
+    purpose: group.muc_dich_san_xuat,
+    herdNotes: group.ghi_chu_dan,
+    origin: group.nguon_goc,
+    birthDate: group.ngay_sinh,
+    maternityId: group.ma_me,
+    paternityId: group.ma_bo,
+    colouring: group.mau_long,
+    reproductiveState: group.trang_thai_sinh_san,
+    primaryIdentification: group.nhan_dien_chinh,
+    targetLiveWeight: group.trong_luong_muc_tieu_kg,
+    targetWeightDate: group.ngay_can_muc_tieu,
+  };
+}
+
+async function loadOwnedGroup(client: PoolClient, farmId: string, groupId: string) {
   const groupRs = await client.query<GroupRow>(
-    `select n.id::text, n.trang_trai_id::text, n.khu_vuc_id::text, n.so_luong,
+    `select n.id::text, n.trang_trai_id::text, n.khu_vuc_id::text,
+            n.ma_nhom, n.ten_nhom, n.loai_vat_nuoi, n.mo_ta, n.cach_tao, n.giong,
+            n.gioi_tinh, n.giai_doan_sinh_truong, n.trang_thai_suc_khoe,
+            n.muc_dich_san_xuat, n.ghi_chu_dan, n.nguon_goc, n.gia_tri_mua,
+            n.tai_khoan_chi_phi, n.ngay_sinh, n.kieu_thu_thai,
+            n.trong_luong_so_sinh_kg, n.ghi_chu_sinh, n.van_de_suc_khoe,
+            n.ma_me, n.ma_bo, n.mau_long, n.mau_mat, n.kieu_tai, n.kieu_sung,
+            n.tinh_trang_mieng, n.diem_the_trang, n.ghi_chu_dac_diem,
+            n.nhan_dien_chinh, n.trang_thai_sinh_san, n.kha_nang_sinh_san,
+            n.tang_trong_binh_quan_ngay, n.nang_luong_megajoule_ngay,
+            n.trong_luong_muc_tieu_kg, n.ngay_can_muc_tieu, n.metadata_json,
+            n.so_luong,
             (select count(*)::int from du_lieu.vat_nuoi v where v.nhom_vat_nuoi_id = n.id) as linked_count
      from du_lieu.nhom_vat_nuoi n
-     join du_lieu.trang_trai t on t.id = n.trang_trai_id
-     where n.id::text = $1 and t.chu_so_huu_id = $2
+     where n.id::text = $1 and n.trang_trai_id::text = $2
+       and coalesce(lower(n.loai_vat_nuoi), '') not in ('cá', 'ca', 'fish')
      limit 1`,
-    [groupId, ownerId]
+    [groupId, farmId]
   );
   return groupRs.rows[0] ?? null;
 }
@@ -299,14 +407,30 @@ async function validateZone(client: PoolClient, farmId: string, zoneId: string |
   return zoneRs.rows[0]?.id ?? null;
 }
 
+async function syncGroupHeadCount(client: PoolClient, farmId: string, groupId: string) {
+  const countRs = await client.query<{ total_count: number | string | null }>(
+    `select count(*)::int as total_count
+       from du_lieu.vat_nuoi
+      where trang_trai_id = $1 and nhom_vat_nuoi_id::text = $2`,
+    [farmId, groupId]
+  );
+  const totalCount = numberFromDb(countRs.rows[0]?.total_count ?? null);
+  await client.query(
+    `update du_lieu.nhom_vat_nuoi
+        set so_luong = $3,
+            updated_at = now()
+      where id::text = $1 and trang_trai_id = $2`,
+    [groupId, farmId, totalCount]
+  );
+  return totalCount;
+}
+
 async function loadCurrentUserName(client: PoolClient, ownerId: string) {
   try {
     const rs = await client.query<{ name: string | null }>(
       `select coalesce(
           (select nullif(ho_ten, '') from du_lieu.nguoi_dung where id::text = $1 limit 1),
           (select nullif(email, '') from du_lieu.nguoi_dung where id::text = $1 limit 1),
-          (select nullif(full_name, '') from du_lieu.chu_so_huu where id::text = $1 limit 1),
-          (select nullif(email, '') from du_lieu.chu_so_huu where id::text = $1 limit 1),
           'Người dùng hiện tại'
         ) as name`,
       [ownerId]
@@ -321,6 +445,8 @@ export async function POST(request: NextRequest) {
   try {
     const ownerId = layOwnerIdTuRequest(request);
     if (!ownerId) return NextResponse.json({ message: "Phiên đăng nhập không hợp lệ." }, { status: 401 });
+    const farmId = await getAccessibleFarmId(ownerId, "write");
+    if (!farmId) return NextResponse.json({ message: "Không có quyền ghi sự kiện vật nuôi." }, { status: 403 });
 
     await ensureLivestockEventSchema();
 
@@ -339,6 +465,7 @@ export async function POST(request: NextRequest) {
     const healthType = eventType === "health" ? normalizeHealthType(baseMetadata.healthType) : null;
     const weightSource = eventType === "weight" ? normalizeWeightSource(baseMetadata.weightSource) : null;
     const movementType = eventType === "move" ? normalizeMovementType(baseMetadata.movementType) : null;
+    const groupingAction = eventType === "grouping" ? normalizeGroupingAction(baseMetadata.groupingAction) : null;
     const submittedWeightRecords = eventType === "weight" ? normalizeWeightRecords(body.animalWeights) : [];
     const requestedAnimalIds = eventType === "weight" ? submittedWeightRecords.map((record) => record.animalId) : normalizeAnimalIds(body.animalIds);
     if (requestedAnimalIds.length === 0) {
@@ -349,7 +476,7 @@ export async function POST(request: NextRequest) {
     try {
       await client.query("begin");
 
-      const group = await loadOwnedGroup(client, ownerId, groupId);
+      const group = await loadOwnedGroup(client, farmId, groupId);
       if (!group) {
         await client.query("rollback");
         return NextResponse.json({ message: "Không tìm thấy nhóm vật nuôi hoặc không có quyền ghi sự kiện." }, { status: 404 });
@@ -398,13 +525,9 @@ export async function POST(request: NextRequest) {
           await client.query("rollback");
           return NextResponse.json({ message: `Vui lòng nhập ${missingField.label}.` }, { status: 400 });
         }
-        if (adjustmentType === "add_animals" && (parseNumber(body.numericValue) ?? 0) <= 0) {
+        if (adjustmentType === "deceased_group" && !isWholeGroup) {
           await client.query("rollback");
-          return NextResponse.json({ message: "Vui lòng nhập số lượng thêm." }, { status: 400 });
-        }
-        if (adjustmentType === "archive_group" && !isWholeGroup) {
-          await client.query("rollback");
-          return NextResponse.json({ message: "Vui lòng chọn toàn bộ cá thể khi lưu trữ nhóm." }, { status: 400 });
+          return NextResponse.json({ message: "Vui lòng chọn toàn bộ cá thể khi đánh dấu cả nhóm tử vong." }, { status: 400 });
         }
       }
 
@@ -434,25 +557,158 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ message: "Một số cá thể chưa có cân nặng hợp lệ." }, { status: 400 });
         }
       }
+
+      let groupingTargetGroup: GroupRow | null = null;
+      let groupingTargetGroupId: string | null = null;
+      let groupingTargetGroupName: string | null = null;
+      let groupingDestinationZoneId: string | null = null;
+      let splitNewGroupId: string | null = null;
+
+      if (eventType === "grouping") {
+        if (!groupingAction) {
+          await client.query("rollback");
+          return NextResponse.json({ message: "Vui lòng chọn tác vụ tách nhóm hoặc gộp nhóm." }, { status: 400 });
+        }
+
+        if (groupingAction === "split_group") {
+          if (isWholeGroup) {
+            await client.query("rollback");
+            return NextResponse.json({ message: "Tách nhóm cần giữ lại ít nhất một cá thể trong nhóm hiện tại." }, { status: 400 });
+          }
+
+          const newGroupName = metadataString(baseMetadata, "newGroupName", 180);
+          if (!newGroupName) {
+            await client.query("rollback");
+            return NextResponse.json({ message: "Vui lòng nhập tên nhóm mới." }, { status: 400 });
+          }
+
+          splitNewGroupId = randomUUID();
+          const splitZoneId = destinationZoneId ?? sourceZoneId;
+          const newGroupCode = makeSplitGroupCode(group.ma_nhom);
+          groupingTargetGroupId = splitNewGroupId;
+          groupingTargetGroupName = newGroupName;
+          groupingDestinationZoneId = splitZoneId;
+          const splitGroupMetadata = JSON.stringify({
+            ...objectMetadata(group.metadata_json),
+            createdFrom: "split_group_event",
+            sourceGroupId: group.id,
+            sourceGroupCode: group.ma_nhom,
+            selectedAnimalCount: selectedAnimalIds.length,
+            sourceGroupSnapshot: groupSnapshot(group),
+          });
+
+          await client.query(
+            `insert into du_lieu.nhom_vat_nuoi (
+              id, trang_trai_id, khu_vuc_id, ma_nhom, ten_nhom, loai_vat_nuoi, mo_ta, cach_tao,
+              giong, so_luong, gioi_tinh, giai_doan_sinh_truong, trang_thai_suc_khoe,
+              muc_dich_san_xuat, ghi_chu_dan, nguon_goc, gia_tri_mua, tai_khoan_chi_phi,
+              ngay_sinh, kieu_thu_thai, trong_luong_so_sinh_kg, ghi_chu_sinh, van_de_suc_khoe,
+              ma_me, ma_bo, mau_long, mau_mat, kieu_tai, kieu_sung, tinh_trang_mieng,
+              diem_the_trang, ghi_chu_dac_diem, nhan_dien_chinh, trang_thai_sinh_san,
+              kha_nang_sinh_san, tang_trong_binh_quan_ngay, nang_luong_megajoule_ngay,
+              trong_luong_muc_tieu_kg, ngay_can_muc_tieu, metadata_json
+            )
+            values (
+              $1,$2,$3::uuid,$4,$5,$6,$7,$8,
+              $9,$10,$11,$12,$13,
+              $14,$15,$16,$17,$18,
+              $19,$20,$21,$22,$23,
+              $24,$25,$26,$27,$28,$29,$30,
+              $31,$32,$33,$34,
+              $35,$36,$37,
+              $38,$39,$40::jsonb
+            )`,
+            [
+              splitNewGroupId,
+              group.trang_trai_id,
+              splitZoneId,
+              newGroupCode,
+              newGroupName,
+              cleanString(group.loai_vat_nuoi, 120) ?? "Vật nuôi",
+              group.mo_ta,
+              group.cach_tao,
+              group.giong,
+              selectedAnimalIds.length,
+              group.gioi_tinh,
+              group.giai_doan_sinh_truong,
+              group.trang_thai_suc_khoe ?? "Đang theo dõi",
+              group.muc_dich_san_xuat,
+              group.ghi_chu_dan,
+              group.nguon_goc,
+              group.gia_tri_mua,
+              group.tai_khoan_chi_phi,
+              group.ngay_sinh,
+              group.kieu_thu_thai,
+              group.trong_luong_so_sinh_kg,
+              group.ghi_chu_sinh,
+              group.van_de_suc_khoe,
+              group.ma_me,
+              group.ma_bo,
+              group.mau_long,
+              group.mau_mat,
+              group.kieu_tai,
+              group.kieu_sung,
+              group.tinh_trang_mieng,
+              group.diem_the_trang,
+              group.ghi_chu_dac_diem,
+              group.nhan_dien_chinh,
+              group.trang_thai_sinh_san,
+              group.kha_nang_sinh_san,
+              group.tang_trong_binh_quan_ngay,
+              group.nang_luong_megajoule_ngay,
+              group.trong_luong_muc_tieu_kg,
+              group.ngay_can_muc_tieu,
+              splitGroupMetadata,
+            ]
+          );
+        }
+
+        if (groupingAction === "merge_group") {
+          const targetGroupId = metadataString(baseMetadata, "targetGroupId", 80) ?? metadataString(baseMetadata, "targetGroup", 80);
+          if (!targetGroupId) {
+            await client.query("rollback");
+            return NextResponse.json({ message: "Vui lòng chọn nhóm đích để gộp." }, { status: 400 });
+          }
+          if (targetGroupId === groupId) {
+            await client.query("rollback");
+            return NextResponse.json({ message: "Nhóm đích phải khác nhóm nguồn." }, { status: 400 });
+          }
+
+          groupingTargetGroup = await loadOwnedGroup(client, group.trang_trai_id, targetGroupId);
+          if (!groupingTargetGroup) {
+            await client.query("rollback");
+            return NextResponse.json({ message: "Không tìm thấy nhóm đích hoặc không có quyền gộp nhóm." }, { status: 404 });
+          }
+          if (!isSameLivestockType(group.loai_vat_nuoi, groupingTargetGroup.loai_vat_nuoi)) {
+            await client.query("rollback");
+            return NextResponse.json({ message: "Chỉ được gộp các nhóm cùng loại vật nuôi." }, { status: 400 });
+          }
+
+          groupingTargetGroupId = groupingTargetGroup.id;
+          groupingTargetGroupName = groupingTargetGroup.ten_nhom;
+          groupingDestinationZoneId = groupingTargetGroup.khu_vuc_id;
+        }
+      }
+
       const eventDestinationZoneId =
         eventType === "move"
           ? moveNeedsDestination ? destinationZoneId : null
-          : eventType === "adjustment" ? null : destinationZoneId;
+          : eventType === "adjustment" ? null : eventType === "grouping" ? groupingDestinationZoneId : destinationZoneId;
       const eventDate = dateOrNull(body.eventDate) ?? new Date().toISOString().slice(0, 10);
       const eventId = randomUUID();
       const eventCode = makeEventCode(eventType);
       const title = cleanString(body.title, 180) ?? typeOption.defaultTitle;
       const requestedNumericValue = eventType === "weight" ? averageWeight : parseNumber(body.numericValue);
-      const numericValue =
-        eventType === "adjustment" && adjustmentType !== "add_animals"
-          ? selectedAnimalIds.length
-          : requestedNumericValue;
-      const unit = eventType === "adjustment" ? "con" : cleanString(body.unit, 40) ?? typeOption.defaultUnit ?? null;
+      const numericValue = eventType === "adjustment" || eventType === "grouping" ? selectedAnimalIds.length : requestedNumericValue;
+      const unit = eventType === "adjustment" || eventType === "grouping" ? "con" : cleanString(body.unit, 40) ?? typeOption.defaultUnit ?? null;
       const metadata = {
         ...baseMetadata,
         ...(adjustmentType
           ? {
               adjustmentType,
+              deathDate: eventDate,
+              deathScope: adjustmentType === "deceased_group" ? "group" : "animals",
+              causeOfDeath: metadataString(baseMetadata, "causeOfDeath", 700),
             }
           : {}),
         ...(healthType
@@ -472,6 +728,17 @@ export async function POST(request: NextRequest) {
           ? {
               movementType,
               movementScope: movementNeedsFarmDestination(movementType) ? "on_farm" : "off_farm",
+            }
+          : {}),
+        ...(groupingAction
+          ? {
+              groupingAction,
+              sourceGroupId: groupId,
+              targetGroupId: groupingTargetGroupId,
+              targetGroupName: groupingTargetGroupName,
+              targetZoneId: groupingDestinationZoneId,
+              sourceGroupSnapshot: groupSnapshot(group),
+              targetGroupSnapshot: groupingTargetGroup ? groupSnapshot(groupingTargetGroup) : null,
             }
           : {}),
         selectedAnimalCount: selectedAnimalIds.length,
@@ -532,38 +799,66 @@ export async function POST(request: NextRequest) {
       }
 
       if (eventType === "adjustment" && adjustmentType) {
-        if (adjustmentType === "add_animals") {
-          await client.query(
-            `update du_lieu.vat_nuoi
-                set trang_thai = coalesce(nullif(trang_thai, ''), 'Đang nuôi'),
-                    metadata_json = coalesce(metadata_json, '{}'::jsonb) || jsonb_build_object('lastAdjustmentEventId', $1::text, 'lastAdjustmentType', $4::text),
-                    updated_at = now()
-              where id::text = any($2::text[]) and trang_trai_id = $3`,
-            [eventId, selectedAnimalIds, group.trang_trai_id, adjustmentType]
-          );
-        }
+        await client.query(
+          `update du_lieu.vat_nuoi
+              set trang_thai = 'Đã tử vong',
+                  metadata_json = coalesce(metadata_json, '{}'::jsonb) || jsonb_build_object(
+                    'lastAdjustmentEventId', $1::text,
+                    'lastAdjustmentType', $4::text,
+                    'lastDeathEventId', $1::text,
+                    'deathDate', $5::text,
+                    'causeOfDeath', $6::text,
+                    'deceasedAt', now()::text
+                  ),
+                  updated_at = now()
+            where id::text = any($2::text[]) and trang_trai_id = $3`,
+          [
+            eventId,
+            selectedAnimalIds,
+            group.trang_trai_id,
+            adjustmentType,
+            eventDate,
+            metadataString(baseMetadata, "causeOfDeath", 700),
+          ]
+        );
 
-        if (adjustmentType === "archive_animals" || adjustmentType === "archive_group" || adjustmentType === "remove_animals") {
-          const nextStatus = adjustmentType === "remove_animals" ? "Đã loại bỏ" : "Đã lưu trữ";
-          await client.query(
-            `update du_lieu.vat_nuoi
-                set trang_thai = $1,
-                    metadata_json = coalesce(metadata_json, '{}'::jsonb) || jsonb_build_object('lastAdjustmentEventId', $2::text, 'lastAdjustmentType', $5::text),
-                    updated_at = now()
-              where id::text = any($3::text[]) and trang_trai_id = $4`,
-            [nextStatus, eventId, selectedAnimalIds, group.trang_trai_id, adjustmentType]
-          );
+        const deathCountRs = await client.query<GroupDeathCountRow>(
+          `select count(*)::int as total_count,
+                  count(*) filter (
+                    where coalesce(lower(trang_thai), '') in ('đã tử vong', 'da tu vong', 'deceased', 'dead')
+                       or coalesce(metadata_json, '{}'::jsonb) ? 'lastDeathEventId'
+                  )::int as deceased_count
+             from du_lieu.vat_nuoi
+            where nhom_vat_nuoi_id::text = $1 and trang_trai_id = $2`,
+          [groupId, group.trang_trai_id]
+        );
+        const totalInGroup = numberFromDb(deathCountRs.rows[0]?.total_count ?? null);
+        const deceasedInGroup = numberFromDb(deathCountRs.rows[0]?.deceased_count ?? null);
+        const allAnimalsDeceased = totalInGroup > 0 && deceasedInGroup >= totalInGroup;
 
-          if (adjustmentType === "archive_group") {
-            await client.query(
-              `update du_lieu.nhom_vat_nuoi
-                  set trang_thai_suc_khoe = 'Đã lưu trữ',
-                      metadata_json = coalesce(metadata_json, '{}'::jsonb) || jsonb_build_object('lastAdjustmentEventId', $3::text, 'lastAdjustmentType', $4::text, 'archivedAt', now()::text),
-                      updated_at = now()
-                where id::text = $1 and trang_trai_id = $2`,
-              [groupId, group.trang_trai_id, eventId, adjustmentType]
-            );
-          }
+        if (allAnimalsDeceased) {
+          await client.query(
+            `update du_lieu.nhom_vat_nuoi
+                set trang_thai_suc_khoe = 'Đã tử vong',
+                    metadata_json = coalesce(metadata_json, '{}'::jsonb) || jsonb_build_object(
+                      'lastAdjustmentEventId', $3::text,
+                      'lastAdjustmentType', $4::text,
+                      'lastDeathEventId', $3::text,
+                      'deathDate', $5::text,
+                      'causeOfDeath', $6::text,
+                      'deceasedAt', now()::text
+                    ),
+                    updated_at = now()
+              where id::text = $1 and trang_trai_id = $2`,
+            [
+              groupId,
+              group.trang_trai_id,
+              eventId,
+              adjustmentType,
+              eventDate,
+              metadataString(baseMetadata, "causeOfDeath", 700),
+            ]
+          );
         }
       }
 
@@ -613,6 +908,67 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      if (eventType === "grouping" && groupingAction && groupingTargetGroupId) {
+        await client.query(
+          `update du_lieu.vat_nuoi
+              set nhom_vat_nuoi_id = $1::uuid,
+                  khu_vuc_id = $2::uuid,
+                  metadata_json = coalesce(metadata_json, '{}'::jsonb) || jsonb_build_object(
+                    'lastGroupingEventId', $5::text,
+                    'lastGroupingAction', $6::text,
+                    'lastGroupingTargetGroupId', $1::text,
+                    'previousGroupId', $7::text,
+                    'previousGroupName', $8::text,
+                    'previousGroupSnapshot', $9::jsonb,
+                    'groupingUpdatedAt', now()::text
+                  ),
+                  updated_at = now()
+            where id::text = any($3::text[]) and trang_trai_id = $4`,
+          [
+            groupingTargetGroupId,
+            groupingDestinationZoneId,
+            selectedAnimalIds,
+            group.trang_trai_id,
+            eventId,
+            groupingAction,
+            group.id,
+            group.ten_nhom,
+            JSON.stringify(groupSnapshot(group)),
+          ]
+        );
+
+        const sourceCount = await syncGroupHeadCount(client, group.trang_trai_id, groupId);
+        await syncGroupHeadCount(client, group.trang_trai_id, groupingTargetGroupId);
+
+        await client.query(
+          `update du_lieu.nhom_vat_nuoi
+              set metadata_json = coalesce(metadata_json, '{}'::jsonb) || jsonb_build_object(
+                    'lastGroupingEventId', $3::text,
+                    'lastGroupingAction', $4::text,
+                    'lastGroupingTargetGroupId', $5::text,
+                    'groupingUpdatedAt', now()::text
+                  ),
+                  updated_at = now()
+            where id::text = any($1::text[]) and trang_trai_id = $2`,
+          [[groupId, groupingTargetGroupId], group.trang_trai_id, eventId, groupingAction, groupingTargetGroupId]
+        );
+
+        if (groupingAction === "merge_group" && sourceCount === 0) {
+          await client.query(
+            `update du_lieu.nhom_vat_nuoi
+                set trang_thai_suc_khoe = 'Đã gộp nhóm',
+                    metadata_json = coalesce(metadata_json, '{}'::jsonb) || jsonb_build_object(
+                      'mergedIntoGroupId', $3::text,
+                      'mergedByEventId', $4::text,
+                      'mergedAt', now()::text
+                    ),
+                    updated_at = now()
+              where id::text = $1 and trang_trai_id = $2`,
+            [groupId, group.trang_trai_id, groupingTargetGroupId, eventId]
+          );
+        }
+      }
+
       if (eventType === "health") {
         const nextStatus = healthType && HEALTH_CATEGORIES[healthType] === "clinical" ? "Cần chú ý" : "Đang theo dõi";
         await client.query(
@@ -654,7 +1010,12 @@ export async function POST(request: NextRequest) {
 
       await client.query("commit");
       return NextResponse.json({
-        message: "Đã ghi nhận sự kiện vật nuôi.",
+        message:
+          eventType === "adjustment"
+            ? "Đã ghi nhận vật nuôi tử vong."
+            : eventType === "grouping"
+              ? groupingAction === "split_group" ? "Đã tách nhóm vật nuôi." : "Đã gộp nhóm vật nuôi."
+              : "Đã ghi nhận sự kiện vật nuôi.",
         eventId,
         eventCode,
         selectedAnimalCount: selectedAnimalIds.length,

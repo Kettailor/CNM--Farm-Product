@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { layOwnerIdTuServerCookie } from "@/lib/auth";
+import { getAccessibleFarmId, type FarmAccessAction } from "@/lib/farm-access";
 import { getZoneTypeInfo, normalizeText, type ZoneTypeKey } from "@/lib/zone-type-utils";
 
 type ZonePayload = {
@@ -164,25 +165,15 @@ const toZone = (row: ZoneRow) => {
 };
 
 
-async function getOwnerFarmId() {
+async function getOwnerFarmId(action: FarmAccessAction = "read") {
   const ownerId = layOwnerIdTuServerCookie();
   if (!ownerId) return null;
-
-  const rs = await db.query(
-    `select id
-     from du_lieu.trang_trai
-     where chu_so_huu_id = $1
-     order by created_at desc
-     limit 1`,
-    [ownerId]
-  );
-
-  return rs.rows[0]?.id as string | undefined;
+  return getAccessibleFarmId(ownerId, action);
 }
 
 export async function GET() {
   try {
-    const farmId = await getOwnerFarmId();
+    const farmId = await getOwnerFarmId("read");
     if (!farmId) return NextResponse.json({ zones: [] });
 
     const rs = await db.query(
@@ -199,9 +190,9 @@ export async function POST(request: NextRequest) {
   const zone = (await request.json()) as ZonePayload;
 
   try {
-    const farmId = await getOwnerFarmId();
+    const farmId = await getOwnerFarmId("write");
     if (!farmId) {
-      return NextResponse.json({ message: "Không tìm thấy trang trại của tài khoản hiện tại." }, { status: 404 });
+      return NextResponse.json({ message: "Không có quyền tạo khu mới." }, { status: 403 });
     }
 
     const existingName = await db.query(
@@ -235,8 +226,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   const zone = (await request.json()) as ZonePayload;
-  const farmId = await getOwnerFarmId();
-  if (!farmId) return NextResponse.json({ message: "Không tìm thấy trang trại của tài khoản hiện tại." }, { status: 404 });
+  const farmId = await getOwnerFarmId("write");
+  if (!farmId) return NextResponse.json({ message: "Không có quyền cập nhật khu vực." }, { status: 403 });
 
   const zoneKind = zoneKindForDb(zone.metadata.usage ?? zone.metadata.farmType);
   const boundary = {
@@ -255,8 +246,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   const { id } = (await request.json()) as { id: string };
-  const farmId = await getOwnerFarmId();
-  if (!farmId) return NextResponse.json({ message: "Không tìm thấy trang trại của tài khoản hiện tại." }, { status: 404 });
+  const farmId = await getOwnerFarmId("write");
+  if (!farmId) return NextResponse.json({ message: "Không có quyền xóa khu vực." }, { status: 403 });
 
   const rs = await db.query("select hinh_hoc_geojson from du_lieu.khu_vuc where id = $1 and trang_trai_id = $2 limit 1", [id, farmId]);
   const currentBoundary = rs.rows[0]?.hinh_hoc_geojson ?? {};

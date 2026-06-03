@@ -1,23 +1,53 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import CowLoading from "@/components/cow-loading";
 
-type LastSource = "name" | "link" | "coord";
+type LastSource = "name" | "link" | "coord" | "current";
 type Suggestion = { name: string; lat: string; lng: string };
 type StepKey = 1 | 2 | 3 | 4 | 5;
+type ReverseAddress = {
+  displayName: string;
+  addressLine2: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+};
+type NominatimReverseResponse = {
+  display_name?: string;
+  address?: Record<string, string | undefined>;
+};
 
 const STEPS = [
   "Thông tin nông trại",
   "Vị trí nông trại",
-  "Chăn nuôi",
+  "Nuôi con gì",
   "Thiết lập",
   "Nguồn biết đến hệ thống",
 ];
-const LIVESTOCK = ["Gia súc", "Cừu", "Dê", "Ngựa", "Lợn", "Gia cầm", "Alpacas", "Khác"];
+const LIVESTOCK = ["Bò", "Trâu", "Dê", "Cừu", "Heo", "Gà", "Vịt", "Cá", "Khác"];
 const HEARD = ["Sự kiện", "Báo chí", "Blog hoặc ấn phẩm trực tuyến", "Đề xuất ngang hàng", "Đài phát thanh", "Công cụ tìm kiếm", "Truyền thông xã hội", "Truyền hình", "Biển quảng cáo", "Khác"];
 const isCoordValid = (lat: string, lng: string) => /^[-]?[0-9]+\.[0-9]{4,}$/.test(lat) && /^[-]?[0-9]+\.[0-9]{4,}$/.test(lng);
+const firstText = (...values: Array<string | undefined>) => values.find((value) => value?.trim())?.trim() ?? "";
+
+function normalizeReverseAddress(data: NominatimReverseResponse): ReverseAddress {
+  const address = data.address ?? {};
+  const city = firstText(address.city, address.town, address.municipality, address.city_district, address.county, address.state);
+  const state = firstText(address.state, address.province, address.region, city);
+  const addressLine2 = [address.suburb, address.quarter, address.village, address.hamlet, address.road].map((item) => item?.trim()).filter(Boolean).join(", ");
+
+  return {
+    displayName: data.display_name?.trim() ?? "",
+    addressLine2,
+    city,
+    state,
+    postalCode: firstText(address.postcode),
+    country: firstText(address.country),
+  };
+}
 
 export default function FarmRegistrationPage() {
   const router = useRouter();
@@ -25,11 +55,18 @@ export default function FarmRegistrationPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [locationError, setLocationError] = useState("");
+  const [resolvingLocation, setResolvingLocation] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const submittingRef = useRef(false);
   const [f, setF] = useState({
     farmName: "",
     farmArea: "10",
     locationName: "",
+    addressLine2: "",
+    city: "",
+    state: "",
+    postalCode: "",
+    country: "",
     mapsLink: "",
     lat: "10.762622",
     lng: "106.660172",
@@ -46,6 +83,33 @@ export default function FarmRegistrationPage() {
   const mapEmbed = `https://maps.google.com/maps?q=${encodeURIComponent(`${f.lat},${f.lng}`)}&z=15&output=embed`;
   const hasValidLocation = (!!f.locationName.trim() || /^https?:\/\//i.test(f.mapsLink.trim())) && isCoordValid(f.lat, f.lng);
   const pick = (k: "livestockTypes" | "heardFrom", v: string) => setF((p) => ({ ...p, [k]: p[k].includes(v) ? p[k].filter((x) => x !== v) : [...p[k], v] }));
+
+  const resolveAddress = useCallback(async (lat: string, lng: string, fallbackName?: string) => {
+    if (!isCoordValid(lat, lng)) return;
+    setResolvingLocation(true);
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=1`);
+      if (!response.ok) return;
+      const address = normalizeReverseAddress((await response.json()) as NominatimReverseResponse);
+      setF((current) => {
+        if (current.lat !== lat || current.lng !== lng) return current;
+        return {
+          ...current,
+          locationName: address.displayName || fallbackName || current.locationName,
+          addressLine2: address.addressLine2,
+          city: address.city,
+          state: address.state,
+          postalCode: address.postalCode,
+          country: address.country,
+        };
+      });
+      setLocationError("");
+    } catch {
+      setLocationError("Không thể tự động lấy địa chỉ từ tọa độ. Vui lòng kiểm tra lại vị trí.");
+    } finally {
+      setResolvingLocation(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (step !== 2 || f.lastSource !== "name" || f.locationName.trim().length < 2) return setSuggestions([]);
@@ -69,8 +133,42 @@ export default function FarmRegistrationPage() {
     if (!isCoordValid(lat, lng)) return setLocationError("Tọa độ trong liên kết không hợp lệ.");
     const name = decodeURIComponent((link.match(/\/place\/([^/]+)/)?.[1] || "").replace(/\+/g, " "));
     setLocationError("");
-    setF((p) => ({ ...p, mapsLink: link, locationName: name || `Google Maps ${lat}, ${lng}`, lat, lng, lastSource: "link" }));
+    const fallbackName = name || `Google Maps ${lat}, ${lng}`;
+    setF((p) => ({ ...p, mapsLink: link, locationName: fallbackName, lat, lng, lastSource: "link" }));
+    void resolveAddress(lat, lng, fallbackName);
   };
+
+  const useCurrentLocation = () => {
+    setLocationError("");
+    if (!navigator.geolocation) {
+      setLocationError("Trình duyệt không hỗ trợ lấy vị trí hiện tại.");
+      return;
+    }
+    setResolvingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude.toFixed(6);
+        const lng = position.coords.longitude.toFixed(6);
+        const mapsLink = `https://www.google.com/maps?q=${lat},${lng}`;
+        const fallbackName = `Vị trí hiện tại ${lat}, ${lng}`;
+        setF((p) => ({ ...p, locationName: fallbackName, mapsLink, lat, lng, lastSource: "current" }));
+        void resolveAddress(lat, lng, fallbackName);
+      },
+      () => {
+        setResolvingLocation(false);
+        setLocationError("Không thể lấy vị trí hiện tại. Vui lòng cho phép truy cập vị trí hoặc nhập tọa độ thủ công.");
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
+  };
+
+  useEffect(() => {
+    if (step !== 2 || f.lastSource !== "coord" || !isCoordValid(f.lat, f.lng)) return;
+    const timer = setTimeout(() => {
+      void resolveAddress(f.lat, f.lng);
+    }, 650);
+    return () => clearTimeout(timer);
+  }, [f.lat, f.lng, f.lastSource, resolveAddress, step]);
 
   const goNext = () => {
     setError("");
@@ -84,10 +182,13 @@ export default function FarmRegistrationPage() {
   const goBack = () => setStep((s) => (s > 1 ? (s - 1) as StepKey : s));
 
   const onSaveFarm = async () => {
+    if (submittingRef.current) return;
     setError("");
     if (!f.farmName.trim()) return setError("Vui lòng nhập tên nông trại.");
     if (!hasValidLocation) return setError("Vui lòng nhập vị trí nông trại hợp lệ.");
+    submittingRef.current = true;
     setLoading(true);
+    let shouldResetLoading = true;
     try {
       const res = await fetch("/api/register-farm", {
         method: "POST",
@@ -100,6 +201,11 @@ export default function FarmRegistrationPage() {
           },
           location: {
             locationName: f.locationName.trim() || undefined,
+            addressLine2: f.addressLine2.trim() || undefined,
+            city: f.city.trim() || undefined,
+            state: f.state.trim() || undefined,
+            postalCode: f.postalCode.trim() || undefined,
+            country: f.country.trim() || undefined,
             mapsLink: f.mapsLink.trim() || undefined,
             lat: f.lat,
             lng: f.lng,
@@ -120,19 +226,24 @@ export default function FarmRegistrationPage() {
       });
       const data = (await res.json()) as { message?: string; nextPath?: string };
       if (!res.ok) return setError(data.message || "Không thể lưu thông tin nông trại.");
+      shouldResetLoading = false;
+      window.dispatchEvent(new Event("farm:navigation-loading"));
       router.push(data.nextPath || "/dashboard");
       router.refresh();
     } catch {
       setError("Không thể kết nối máy chủ.");
     } finally {
-      setLoading(false);
+      if (shouldResetLoading) {
+        submittingRef.current = false;
+        setLoading(false);
+      }
     }
   };
 
   const rightCta = step === 5 ? (
     <button type="button" className="btn btn-primary" onClick={onSaveFarm} disabled={loading}>{loading ? <CowLoading label="Đang tải..." /> : "Lưu nông trại"}</button>
   ) : (
-    <button type="button" className="btn btn-primary" onClick={goNext}>Tiếp tục</button>
+    <button type="button" className="btn btn-primary" onClick={goNext} disabled={loading}>Tiếp tục</button>
   );
 
   const canGoBack = step > 1;
@@ -142,7 +253,7 @@ export default function FarmRegistrationPage() {
       <section className="auth-card card farm-auth-card">
         <aside className="auth-visual auth-visual-register farm-setup-panel">
           <div className="auth-brand-row">
-            <img src="/favicon.ico" alt="KetKat-EcoFarm" className="auth-logo" />
+            <Image src="/favicon.ico" alt="KetKat-EcoFarm" width={46} height={46} className="auth-logo" />
             <div>
               <p className="auth-brand-label">Thiết lập nông trại</p>
               <strong>KetKat-EcoFarm</strong>
@@ -188,12 +299,17 @@ export default function FarmRegistrationPage() {
                   <span>Tên vị trí</span>
                   <input className="input" placeholder="Tên vị trí" value={f.locationName} onChange={(e) => { setLocationError(""); setF({ ...f, locationName: e.target.value, lastSource: "name" }); }} />
                 </label>
-                {suggestions.length > 0 && <div className="card suggestion-list">{suggestions.map((s) => <button key={`${s.lat}-${s.lng}-${s.name}`} type="button" className="btn btn-secondary suggestion-item" onClick={() => { setSuggestions([]); setF((p) => ({ ...p, locationName: s.name, lat: s.lat, lng: s.lng, mapsLink: `https://www.google.com/maps?q=${s.lat},${s.lng}`, lastSource: "name" })); }}>{s.name}</button>)}</div>}
+                {suggestions.length > 0 && <div className="card suggestion-list">{suggestions.map((s) => <button key={`${s.lat}-${s.lng}-${s.name}`} type="button" className="btn btn-secondary suggestion-item" onClick={() => { setSuggestions([]); setF((p) => ({ ...p, locationName: s.name, lat: s.lat, lng: s.lng, mapsLink: `https://www.google.com/maps?q=${s.lat},${s.lng}`, lastSource: "name" })); void resolveAddress(s.lat, s.lng, s.name); }}>{s.name}</button>)}</div>}
               </div>
               <label className="auth-field full">
                 <span>Liên kết Google Maps</span>
                 <input className="input full" placeholder="Liên kết Google Maps" value={f.mapsLink} onChange={(e) => { const v = e.target.value; setF((p) => ({ ...p, mapsLink: v })); if (/^https?:\/\//i.test(v)) applyLink(v); }} />
               </label>
+              <div className="full">
+                <button type="button" className="btn btn-secondary" onClick={useCurrentLocation} disabled={resolvingLocation}>
+                  {resolvingLocation ? <CowLoading label="Đang lấy vị trí..." /> : "Dùng vị trí hiện tại"}
+                </button>
+              </div>
               <div className="grid-2 full">
                 <label className="auth-field">
                   <span>Vĩ độ</span>
@@ -204,10 +320,24 @@ export default function FarmRegistrationPage() {
                   <input className="input" placeholder="Kinh độ" value={f.lng} onChange={(e) => setF({ ...f, lng: e.target.value, lastSource: "coord" })} />
                 </label>
               </div>
+              <div className="grid-3 full">
+                <label className="auth-field">
+                  <span>Thành phố</span>
+                  <input className="input" value={f.city} readOnly placeholder={resolvingLocation ? "Đang lấy..." : "Tự động"} />
+                </label>
+                <label className="auth-field">
+                  <span>Tỉnh/Thành</span>
+                  <input className="input" value={f.state} readOnly placeholder={resolvingLocation ? "Đang lấy..." : "Tự động"} />
+                </label>
+                <label className="auth-field">
+                  <span>Quốc gia</span>
+                  <input className="input" value={f.country} readOnly placeholder={resolvingLocation ? "Đang lấy..." : "Tự động"} />
+                </label>
+              </div>
               <div className="card full"><iframe title="Bản đồ vị trí" src={mapEmbed} loading="lazy" className="register-map" /></div>
             </>}
 
-            {step === 3 && <div className="full"><strong>Chăn nuôi</strong><div className="grid-3 check-grid">{LIVESTOCK.map((x) => <label key={x} className="card check-item"><input type="checkbox" checked={f.livestockTypes.includes(x)} onChange={() => pick("livestockTypes", x)} />{x}</label>)}</div></div>}
+            {step === 3 && <div className="full"><strong>Nuôi con gì</strong><div className="grid-3 check-grid">{LIVESTOCK.map((x) => <label key={x} className="card check-item"><input type="checkbox" checked={f.livestockTypes.includes(x)} onChange={() => pick("livestockTypes", x)} />{x}</label>)}</div></div>}
 
             {step === 4 && <>
               <label className="auth-field full">
@@ -235,7 +365,7 @@ export default function FarmRegistrationPage() {
           </div>
 
           <div className="register-actions auth-actions">
-            <button type="button" className="btn btn-secondary" onClick={goBack} disabled={!canGoBack}>Quay lại</button>
+            <button type="button" className="btn btn-secondary" onClick={goBack} disabled={!canGoBack || loading}>Quay lại</button>
             {rightCta}
           </div>
 

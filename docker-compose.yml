@@ -10,14 +10,15 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: sh -c "npm ci && mkdir -p .next && rm -rf .next/* .next/.[!.]* .next/..?* && npm run dev"
+    command: sh -c "npm ci && mkdir -p .next && rm -rf .next/* .next/.[!.]* .next/..?* && npm run dev -- -H 0.0.0.0 -p 3000"
+    ports:
+      - "3000:3000"
     volumes:
       - .:/app
       - app_node_modules:/app/node_modules
       - app_next_cache:/app/.next
     environment:
       NODE_ENV: development
-      HOSTNAME: 0.0.0.0
       PORT: 3000
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
@@ -32,22 +33,6 @@ services:
       timeout: 5s
       retries: 12
       start_period: 60s
-    restart: unless-stopped
-
-  fastapi:
-    image: cnm-farm-product-traceability-fastapi
-    build:
-      context: ./backend-fastapi
-      dockerfile: Dockerfile
-    container_name: farmhub-fastapi
-    environment:
-      PYTHONUNBUFFERED: "1"
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\" || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
     restart: unless-stopped
 
   db:
@@ -91,8 +76,6 @@ services:
     container_name: farmhub-nginx
     depends_on:
       app:
-        condition: service_healthy
-      fastapi:
         condition: service_healthy
     ports:
       - "80:80"

@@ -3,7 +3,7 @@ import { layOwnerIdTuServerCookie } from "@/lib/auth";
 import { getDashboardOverview } from "@/lib/dashboard-overview";
 import { layDuLieuThoiTietToiUu } from "@/lib/thoi-tiet";
 import { redirect } from "next/navigation";
-import WeatherDashboardClient from "./weather-dashboard-client";
+import WeatherDashboardLoader from "./weather-dashboard-loader";
 
 export default async function DashboardThoiTietPage() {
   const ownerId = layOwnerIdTuServerCookie();
@@ -14,7 +14,7 @@ export default async function DashboardThoiTietPage() {
 
   return (
     <DashboardShell farmName={overview.farmName} activePath="/dashboard/thoi-tiet">
-      <WeatherDashboardClient
+      <WeatherDashboardLoader
         farmName={overview.farmName}
         locationName={overview.locationName}
         latitude={overview.latitude}

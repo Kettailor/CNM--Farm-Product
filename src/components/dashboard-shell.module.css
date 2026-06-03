@@ -42,6 +42,12 @@
   color: var(--muted);
 }
 
+.headerActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .layout {
   display: grid;
   grid-template-columns: 204px minmax(0, 1fr);

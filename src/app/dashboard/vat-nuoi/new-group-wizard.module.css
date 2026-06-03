@@ -395,6 +395,163 @@
   border-radius: 0 6px 6px 0;
 }
 
+.createModePanel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin-top: 2px;
+  padding: 14px;
+  border: 1px solid #dbe5d4;
+  border-radius: 8px;
+  background: #fbfdf8;
+}
+
+.createModeHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+}
+
+.createModeHead > div {
+  min-width: 0;
+}
+
+.createModeHead strong {
+  display: block;
+  color: #1f2937;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.createModeHead p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.createModeHead > span {
+  min-width: 52px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #e8f7dc;
+  color: #2d7f09;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.createModeActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.createModeActions button {
+  min-height: 30px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #334155;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.createModeActions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.recordedAnimalList {
+  display: grid;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+}
+
+.recordedAnimalRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+}
+
+.recordedAnimalRow input {
+  width: 16px;
+  height: 16px;
+  accent-color: #58b90a;
+}
+
+.recordedAnimalRow span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.recordedAnimalRow strong,
+.recordedAnimalRow small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recordedAnimalRow strong {
+  color: #1f2937;
+  font-size: 13px;
+}
+
+.recordedAnimalRow small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.templateSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.templateSummary span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 999px;
+  background: #edf7e6;
+  color: #2d7f09;
+  padding: 6px 9px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.emptyState {
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed #cbd5e1;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #64748b;
+  padding: 10px;
+  font-size: 13px;
+  text-align: center;
+}
+
 .tagArea {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr);
@@ -648,6 +805,14 @@
   .qrPlan {
     grid-template-columns: 1fr;
     align-items: start;
+  }
+
+  .createModeHead {
+    flex-direction: column;
+  }
+
+  .createModeHead > span {
+    align-self: flex-start;
   }
 
   .tagCard label {

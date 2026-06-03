@@ -1,5 +1,4 @@
 import DashboardShell from "@/components/dashboard-shell";
-import DashboardTopActions from "@/components/dashboard-top-actions";
 import MapViewSwitcher from "@/components/dashboard-map-view-switcher";
 import Link from "next/link";
 import LivestockPageTools from "./livestock-page-tools";
@@ -11,13 +10,15 @@ import { redirect } from "next/navigation";
 import type { CSSProperties } from "react";
 import styles from "./page.module.css";
 
-type SpeciesIcon = "cow" | "goat" | "sheep" | "pig" | "chicken" | "duck" | "buffalo" | "fish" | "other";
+type SpeciesIcon = "cow" | "goat" | "sheep" | "pig" | "chicken" | "duck" | "buffalo" | "other";
 
 type AnimalRow = {
   id: string;
   code: string | null;
   qrCode: string | null;
   identity: string | null;
+  species: string | null;
+  breed: string | null;
   status: string | null;
   description: string | null;
   groupId: string | null;
@@ -31,11 +32,43 @@ type AnimalGroupRow = {
   id: string;
   name: string;
   species: string;
+  description: string | null;
+  createFrom: string | null;
   breed: string | null;
   headCount: number;
   linkedCount: number;
+  deceasedCount: number;
   healthStatus: string | null;
+  gender: string | null;
+  lifeStage: string | null;
+  purpose: string | null;
+  locationId: string | null;
   zoneName: string | null;
+  herdNotes: string | null;
+  origin: string | null;
+  price: string | null;
+  expenseAccount: string | null;
+  birthDate: string | null;
+  conceptionType: string | null;
+  averageBirthWeight: string | null;
+  birthNotes: string | null;
+  healthIssues: string | null;
+  maternityId: string | null;
+  paternityId: string | null;
+  colouring: string | null;
+  eyeColor: string | null;
+  earType: string | null;
+  hornType: string | null;
+  mouth: string | null;
+  bodyConditionScore: string | null;
+  traitNotes: string | null;
+  primaryIdentification: string | null;
+  reproductiveState: string | null;
+  reproductiveAvailability: string | null;
+  lifetimeAdg: string | null;
+  lifetimeMjDay: string | null;
+  targetLiveWeight: string | null;
+  targetWeightDate: string | null;
   updatedAt: string | Date | null;
   createdAt: string | Date | null;
 };
@@ -73,6 +106,8 @@ type AnimalGroup = {
   color: string;
   count: number;
   activeCount: number;
+  deceased: boolean;
+  deceasedCount: number;
   zones: string[];
   statusLabel: string;
   updatedAt: string | Date | null;
@@ -88,7 +123,6 @@ const speciesCatalog: Array<{ label: string; icon: SpeciesIcon; color: string; k
   { label: "Heo", icon: "pig", color: "#db2777", keywords: ["heo", "lon", "pig"] },
   { label: "Gà", icon: "chicken", color: "#d97706", keywords: ["ga", "chicken"] },
   { label: "Vịt", icon: "duck", color: "#0284c7", keywords: ["vit", "duck"] },
-  { label: "Cá", icon: "fish", color: "#2563eb", keywords: ["ca", "fish"] },
 ];
 
 const zonePalette = ["#2f855a", "#2563eb", "#d97706", "#dc2626", "#7c3aed", "#0891b2", "#4d7c0f"];
@@ -124,10 +158,19 @@ function formatDate(value: string | Date | null) {
   return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+function dateInputValue(value: unknown) {
+  if (!value) return null;
+  if (typeof value === "string") return value.slice(0, 10);
+  const date = new Date(value as string | Date);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+}
+
 function statusLabel(status: string | null) {
   const raw = cleanText(status);
   if (!raw) return "Chưa cập nhật";
   const normalized = normalizeSearch(raw);
+  if (normalized.includes("tu vong") || normalized.includes("deceased") || normalized.includes("dead")) return "Đã tử vong";
   if (normalized.includes("dang hoat dong") || normalized.includes("active")) return "Đang theo dõi";
   if (normalized.includes("theo doi") || normalized.includes("canh bao") || normalized.includes("benh")) return "Cần chú ý";
   if (normalized.includes("ngung") || normalized.includes("inactive")) return "Ngừng theo dõi";
@@ -143,8 +186,13 @@ function isActiveStatus(status: string | null) {
   return normalized.includes("dang hoat dong") || normalized.includes("active");
 }
 
+function isDeceasedStatus(status: string | null) {
+  const normalized = normalizeSearch(status);
+  return normalized.includes("tu vong") || normalized.includes("deceased") || normalized.includes("dead");
+}
+
 function resolveSpecies(row: AnimalRow) {
-  const haystack = normalizeSearch([row.identity, row.description, row.code].filter(Boolean).join(" "));
+  const haystack = normalizeSearch([row.species, row.breed, row.identity, row.description, row.code].filter(Boolean).join(" "));
   const matched = speciesCatalog.find((item) => item.keywords.some((keyword) => haystack.includes(keyword)));
   if (matched) return matched;
 
@@ -216,12 +264,13 @@ function zoneColor(index: number, color: unknown, status: string | null) {
   return zonePalette[index % zonePalette.length];
 }
 
-function buildLegacyAnimalGroups(animals: AnimalRow[]): AnimalGroup[] {
+function buildLegacyAnimalGroups(animals: AnimalRow[], includeDeceased: boolean): AnimalGroup[] {
   const groups = new Map<string, AnimalGroup & { statusCounts: Map<string, number> }>();
 
-  for (const animal of animals) {
+  for (const animal of includeDeceased ? animals : animals.filter((item) => !isDeceasedStatus(item.status))) {
     const species = resolveSpecies(animal);
     const key = makeKey(species.label);
+    const deceased = isDeceasedStatus(animal.status);
     const current =
       groups.get(key) ??
       ({
@@ -231,6 +280,8 @@ function buildLegacyAnimalGroups(animals: AnimalRow[]): AnimalGroup[] {
         color: species.color,
         count: 0,
         activeCount: 0,
+        deceased: false,
+        deceasedCount: 0,
         zones: [],
         statusLabel: "Chưa cập nhật",
         updatedAt: null,
@@ -239,6 +290,8 @@ function buildLegacyAnimalGroups(animals: AnimalRow[]): AnimalGroup[] {
 
     current.count += 1;
     if (isActiveStatus(animal.status)) current.activeCount += 1;
+    if (deceased) current.deceasedCount += 1;
+    current.deceased = current.count > 0 && current.deceasedCount >= current.count;
 
     const zoneName = cleanText(animal.zoneName) || "Chưa gắn khu vực";
     if (!current.zones.includes(zoneName)) current.zones.push(zoneName);
@@ -256,33 +309,37 @@ function buildLegacyAnimalGroups(animals: AnimalRow[]): AnimalGroup[] {
 
   return Array.from(groups.values())
     .map(({ statusCounts, ...group }) => {
-      const mainStatus = Array.from(statusCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Chưa cập nhật";
+      const mainStatus = group.deceased ? "Đã tử vong" : Array.from(statusCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Chưa cập nhật";
       return { ...group, statusLabel: mainStatus };
     })
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "vi"));
 }
 
-function buildAnimalGroups(animals: AnimalRow[] = [], savedGroups: AnimalGroupRow[] = []): AnimalGroup[] {
+function buildAnimalGroups(animals: AnimalRow[] = [], savedGroups: AnimalGroupRow[] = [], includeDeceasedGroups = false, includeDeceasedAnimals = includeDeceasedGroups): AnimalGroup[] {
   const explicitGroups: AnimalGroup[] = savedGroups.map((group) => {
     const species = resolveSpeciesFromText(group.species);
     const count = group.linkedCount || group.headCount;
+    const deceased = count > 0 && (group.deceasedCount >= count || isDeceasedStatus(group.healthStatus));
+    const visibleCount = includeDeceasedAnimals || (deceased && includeDeceasedGroups) ? count : Math.max(count - group.deceasedCount, 0);
     return {
       key: `nhom-${group.id}`,
       href: `/dashboard/vat-nuoi/${group.id}`,
       label: group.name,
       icon: species.icon,
       color: species.color,
-      count,
-      activeCount: isActiveStatus(group.healthStatus) ? count : 0,
+      count: visibleCount,
+      activeCount: deceased ? 0 : visibleCount,
+      deceased,
+      deceasedCount: group.deceasedCount,
       zones: [cleanText(group.zoneName) || "Chưa gắn khu vực"],
-      statusLabel: statusLabel(group.healthStatus),
+      statusLabel: deceased ? "Đã tử vong" : statusLabel(group.healthStatus),
       updatedAt: group.updatedAt || group.createdAt,
     };
-  });
+  }).filter((group) => includeDeceasedGroups || !group.deceased);
 
   const groupedAnimalIds = new Set(savedGroups.map((group) => group.id));
   const legacyAnimals = animals.filter((animal) => !animal.groupId || !groupedAnimalIds.has(animal.groupId));
-  return [...explicitGroups, ...buildLegacyAnimalGroups(legacyAnimals)].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "vi"));
+  return [...explicitGroups, ...buildLegacyAnimalGroups(legacyAnimals, includeDeceasedAnimals)].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "vi"));
 }
 
 async function loadLivestockData(farmId: string) {
@@ -290,29 +347,52 @@ async function loadLivestockData(farmId: string) {
 
   const [animalRs, groupRs, zoneRs, countRs, alertRs] = await Promise.all([
     db.query(
-      `select v.id::text, v.ma_vat_nuoi, v.ma_qr, v.the_nhan_dien, v.trang_thai, v.mo_ta,
+      `select v.id::text, v.ma_vat_nuoi, v.ma_qr, v.the_nhan_dien, v.loai_vat_nuoi, v.giong, v.trang_thai, v.mo_ta,
               v.nhom_vat_nuoi_id::text,
               v.khu_vuc_id::text, v.created_at, v.updated_at, k.ten_khu_vuc
        from du_lieu.vat_nuoi v
+       left join du_lieu.nhom_vat_nuoi n on n.id = v.nhom_vat_nuoi_id
        left join du_lieu.khu_vuc k on k.id = v.khu_vuc_id and coalesce(lower(k.trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')
        where v.trang_trai_id = $1
+         and coalesce(lower(coalesce(v.loai_vat_nuoi, n.loai_vat_nuoi)), '') not in ('cá', 'ca', 'fish')
        order by v.updated_at desc nulls last, v.created_at desc nulls last, v.id desc`,
       [farmId]
     ),
     db.query(
-      `select n.id::text, n.ten_nhom, n.loai_vat_nuoi, n.giong, n.so_luong,
-              n.trang_thai_suc_khoe, n.created_at, n.updated_at, k.ten_khu_vuc,
-              (select count(*)::int from du_lieu.vat_nuoi v where v.nhom_vat_nuoi_id = n.id) as linked_count
+      `select n.id::text, n.ten_nhom, n.loai_vat_nuoi, n.mo_ta, n.cach_tao, n.giong, n.so_luong,
+              n.gioi_tinh, n.giai_doan_sinh_truong, n.trang_thai_suc_khoe,
+              n.muc_dich_san_xuat, n.khu_vuc_id::text, n.ghi_chu_dan, n.nguon_goc,
+              n.gia_tri_mua, n.tai_khoan_chi_phi, n.ngay_sinh, n.kieu_thu_thai,
+              n.trong_luong_so_sinh_kg, n.ghi_chu_sinh, n.van_de_suc_khoe,
+              n.ma_me, n.ma_bo, n.mau_long, n.mau_mat, n.kieu_tai, n.kieu_sung,
+              n.tinh_trang_mieng, n.diem_the_trang, n.ghi_chu_dac_diem,
+              n.nhan_dien_chinh, n.trang_thai_sinh_san, n.kha_nang_sinh_san,
+              n.tang_trong_binh_quan_ngay, n.nang_luong_megajoule_ngay,
+              n.trong_luong_muc_tieu_kg, n.ngay_can_muc_tieu,
+              n.created_at, n.updated_at, k.ten_khu_vuc,
+              (select count(*)::int from du_lieu.vat_nuoi v where v.nhom_vat_nuoi_id = n.id) as linked_count,
+              (select count(*)::int
+                 from du_lieu.vat_nuoi v
+                where v.nhom_vat_nuoi_id = n.id
+                  and (
+                    coalesce(lower(v.trang_thai), '') in ('đã tử vong', 'da tu vong', 'deceased', 'dead')
+                    or coalesce(v.metadata_json, '{}'::jsonb) ? 'lastDeathEventId'
+                  )) as deceased_count
        from du_lieu.nhom_vat_nuoi n
        left join du_lieu.khu_vuc k on k.id = n.khu_vuc_id and coalesce(lower(k.trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')
        where n.trang_trai_id = $1
+         and coalesce(lower(n.loai_vat_nuoi), '') not in ('cá', 'ca', 'fish')
        order by n.updated_at desc nulls last, n.created_at desc nulls last, n.id desc`,
       [farmId]
     ),
     db.query(
       `select k.id::text, k.ten_khu_vuc, k.trang_thai, coalesce(k.dien_tich_ha, 0)::float8 as dien_tich_ha,
               k.hinh_hoc_geojson, k.mau_sac,
-              (select count(*)::int from du_lieu.vat_nuoi v where v.khu_vuc_id = k.id) as animal_count,
+              (select count(*)::int
+                from du_lieu.vat_nuoi v
+                left join du_lieu.nhom_vat_nuoi n on n.id = v.nhom_vat_nuoi_id
+               where v.khu_vuc_id = k.id
+                  and coalesce(lower(coalesce(v.loai_vat_nuoi, n.loai_vat_nuoi)), '') not in ('cá', 'ca', 'fish')) as animal_count,
               (select d.so_luong from du_lieu.dem_dong_vat d where d.khu_vuc_id = k.id order by d.created_at desc limit 1) as latest_count,
               (select d.created_at from du_lieu.dem_dong_vat d where d.khu_vuc_id = k.id order by d.created_at desc limit 1) as latest_count_at
        from du_lieu.khu_vuc k
@@ -360,6 +440,8 @@ async function loadLivestockData(farmId: string) {
     code: cleanText(row.ma_vat_nuoi),
     qrCode: cleanText(row.ma_qr),
     identity: cleanText(row.the_nhan_dien),
+    species: cleanText(row.loai_vat_nuoi),
+    breed: cleanText(row.giong),
     status: cleanText(row.trang_thai),
     description: cleanText(row.mo_ta),
     groupId: cleanText(row.nhom_vat_nuoi_id),
@@ -373,11 +455,43 @@ async function loadLivestockData(farmId: string) {
     id: String(row.id),
     name: cleanText(row.ten_nhom) || "Nhóm vật nuôi chưa đặt tên",
     species: cleanText(row.loai_vat_nuoi) || "Chưa phân loại",
+    description: cleanText(row.mo_ta),
+    createFrom: cleanText(row.cach_tao),
     breed: cleanText(row.giong),
     headCount: Number(row.so_luong ?? 0),
     linkedCount: Number(row.linked_count ?? 0),
+    deceasedCount: Number(row.deceased_count ?? 0),
     healthStatus: cleanText(row.trang_thai_suc_khoe),
+    gender: cleanText(row.gioi_tinh),
+    lifeStage: cleanText(row.giai_doan_sinh_truong),
+    purpose: cleanText(row.muc_dich_san_xuat),
+    locationId: cleanText(row.khu_vuc_id),
     zoneName: cleanText(row.ten_khu_vuc),
+    herdNotes: cleanText(row.ghi_chu_dan),
+    origin: cleanText(row.nguon_goc),
+    price: cleanText(row.gia_tri_mua),
+    expenseAccount: cleanText(row.tai_khoan_chi_phi),
+    birthDate: dateInputValue(row.ngay_sinh),
+    conceptionType: cleanText(row.kieu_thu_thai),
+    averageBirthWeight: cleanText(row.trong_luong_so_sinh_kg),
+    birthNotes: cleanText(row.ghi_chu_sinh),
+    healthIssues: cleanText(row.van_de_suc_khoe),
+    maternityId: cleanText(row.ma_me),
+    paternityId: cleanText(row.ma_bo),
+    colouring: cleanText(row.mau_long),
+    eyeColor: cleanText(row.mau_mat),
+    earType: cleanText(row.kieu_tai),
+    hornType: cleanText(row.kieu_sung),
+    mouth: cleanText(row.tinh_trang_mieng),
+    bodyConditionScore: cleanText(row.diem_the_trang),
+    traitNotes: cleanText(row.ghi_chu_dac_diem),
+    primaryIdentification: cleanText(row.nhan_dien_chinh),
+    reproductiveState: cleanText(row.trang_thai_sinh_san),
+    reproductiveAvailability: cleanText(row.kha_nang_sinh_san),
+    lifetimeAdg: cleanText(row.tang_trong_binh_quan_ngay),
+    lifetimeMjDay: cleanText(row.nang_luong_megajoule_ngay),
+    targetLiveWeight: cleanText(row.trong_luong_muc_tieu_kg),
+    targetWeightDate: dateInputValue(row.ngay_can_muc_tieu),
     updatedAt: row.updated_at ?? null,
     createdAt: row.created_at ?? null,
   }));
@@ -477,14 +591,6 @@ function AnimalIcon({ type }: { type: SpeciesIcon }) {
           <path d="M24 47v7m12-7v7" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
         </svg>
       );
-    case "fish":
-      return (
-        <svg viewBox="0 0 64 64" aria-hidden="true">
-          <path d="M12 33c8-10 22-14 36-4l6-6v20l-6-6c-14 10-28 6-36-4Z" fill="currentColor" opacity="0.18" />
-          <circle cx="24" cy="31" r="2.3" fill="currentColor" />
-          <path d="M37 27c-3 4-3 8 0 12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        </svg>
-      );
     default:
       return (
         <svg viewBox="0 0 64 64" aria-hidden="true">
@@ -520,11 +626,20 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
   if (!data.farmId) redirect("/register/farm");
   if (searchValue(searchParams?.["hanh-dong"]) === "dieu-tri") redirect("/dashboard/vat-nuoi/dieu-tri");
   if (searchValue(searchParams?.["hanh-dong"]) === "ghi-nhan-su-kien") redirect("/dashboard/vat-nuoi/su-kien");
+  const showDeceasedGroups = searchValue(searchParams?.["hien-nhom-tu-vong"]) === "1";
+  const showDeceasedAnimals = searchValue(searchParams?.["hien-ca-the-tu-vong"]) === "1";
+  const showSummary = searchValue(searchParams?.["hien-tom-tat"]) !== "0";
+  const showGroupCards = searchValue(searchParams?.["hien-the-nhom"]) !== "0";
+  const showGroupsTable = searchValue(searchParams?.["hien-bang-nhom"]) !== "0";
+  const showMap = searchValue(searchParams?.["hien-ban-do"]) !== "0";
 
   const { animals, savedGroups, zones, countSummary, alertSummary } = await loadLivestockData(data.farmId);
-  const groups = buildAnimalGroups(animals, savedGroups);
-  const activeAnimals = animals.filter((animal) => isActiveStatus(animal.status)).length;
-  const linkedAnimals = animals.filter((animal) => animal.zoneId).length;
+  const includeDeceasedAnimals = showDeceasedGroups || showDeceasedAnimals;
+  const visibleAnimals = includeDeceasedAnimals ? animals : animals.filter((animal) => !isDeceasedStatus(animal.status));
+  const groups = buildAnimalGroups(animals, savedGroups, showDeceasedGroups, includeDeceasedAnimals);
+  const deceasedGroupCount = buildAnimalGroups(animals, savedGroups, true).filter((group) => group.deceased).length;
+  const activeAnimals = visibleAnimals.filter((animal) => isActiveStatus(animal.status)).length;
+  const linkedAnimals = visibleAnimals.filter((animal) => animal.zoneId).length;
   const locationZones = zones.filter((zone) => zone.animalCount > 0 || Number(zone.latestCount ?? 0) > 0);
   const mapZones = (locationZones.length > 0 ? locationZones : zones).filter((zone) => zone.polygon.length >= 3);
   const mapObjects = locationZones
@@ -536,9 +651,11 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
       kind: "vat_nuoi",
       geometry: { type: "Point" as const, coordinates: [zone.center!.lng, zone.center!.lat] as [number, number] },
     }));
+  const recordedAnimalOptions = visibleAnimals.filter((animal) => !animal.groupId && !isDeceasedStatus(animal.status));
+  const copyGroupOptions = savedGroups.filter((group) => !isDeceasedStatus(group.healthStatus));
 
   const statCards = [
-    { label: "Tổng vật nuôi", value: formatNumber(animals.length), icon: "stable" as const },
+    { label: "Tổng vật nuôi", value: formatNumber(visibleAnimals.length), icon: "stable" as const },
     { label: "Nhóm ghi nhận", value: formatNumber(groups.length), icon: "list" as const },
     { label: "Đang theo dõi", value: formatNumber(activeAnimals), icon: "stable" as const },
     { label: "Có khu vực", value: `${formatNumber(linkedAnimals)}/${formatNumber(animals.length)}`, icon: "map" as const },
@@ -559,12 +676,18 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
             </div>
           </div>
           <div className={styles.headerActions}>
-            <LivestockPageTools zones={zones.map((zone) => ({ id: zone.id, name: zone.name }))} />
-            <DashboardTopActions />
+            <LivestockPageTools
+              zones={zones.map((zone) => ({ id: zone.id, name: zone.name }))}
+              recordedAnimals={recordedAnimalOptions}
+              copyGroups={copyGroupOptions}
+              canWrite={data.access.canWrite}
+              showDeceasedGroups={showDeceasedGroups}
+              showDeceasedAnimals={showDeceasedAnimals}
+            />
           </div>
         </section>
 
-        <section className={styles.statsGrid} aria-label="Chỉ số vật nuôi">
+        {showSummary && <section className={styles.statsGrid} aria-label="Chỉ số vật nuôi">
           {statCards.map((item) => (
             <article key={item.label} className={styles.statCard}>
               <span className={styles.statIcon}><SmallIcon name={item.icon} /></span>
@@ -574,14 +697,15 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
               </div>
             </article>
           ))}
-        </section>
+        </section>}
 
-        <section className={styles.speciesSection}>
+        {showGroupCards && <section className={styles.speciesSection}>
           <div className={styles.sectionHead}>
             <div>
               <p className={styles.eyebrow}>Nhóm vật nuôi</p>
-              <h2>{formatNumber(animals.length)} hồ sơ vật nuôi · {formatNumber(groups.length)} nhóm</h2>
+              <h2>{formatNumber(visibleAnimals.length)} hồ sơ vật nuôi · {formatNumber(groups.length)} nhóm</h2>
             </div>
+            {deceasedGroupCount > 0 && <div className={styles.panelBadge}>{showDeceasedGroups ? `Đang hiện ${formatNumber(deceasedGroupCount)} nhóm tử vong` : `Đã ẩn ${formatNumber(deceasedGroupCount)} nhóm tử vong`}</div>}
           </div>
 
           {groups.length > 0 ? (
@@ -592,7 +716,7 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
                     <span className={styles.speciesIcon}><AnimalIcon type={group.icon} /></span>
                     <div>
                       <h3>{group.label}</h3>
-                      <p>{group.statusLabel}</p>
+                      <p><span className={`${styles.statusPill} ${group.deceased ? styles.deceasedPill : ""}`}>{group.statusLabel}</span></p>
                     </div>
                   </div>
                   <div className={styles.speciesCount}>{formatNumber(group.count)}</div>
@@ -606,9 +730,9 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
           ) : (
             <div className={styles.emptyState}>Chưa có hồ sơ vật nuôi trong cơ sở dữ liệu của trang trại này.</div>
           )}
-        </section>
+        </section>}
 
-        <section className={styles.tablePanel}>
+        {showGroupsTable && <section className={styles.tablePanel}>
           <div className={styles.sectionHead}>
             <div>
               <p className={styles.eyebrow}>Bảng quản lý</p>
@@ -641,7 +765,7 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
                       <td>{formatNumber(group.count)}</td>
                       <td>{formatNumber(group.activeCount)}</td>
                       <td>{group.zones.join(", ")}</td>
-                      <td><span className={styles.statusPill}>{group.statusLabel}</span></td>
+                      <td><span className={`${styles.statusPill} ${group.deceased ? styles.deceasedPill : ""}`}>{group.statusLabel}</span></td>
                       <td>{formatDate(group.updatedAt)}</td>
                     </tr>
                   ))}
@@ -651,9 +775,9 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
           ) : (
             <div className={styles.emptyState}>Chưa có nhóm vật nuôi để hiển thị.</div>
           )}
-        </section>
+        </section>}
 
-        <section className={styles.mapPanel}>
+        {showMap && <section className={styles.mapPanel}>
           <div className={styles.sectionHead}>
             <div>
               <p className={styles.eyebrow}>Vị trí vật nuôi</p>
@@ -689,7 +813,7 @@ export default async function VatNuoiPage({ searchParams }: { searchParams?: { [
               ? "Bản đồ ưu tiên các khu vực có vật nuôi được gắn khu vực hoặc có bản ghi đếm mới nhất."
               : "Chưa có vị trí vật nuôi được gắn trực tiếp; bản đồ đang hiển thị các khu vực hiện có của trang trại."}
           </div>
-        </section>
+        </section>}
       </div>
     </DashboardShell>
   );

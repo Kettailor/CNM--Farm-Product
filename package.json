@@ -6,10 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "audit:db-schema": "echo \"Removed\"",
-    "rebuild:db": "echo \"Removed\"",
-    "migrate:db": "echo \"Removed\""
+    "lint": "next lint"
   },
   "dependencies": {
     "@types/maplibre-gl": "^1.13.2",

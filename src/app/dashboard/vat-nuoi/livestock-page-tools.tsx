@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import NewGroupWizard, { type LivestockZoneOption } from "./new-group-wizard";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import NewGroupWizard, { type LivestockGroupCopyOption, type LivestockRecordedAnimalOption, type LivestockZoneOption } from "./new-group-wizard";
 import styles from "./page.module.css";
 
 type ToolItem = {
   label: string;
   tone: "neutral" | "green" | "amber" | "blue" | "sky";
-  icon: "dashboard" | "add" | "treatment" | "record" | "reset" | "settings";
+  icon: "dashboard" | "add" | "treatment" | "record" | "settings";
   onClick?: () => void;
   href?: string;
 };
@@ -43,14 +43,6 @@ function ToolIcon({ name }: { name: ToolItem["icon"] }) {
           <path d="M10 8h4M10 12h4M10 16h2" />
         </svg>
       );
-    case "reset":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M6 7h12" />
-          <path d="M9 7V5h6v2" />
-          <path d="m9 10 .6 9h4.8l.6-9" />
-        </svg>
-      );
     case "settings":
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -61,9 +53,26 @@ function ToolIcon({ name }: { name: ToolItem["icon"] }) {
   }
 }
 
-export default function LivestockPageTools({ zones }: { zones: LivestockZoneOption[] }) {
+export default function LivestockPageTools({
+  zones,
+  recordedAnimals,
+  copyGroups,
+  canWrite,
+  showDeceasedGroups,
+  showDeceasedAnimals,
+}: {
+  zones: LivestockZoneOption[];
+  recordedAnimals: LivestockRecordedAnimalOption[];
+  copyGroups: LivestockGroupCopyOption[];
+  canWrite: boolean;
+  showDeceasedGroups: boolean;
+  showDeceasedAnimals: boolean;
+}) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -88,9 +97,41 @@ export default function LivestockPageTools({ zones }: { zones: LivestockZoneOpti
     { label: "Nhóm mới", tone: "green", icon: "add", onClick: () => setNewGroupOpen(true) },
     { label: "Điều trị", tone: "amber", icon: "treatment", href: "/dashboard/vat-nuoi/dieu-tri" },
     { label: "Sự kiện", tone: "blue", icon: "record", href: "/dashboard/vat-nuoi/su-kien" },
-    { label: "Đặt lại", tone: "sky", icon: "reset", href: "/dashboard/vat-nuoi" },
-    { label: "Cài đặt", tone: "sky", icon: "settings", href: "/dashboard/settings" },
+    { label: "Cài đặt hiển thị", tone: "sky", icon: "settings", onClick: () => setSettingsOpen(true) },
   ];
+  const visibleTools = tools.filter((tool) => {
+    if (tool.icon === "settings") return true;
+    if (tool.href === "/dashboard/vat-nuoi") return true;
+    return canWrite;
+  });
+  const settingEnabled = (key: string, defaultValue = true) => {
+    const value = searchParams.get(key);
+    if (value == null) return defaultValue;
+    return value !== "0";
+  };
+  const updateSetting = (key: string, enabled: boolean, defaultValue = true) => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (enabled === defaultValue) next.delete(key);
+    else next.set(key, enabled ? "1" : "0");
+    const query = next.toString();
+    window.dispatchEvent(new Event("farm:navigation-loading"));
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+  const toggleParam = (key: string, enabled: boolean) => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (enabled) next.set(key, "1");
+    else next.delete(key);
+    const query = next.toString();
+    window.dispatchEvent(new Event("farm:navigation-loading"));
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+  const ToggleRow = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) => (
+    <label className={styles.settingsRow}>
+      <span>{label}</span>
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      <span className={styles.settingsSwitch} data-checked={checked ? "true" : "false"} aria-hidden="true" />
+    </label>
+  );
 
   return (
     <div className={styles.tools} ref={rootRef}>
@@ -112,7 +153,7 @@ export default function LivestockPageTools({ zones }: { zones: LivestockZoneOpti
         </button>
         {open && (
           <div className={styles.dropdown} role="menu">
-            {tools.map((tool) => (
+            {visibleTools.map((tool) => (
               <button
                 type="button"
                 key={tool.label}
@@ -138,7 +179,37 @@ export default function LivestockPageTools({ zones }: { zones: LivestockZoneOpti
           </div>
         )}
       </div>
-      <NewGroupWizard open={newGroupOpen} zones={zones} onClose={() => setNewGroupOpen(false)} />
+      {settingsOpen && (
+        <div className={styles.settingsBackdrop} role="presentation" onClick={() => setSettingsOpen(false)}>
+          <aside className={styles.settingsPanel} role="dialog" aria-modal="true" aria-label="Cài đặt hiển thị vật nuôi" onClick={(event) => event.stopPropagation()}>
+            <div className={styles.settingsHeader}>
+              <strong>Cài đặt hiển thị</strong>
+              <button type="button" aria-label="Đóng cài đặt" onClick={() => setSettingsOpen(false)}>×</button>
+            </div>
+            <div className={styles.settingsSection}>
+              <h3>Tổng quan</h3>
+              <ToggleRow label="Thẻ tóm tắt" checked={settingEnabled("hien-tom-tat")} onChange={(value) => updateSetting("hien-tom-tat", value)} />
+              <ToggleRow label="Thẻ nhóm vật nuôi" checked={settingEnabled("hien-the-nhom")} onChange={(value) => updateSetting("hien-the-nhom", value)} />
+              <ToggleRow label="Bảng nhóm" checked={settingEnabled("hien-bang-nhom")} onChange={(value) => updateSetting("hien-bang-nhom", value)} />
+              <ToggleRow label="Bản đồ" checked={settingEnabled("hien-ban-do")} onChange={(value) => updateSetting("hien-ban-do", value)} />
+            </div>
+            <div className={styles.settingsSection}>
+              <h3>Tử vong</h3>
+              <ToggleRow label="Hiện nhóm tử vong" checked={showDeceasedGroups} onChange={(value) => toggleParam("hien-nhom-tu-vong", value)} />
+              <ToggleRow label="Hiện cá thể tử vong" checked={showDeceasedAnimals} onChange={(value) => toggleParam("hien-ca-the-tu-vong", value)} />
+            </div>
+          </aside>
+        </div>
+      )}
+      {canWrite && (
+        <NewGroupWizard
+          open={newGroupOpen}
+          zones={zones}
+          recordedAnimals={recordedAnimals}
+          copyGroups={copyGroups}
+          onClose={() => setNewGroupOpen(false)}
+        />
+      )}
     </div>
   );
 }

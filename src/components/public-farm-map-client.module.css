@@ -102,6 +102,10 @@
 .avatar,
 .avatarSmall,
 .markerAvatar {
+  display: block;
+  background-color: #e6f4ea;
+  background-position: center;
+  background-size: cover;
   object-fit: cover;
   flex: 0 0 auto;
 }
@@ -138,6 +142,149 @@
 
 .empty {
   margin: 4px 0 0;
+}
+
+.detailPanel {
+  display: grid;
+  gap: 14px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(16, 32, 22, 0.08);
+}
+
+.detailHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.detailHeader p {
+  margin: 0 0 2px;
+  color: #2f7d46;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.detailHeader h3 {
+  margin: 0;
+  color: #173123;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.overviewList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.overviewList > div {
+  display: grid;
+  gap: 2px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(16, 32, 22, 0.06);
+}
+
+.overviewList dt {
+  color: #718074;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.overviewList dd {
+  margin: 0;
+  color: #173123;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.detailMetrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.detailMetrics span {
+  min-width: 0;
+  padding: 10px 8px;
+  border-radius: 14px;
+  background: #eef8f1;
+  color: #617164;
+  font-size: 11px;
+  text-align: center;
+}
+
+.detailMetrics strong {
+  display: block;
+  color: #173123;
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.detailNote {
+  margin: 0;
+  color: #617164;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.sharedDocuments {
+  display: grid;
+  gap: 10px;
+}
+
+.sharedDocumentsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #173123;
+  font-size: 14px;
+}
+
+.sharedDocumentsHeader span {
+  min-width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #2f7d46;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.documentList {
+  display: grid;
+  gap: 8px;
+}
+
+.documentLink {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #f8fbf7;
+  border: 1px solid rgba(47, 125, 70, 0.12);
+  text-decoration: none;
+}
+
+.documentLink:hover {
+  border-color: rgba(47, 125, 70, 0.28);
+  background: #eef8f1;
+}
+
+.documentLink strong {
+  color: #173123;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.documentLink span {
+  color: #617164;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .mapPanel {
@@ -239,6 +386,17 @@
 
 .mapStage :global(.leaflet-popup-content) {
   margin: 14px 16px;
+}
+
+.mapStage :global(.leaflet-popup-close-button) {
+  color: #66726a;
+  font-size: 20px;
+  padding: 8px 10px 0 0;
+}
+
+.mapStage :global(.leaflet-popup-tip) {
+  background: #fff;
+  box-shadow: 0 16px 28px rgba(16, 32, 22, 0.12);
 }
 
 .mapLoadingHint {

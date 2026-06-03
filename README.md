@@ -1,64 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CNM Farm Product Traceability
 
-## Getting Started
+Ứng dụng quản lý nông trại và truy xuất sản phẩm xây dựng bằng Next.js, PostgreSQL và Docker.
 
-First, run the development server:
+## Chạy local
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Mở `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Kiểm tra chất lượng
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run lint
+npx tsc --noEmit
+npm run build
+```
 
-## Learn More
+## Database
 
-To learn more about Next.js, take a look at the following resources:
+Schema PostgreSQL chuẩn của hệ thống nằm tại:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `database/FarmHub_schema.sql`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Docker Compose mount file này vào PostgreSQL tại `/docker-entrypoint-initdb.d/00_FarmHub_schema.sql`, nên schema chỉ được bootstrap khi volume database được tạo lần đầu.
 
-## Deploy on Vercel
+Schema ứng dụng hiện dùng namespace `du_lieu`, với các bảng chính như:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `du_lieu.nguoi_dung`
+- `du_lieu.trang_trai`
+- `du_lieu.vi_tri_trang_trai`
+- `du_lieu.khu_vuc`
+- `du_lieu.nhom_vat_nuoi`
+- `du_lieu.vat_nuoi`
+- `du_lieu.kho_vat_tu`
+- `du_lieu.cong_viec`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Để tạo lại database sạch từ schema hiện tại:
 
-## Database design for smart farm traceability
+```bash
+docker compose down -v
+docker compose up --build
+```
 
-A comprehensive PostgreSQL schema for the smart farm and product traceability domain is available in:
-
-- `docs/database/farm_traceability_schema.sql`
-- `docs/database/README.md`
-
-
-## Run the full project with Docker
-
-This repository now includes a Docker setup for the full project:
-
-- `Dockerfile` for the Next.js application
-- `docker-compose.yml` for the app + PostgreSQL database
-- automatic database initialization from `docs/database/farm_traceability_schema.sql`
-- deployment guide at `docs/database/docker-deployment.md`
-
-### Start
+## Docker
 
 ```bash
 docker compose up --build
 ```
 
-Or use the helper scripts:
+Hoặc dùng script:
 
 ```powershell
 ./scripts/docker-up.ps1
@@ -68,28 +61,21 @@ Or use the helper scripts:
 ./scripts/docker-up.sh
 ```
 
-### Stop
+Dừng hệ thống:
 
 ```bash
 docker compose down
 ```
 
-### View the database easily
-
-You can inspect the running PostgreSQL database in two convenient ways:
-
-- Use Adminer in Docker: `docker compose --profile tools up -d adminer`
-- Use a VS Code plugin such as SQLTools + SQLTools PostgreSQL Driver
-
-Connection info for desktop apps/plugins:
+Thông tin kết nối PostgreSQL từ máy host:
 
 - Host: `127.0.0.1`
-- Port: `5432`
+- Port: `55432`
 - Database: `farmhub`
 - Username: `farmhub`
 - Password: `farmhub`
 
-Connection info for Adminer at `http://localhost:8080`:
+Adminer chạy tại `http://localhost:8080`:
 
 - System: `PostgreSQL`
 - Server: `db`
@@ -97,23 +83,4 @@ Connection info for Adminer at `http://localhost:8080`:
 - Password: `farmhub`
 - Database: `farmhub`
 
-> In Adminer, do **not** use `localhost` as the server name. Adminer runs in a separate container, so `localhost` points to the Adminer container itself, not PostgreSQL.
-
-Once you log in to Adminer, you can inspect the database like this:
-
-- Use **Databases** to see the list of available databases on the server.
-- Open the `farmhub` database, then use **Schema** / **Tables and views** to browse tables.
-- Click a table name to see its columns, indexes, foreign keys, and data rows.
-- Use **SQL command** to run queries such as `SELECT * FROM farm.some_table LIMIT 20;` or joins to inspect relationships.
-
-If you do **not** see any tables, the most common reason is that you are connected to the wrong database/schema or the PostgreSQL volume was created before the init SQL ran. This project creates tables inside the `farm` schema, not the default `public` schema, and the bootstrap SQL only runs the first time the `postgres_data` volume is created. To recreate the schema from scratch, run:
-
-```bash
-docker compose down -v
-docker compose up --build
-```
-
-### Windows note
-
-If you see an error like `open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified` or `unable to get image 'cnm-farm-product-traceability-db'`, Docker Desktop is not running yet. Start Docker Desktop first, wait for the engine to become available, then run the command again. See `docs/database/docker-deployment.md` for troubleshooting steps.
-
+Trong Adminer, không dùng `localhost` làm server vì Adminer chạy trong container riêng.

@@ -26,7 +26,7 @@ async function tableExists(schema: string, table: string) {
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as LoginPayload;
-    const email = body?.email?.trim();
+    const email = body?.email?.trim().toLowerCase();
     const password = body?.password;
 
     if (!email || !password) {
@@ -34,33 +34,39 @@ export async function POST(request: NextRequest) {
     }
 
     const hasNguoiDung = await tableExists("du_lieu", "nguoi_dung");
-    const hasChuSoHuu = await tableExists("du_lieu", "chu_so_huu");
     const hasTrangTrai = await tableExists("du_lieu", "trang_trai");
+    const hasThanhVienTrangTrai = await tableExists("du_lieu", "thanh_vien_trang_trai");
 
-    const result = hasNguoiDung
-      ? await db.query(
-          `select c.id, c.ho_ten as full_name, c.email, c.mat_khau_hash as password_hash,
-                  exists(
-                    select 1
-                    from du_lieu.trang_trai t
-                    where t.chu_so_huu_id = c.id
-                    limit 1
-                  ) as has_farm
-           from du_lieu.nguoi_dung c
-           where c.email = $1
-           limit 1`,
-          [email]
-        )
-      : hasChuSoHuu
-        ? await db.query(
-            `select c.id, c.full_name as full_name, c.email, c.password_hash as password_hash,
-                    ${hasTrangTrai ? "exists(select 1 from du_lieu.trang_trai t where t.chu_so_huu_id = c.id limit 1)" : "false"} as has_farm
-             from du_lieu.chu_so_huu c
-             where c.email = $1
-             limit 1`,
-            [email]
-          )
-        : (() => { throw new Error("Không tìm thấy bảng người dùng trong cơ sở dữ liệu."); })();
+    if (!hasNguoiDung) {
+      throw new Error("Không tìm thấy bảng người dùng trong cơ sở dữ liệu.");
+    }
+
+    const result = await db.query(
+      `select c.id, c.ho_ten as full_name, c.email, c.mat_khau_hash as password_hash,
+              ${
+                hasTrangTrai
+                  ? `(
+                      exists(select 1 from du_lieu.trang_trai t where t.chu_so_huu_id = c.id limit 1)
+                      ${
+                        hasThanhVienTrangTrai
+                          ? `or exists(
+                              select 1
+                              from du_lieu.thanh_vien_trang_trai tv
+                              where tv.nguoi_dung_id = c.id
+                                and lower(coalesce(tv.trang_thai, 'active')) = 'active'
+                              limit 1
+                            )`
+                          : ""
+                      }
+                    )`
+                  : "false"
+              } as has_farm
+       from du_lieu.nguoi_dung c
+       where lower(c.email) = $1
+         and coalesce(nullif(c.trang_thai, ''), 'active') <> 'disabled'
+       limit 1`,
+      [email]
+    );
 
     if (result.rowCount === 0) {
       return NextResponse.json({ message: "Email hoặc mật khẩu không đúng." }, { status: 401 });
@@ -72,7 +78,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Email hoặc mật khẩu không đúng." }, { status: 401 });
     }
 
-    if (hasNguoiDung && hashDangLegacyMd5(user.password_hash)) {
+    if (hashDangLegacyMd5(user.password_hash)) {
       const hashMoi = taoMatKhauHash(password);
       await db.query("update du_lieu.nguoi_dung set mat_khau_hash = $2 where id = $1", [user.id, hashMoi]);
     }
@@ -97,4 +103,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

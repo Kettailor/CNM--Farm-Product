@@ -313,6 +313,12 @@
   gap: 12px;
 }
 
+.singlePanelGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
 .storageMap,
 .alertPanel,
 .chartPanel,
@@ -974,6 +980,129 @@
   border-color: rgba(37, 99, 235, 0.28);
   background: #eff6ff;
   color: #1d4ed8;
+}
+
+.settingsBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  border: 0;
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.settingsDrawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  width: min(420px, 100%);
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 18px;
+  background: #fff;
+  border-left: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow: -22px 0 50px rgba(15, 23, 42, 0.18);
+  transform: translateX(100%);
+  transition: transform 0.18s ease;
+}
+
+.settingsDrawerOpen {
+  transform: translateX(0);
+}
+
+.settingsPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settingsPanelHeader strong {
+  color: #101828;
+  font-size: 18px;
+}
+
+.settingsClose {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 8px;
+  background: #fff;
+  color: #344054;
+  cursor: pointer;
+}
+
+.settingsSection {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.settingsSection h3 {
+  margin: 0;
+  color: #101828;
+  font-size: 14px;
+}
+
+.settingsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.settingsRow strong {
+  display: block;
+  color: #101828;
+  font-size: 13px;
+}
+
+.settingsMeta {
+  display: block;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.switch {
+  width: 46px;
+  height: 26px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 999px;
+  background: #e5e7eb;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.switch span {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+  transition: transform 0.16s ease;
+}
+
+.switchActive {
+  background: #1f7a4a;
+  border-color: #1f7a4a;
+}
+
+.switchActive span {
+  transform: translateX(20px);
 }
 
 @media (max-width: 1380px) {

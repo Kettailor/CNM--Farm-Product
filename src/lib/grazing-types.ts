@@ -46,7 +46,7 @@ export const GRAZING_EVENT_TYPE_VALUES = [
 ] as const;
 export type GrazingEventType = (typeof GRAZING_EVENT_TYPE_VALUES)[number];
 
-export type GrazingMetadata = Record<string, string | number | boolean | null>;
+export type GrazingMetadata = Record<string, string | number | boolean | null | Record<string, unknown>>;
 
 export type GrazingPaddock = {
   id: string;
@@ -83,6 +83,7 @@ export type GrazingEvent = {
   startDate: string | null;
   endDate: string | null;
   note: string | null;
+  metadata: GrazingMetadata;
 };
 
 export type GrazingPlan = {

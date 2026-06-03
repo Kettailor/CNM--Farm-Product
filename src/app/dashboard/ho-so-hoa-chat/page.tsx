@@ -6,6 +6,7 @@ import { loadChemicalProfile } from "@/lib/chemical-data";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import WarehouseIcon from "../quan-ly-kho/warehouse-icons";
+import ChemicalProfileActions from "./chemical-profile-actions";
 import styles from "./page.module.css";
 
 function formatNumber(value: number | null | undefined) {
@@ -30,6 +31,18 @@ function isExpired(value: string | null) {
   return new Date(`${value}T23:59:59`).getTime() < Date.now();
 }
 
+type PageProps = {
+  searchParams?: { [key: string]: string | string[] | undefined };
+};
+
+function searchValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function showSection(searchParams: PageProps["searchParams"], key: string) {
+  return searchValue(searchParams?.[key]) !== "0";
+}
+
 function usageActionLabel(value: string) {
   const labels: Record<string, string> = {
     xuat_dieu_tri: "Xuất dùng điều trị",
@@ -40,7 +53,7 @@ function usageActionLabel(value: string) {
   return labels[value] ?? value.replace(/_/g, " ");
 }
 
-export default async function ChemicalProfilePage() {
+export default async function ChemicalProfilePage({ searchParams }: PageProps) {
   const ownerId = layOwnerIdTuServerCookie();
   if (!ownerId) redirect("/login?next=/dashboard/ho-so-hoa-chat");
 
@@ -53,6 +66,10 @@ export default async function ChemicalProfilePage() {
   const totalVolume = products.reduce((sum, item) => sum + (item.totalVolume ?? item.quantity), 0);
   const expiredCount = products.filter((item) => isExpired(item.expiryDate)).length;
   const zonesWithPolygon = profile.zones.filter((zone) => zone.polygon.length >= 3);
+  const showOverview = showSection(searchParams, "hien-tong-quan");
+  const showProducts = showSection(searchParams, "hien-san-pham");
+  const showUsageLogs = showSection(searchParams, "hien-nhat-ky");
+  const showMap = showSection(searchParams, "hien-ban-do");
 
   return (
     <DashboardShell farmName={overview.farmName} activePath="/dashboard/ho-so-hoa-chat">
@@ -66,17 +83,17 @@ export default async function ChemicalProfilePage() {
               <span>{overview.locationName || "Theo dõi hóa chất, nhật ký sử dụng và khu vực lưu trữ"}</span>
             </div>
           </div>
-          <a className={styles.actionButton} href="/dashboard/quan-ly-kho/tao-moi">Thêm hóa chất</a>
+          <ChemicalProfileActions canWrite={overview.access.canWrite} />
         </section>
 
-        <section className={styles.overviewGrid} aria-label="Tổng quan hóa chất">
+        {showOverview && <section className={styles.overviewGrid} aria-label="Tổng quan hóa chất">
           <article><span>Sản phẩm hóa chất</span><strong>{formatNumber(products.length)}</strong></article>
           <article><span>Tổng dung tích</span><strong>{formatNumber(totalVolume)}</strong></article>
           <article><span>Tổng chi phí</span><strong>{formatCurrency(totalValue)}</strong></article>
           <article><span>Hết hạn</span><strong>{formatNumber(expiredCount)}</strong></article>
-        </section>
+        </section>}
 
-        <section className={styles.tablePanel}>
+        {showProducts && <section className={styles.tablePanel}>
           <div className={styles.sectionHead}>
             <div>
               <p className={styles.eyebrow}>Sản phẩm hóa chất</p>
@@ -135,9 +152,10 @@ export default async function ChemicalProfilePage() {
               </tbody>
             </table>
           </div>
-        </section>
+        </section>}
 
-        <section className={styles.twoColumn}>
+        {(showUsageLogs || showMap) && <section className={styles.twoColumn}>
+          {showUsageLogs && (
           <article className={styles.logPanel}>
             <div className={styles.sectionHead}>
               <div>
@@ -159,7 +177,9 @@ export default async function ChemicalProfilePage() {
               {profile.usageLogs.length === 0 && <div className={styles.emptyState}>Chưa có nhật ký sử dụng hóa chất.</div>}
             </div>
           </article>
+          )}
 
+          {showMap && (
           <article className={styles.mapPanel}>
             <div className={styles.sectionHead}>
               <div>
@@ -186,7 +206,8 @@ export default async function ChemicalProfilePage() {
               />
             </div>
           </article>
-        </section>
+          )}
+        </section>}
       </div>
     </DashboardShell>
   );

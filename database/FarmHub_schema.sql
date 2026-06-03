@@ -23,15 +23,6 @@ alter table du_lieu.nguoi_dung
   add column if not exists ngon_ngu text,
   add column if not exists trang_thai text not null default 'active';
 
-create table if not exists du_lieu.chu_so_huu (
-  id uuid primary key default gen_random_uuid(),
-  full_name text not null,
-  email text not null unique,
-  password_hash text not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
 create table if not exists du_lieu.trang_trai (
   id uuid primary key default gen_random_uuid(),
   chu_so_huu_id uuid not null references du_lieu.nguoi_dung(id) on delete cascade,
@@ -112,14 +103,57 @@ create table if not exists du_lieu.loi_moi_trang_trai (
   id uuid primary key default gen_random_uuid(),
   trang_trai_id uuid not null references du_lieu.trang_trai(id) on delete cascade,
   email text not null,
+  ho_ten text,
+  so_dien_thoai text,
+  ngon_ngu text,
   vai_tro_id uuid references du_lieu.vai_tro_trang_trai(id) on delete set null,
   trang_thai text not null default 'pending',
   token text unique,
   nguoi_moi_id uuid references du_lieu.nguoi_dung(id) on delete set null,
   het_han_luc timestamptz,
+  metadata_json jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table du_lieu.loi_moi_trang_trai
+  add column if not exists ho_ten text,
+  add column if not exists so_dien_thoai text,
+  add column if not exists ngon_ngu text,
+  add column if not exists metadata_json jsonb not null default '{}'::jsonb;
+
+create table if not exists du_lieu.lien_he_marketing_loi_moi (
+  id uuid primary key default gen_random_uuid(),
+  loi_moi_id uuid unique references du_lieu.loi_moi_trang_trai(id) on delete set null,
+  trang_trai_id uuid references du_lieu.trang_trai(id) on delete set null,
+  nguoi_moi_id uuid references du_lieu.nguoi_dung(id) on delete set null,
+  ho_ten text,
+  email text not null,
+  so_dien_thoai text,
+  trang_thai_loi_moi text not null,
+  metadata_json jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists du_lieu.thong_bao_nguoi_dung (
+  id uuid primary key default gen_random_uuid(),
+  nguoi_dung_id uuid not null references du_lieu.nguoi_dung(id) on delete cascade,
+  trang_trai_id uuid references du_lieu.trang_trai(id) on delete cascade,
+  tieu_de text not null,
+  noi_dung text,
+  loai text not null default 'info',
+  module text,
+  href text,
+  metadata_json jsonb not null default '{}'::jsonb,
+  da_doc boolean not null default false,
+  doc_luc timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_thong_bao_nguoi_dung_user_created on du_lieu.thong_bao_nguoi_dung(nguoi_dung_id, created_at desc, id desc);
+create index if not exists idx_thong_bao_nguoi_dung_user_unread on du_lieu.thong_bao_nguoi_dung(nguoi_dung_id) where da_doc = false;
 
 create table if not exists du_lieu.chung_tu_trang_trai (
   id uuid primary key default gen_random_uuid(),
@@ -139,67 +173,12 @@ create table if not exists du_lieu.chung_tu_trang_trai (
   unique (trang_trai_id, ma_chung_tu)
 );
 
-create table if not exists du_lieu.nong_trai (
-  id uuid primary key default gen_random_uuid(),
-  owner_id uuid not null references du_lieu.chu_so_huu(id) on delete cascade,
-  name text not null,
-  farm_area_hectare numeric,
-  special_factors text,
-  other_activity text,
-  annual_rainfall numeric,
-  carrying_capacity numeric,
-  spring_start text,
-  is_map_shared boolean not null default false,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists du_lieu.vi_tri_nong_trai (
-  farm_id uuid primary key references du_lieu.nong_trai(id) on delete cascade,
-  location_name text,
-  maps_link text,
-  latitude numeric,
-  longitude numeric,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists du_lieu.chan_nuoi_nong_trai (
-  id uuid primary key default gen_random_uuid(),
-  farm_id uuid not null references du_lieu.nong_trai(id) on delete cascade,
-  livestock_name text not null,
-  quantity numeric,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists du_lieu.cay_trong_nong_trai (
-  id uuid primary key default gen_random_uuid(),
-  farm_id uuid not null references du_lieu.nong_trai(id) on delete cascade,
-  crop_name text not null,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists du_lieu.tai_nguyen_nong_trai (
-  id uuid primary key default gen_random_uuid(),
-  farm_id uuid not null references du_lieu.nong_trai(id) on delete cascade,
-  resource_name text not null,
-  created_at timestamptz not null default now()
-);
-
 create table if not exists du_lieu.thong_tin_chan_nuoi_trang_trai (
   id uuid primary key default gen_random_uuid(),
   trang_trai_id uuid not null references du_lieu.trang_trai(id) on delete cascade,
   loai_chan_nuoi text not null,
   created_at timestamptz not null default now(),
   unique (trang_trai_id, loai_chan_nuoi)
-);
-
-create table if not exists du_lieu.nguon_biet_den_nong_trai (
-  id uuid primary key default gen_random_uuid(),
-  farm_id uuid not null references du_lieu.nong_trai(id) on delete cascade,
-  channel_name text not null,
-  other_note text,
-  created_at timestamptz not null default now()
 );
 
 -- =========================================================
@@ -298,36 +277,6 @@ create table if not exists du_lieu.khu_vuc_bai_do_xe (
   suc_chua numeric,
   loai_bai_do_xe text,
   nhiet_do numeric,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists du_lieu.dong_chan_tha (
-  id uuid primary key default gen_random_uuid(),
-  farm_id uuid references du_lieu.nong_trai(id) on delete cascade,
-  name text,
-  crop_type text,
-  status text,
-  area_ha numeric,
-  boundary_geojson jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists du_lieu.ghi_chu_khu_vuc (
-  id uuid primary key default gen_random_uuid(),
-  zone_id uuid references du_lieu.dong_chan_tha(id) on delete cascade,
-  note_type text,
-  content text,
-  author text,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists du_lieu.lich_su_khu_vuc (
-  id uuid primary key default gen_random_uuid(),
-  zone_id uuid references du_lieu.dong_chan_tha(id) on delete cascade,
-  action text,
-  details text,
-  actor text,
   created_at timestamptz not null default now()
 );
 
@@ -653,6 +602,38 @@ alter table du_lieu.su_kien_chan_tha
   add constraint su_kien_chan_tha_loai_su_kien_check
   check (loai_su_kien in ('grazing', 'resting', 'burning', 'clipping', 'compacting', 'cultivating', 'cutting', 'deferred', 'feeding', 'fertilising', 'grooming', 'harrowing', 'harvesting', 'hoeing', 'levelling', 'maintenance', 'mowing', 'move', 'other', 'pest_management', 'plowing', 'repairing', 'reseeding', 'rolling', 'scarifying', 'seeding', 'smoothing', 'soil_testing', 'sowing', 'spell_grazing', 'spraying', 'subsoiling', 'tilling', 'thinning', 'top_cutting', 'weeding', 'watering', 'withholding'));
 
+create table if not exists du_lieu.cong_viec (
+  id uuid primary key default gen_random_uuid(),
+  trang_trai_id uuid not null references du_lieu.trang_trai(id) on delete cascade,
+  ma_cong_viec text not null,
+  ten_cong_viec text not null,
+  loai_cong_viec text not null check (loai_cong_viec in ('tong_quat', 'bao_tri', 'canh_tac', 'chan_nuoi', 'kiem_tra')),
+  trang_thai text not null default 'dang_mo' check (trang_thai in ('dang_mo', 'sap_toi', 'qua_han', 'tam_dung', 'hoan_thanh', 'da_huy')),
+  ngay_bat_dau date,
+  ngay_het_han date,
+  nguoi_phu_trach text,
+  mo_ta text,
+  metadata_json jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (trang_trai_id, ma_cong_viec)
+);
+
+create table if not exists du_lieu.cong_viec_hang_muc (
+  id uuid primary key default gen_random_uuid(),
+  cong_viec_id uuid not null references du_lieu.cong_viec(id) on delete cascade,
+  tieu_de text not null,
+  trang_thai text not null default 'chua_lam' check (trang_thai in ('chua_lam', 'dang_lam', 'hoan_thanh', 'da_huy')),
+  muc_uu_tien text not null default 'trung_binh' check (muc_uu_tien in ('thap', 'trung_binh', 'cao', 'khan_cap')),
+  ngay_het_han date,
+  nguoi_phu_trach text,
+  nguoi_bao_cao text,
+  ghi_chu text,
+  metadata_json jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists du_lieu.kho_vat_tu_giao_dich (
   id uuid primary key default gen_random_uuid(),
   trang_trai_id uuid not null references du_lieu.trang_trai(id) on delete cascade,
@@ -667,19 +648,6 @@ create table if not exists du_lieu.kho_vat_tu_giao_dich (
   ghi_chu text,
   metadata_json jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
-);
-
-create table if not exists du_lieu.truy_xuat_san_pham_chuoi_khoi (
-  id uuid primary key default gen_random_uuid(),
-  ma_truy_xuat text not null unique,
-  ma_san_pham text not null,
-  loai_san_pham text not null,
-  nguon_goc text not null,
-  ma_bam_du_lieu text not null,
-  trang_thai_dong_bo text not null,
-  du_lieu_truy_xuat jsonb not null default '{}'::jsonb,
-  siu_du_lieu jsonb not null default '{}'::jsonb,
-  ngay_tao timestamptz not null default now()
 );
 
 create table if not exists du_lieu.thoi_tiet_bo_nho_dem (
@@ -716,6 +684,7 @@ create index if not exists idx_thanh_vien_trang_trai_id on du_lieu.thanh_vien_tr
 create index if not exists idx_thanh_vien_nguoi_dung_id on du_lieu.thanh_vien_trang_trai(nguoi_dung_id);
 create index if not exists idx_loi_moi_trang_trai_id on du_lieu.loi_moi_trang_trai(trang_trai_id);
 create index if not exists idx_loi_moi_trang_thai on du_lieu.loi_moi_trang_trai(trang_thai);
+create index if not exists idx_lien_he_marketing_loi_moi_email on du_lieu.lien_he_marketing_loi_moi(lower(email));
 create index if not exists idx_chung_tu_trang_trai_id on du_lieu.chung_tu_trang_trai(trang_trai_id);
 create index if not exists idx_chung_tu_trang_thai on du_lieu.chung_tu_trang_trai(trang_thai);
 create index if not exists idx_chung_tu_ngay_het_han on du_lieu.chung_tu_trang_trai(ngay_het_han);
@@ -754,6 +723,10 @@ create index if not exists idx_su_kien_chan_tha_ke_hoach_id on du_lieu.su_kien_c
 create index if not exists idx_su_kien_chan_tha_khu_vuc_id on du_lieu.su_kien_chan_tha(khu_vuc_id);
 create index if not exists idx_su_kien_chan_tha_nhom_id on du_lieu.su_kien_chan_tha(nhom_vat_nuoi_id);
 create index if not exists idx_su_kien_chan_tha_ngay on du_lieu.su_kien_chan_tha(ngay_bat_dau, ngay_ket_thuc);
+create index if not exists idx_cong_viec_trang_trai_id on du_lieu.cong_viec(trang_trai_id);
+create index if not exists idx_cong_viec_trang_thai on du_lieu.cong_viec(trang_thai);
+create index if not exists idx_cong_viec_ngay on du_lieu.cong_viec(ngay_bat_dau, ngay_het_han);
+create index if not exists idx_cong_viec_hang_muc_cong_viec_id on du_lieu.cong_viec_hang_muc(cong_viec_id);
 create index if not exists idx_kho_vat_tu_giao_dich_kho_id on du_lieu.kho_vat_tu_giao_dich(kho_vat_tu_id);
 create index if not exists idx_kho_vat_tu_giao_dich_nguon on du_lieu.kho_vat_tu_giao_dich(nguon_nghiep_vu, nguon_ban_ghi_id);
 create index if not exists idx_nhat_ky_chinh_sua_khu_vuc_khu_vuc_id on du_lieu.nhat_ky_chinh_sua_khu_vuc(khu_vuc_id);

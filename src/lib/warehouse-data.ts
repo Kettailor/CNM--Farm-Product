@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { DATE_ONLY_PATTERN } from "@/lib/business-date";
 import { ensureWarehouseSchema } from "@/lib/warehouse-schema";
 import { ensureZoneSchema } from "@/lib/zone-schema";
 import {
@@ -53,6 +54,10 @@ export type WarehouseRow = {
 
 function dateOnly(value: string | Date | null) {
   if (!value) return null;
+  if (typeof value === "string") {
+    const dateOnlyValue = value.match(DATE_ONLY_PATTERN);
+    if (dateOnlyValue) return `${dateOnlyValue[1]}-${dateOnlyValue[2]}-${dateOnlyValue[3]}`;
+  }
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   return date.toISOString().slice(0, 10);

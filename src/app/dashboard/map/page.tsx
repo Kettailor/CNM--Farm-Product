@@ -1,6 +1,7 @@
 import DashboardShell from "@/components/dashboard-shell";
 import { layOwnerIdTuServerCookie } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getAccessibleFarm } from "@/lib/farm-access";
 import { getZoneTypeInfo, normalizeText } from "@/lib/zone-type-utils";
 import { redirect } from "next/navigation";
 import FarmMapDashboardClient, {
@@ -149,16 +150,16 @@ const displayTypeFromRaw = (rawType: unknown, kind: KhuLoai, canonicalLabel: str
   return displayTypeLabel(kind, canonicalLabel);
 };
 
-async function getLatestFarmMap(ownerId: string): Promise<FarmMapInfo | null> {
+async function getLatestFarmMap(farmId: string): Promise<FarmMapInfo | null> {
   try {
     const result = await db.query(
       `select t.ten_trang_trai as farm_name, v.vi_do as latitude, v.kinh_do as longitude, v.ten_dia_diem as location_name
        from du_lieu.trang_trai t
        left join du_lieu.vi_tri_trang_trai v on v.trang_trai_id = t.id
-       where t.chu_so_huu_id = $1
+       where t.id = $1
        order by t.created_at desc
        limit 1`,
-      [ownerId]
+      [farmId]
     );
     return (result.rows[0] as FarmMapInfo) || null;
   } catch {
@@ -166,38 +167,38 @@ async function getLatestFarmMap(ownerId: string): Promise<FarmMapInfo | null> {
   }
 }
 
-async function getFarmMapStats(ownerId: string): Promise<FarmMapStats> {
+async function getFarmMapStats(farmId: string): Promise<FarmMapStats> {
   try {
     const [employeeRows, livestockRows, zoneRows, grazingPlanRows] = await Promise.all([
       db.query(
         `select count(*)::int as c
          from du_lieu.thanh_vien_trang_trai tv
          join du_lieu.trang_trai t on t.id = tv.trang_trai_id
-         where t.chu_so_huu_id = $1
+         where t.id = $1
            and coalesce(lower(tv.trang_thai), '') not in ('inactive', 'da_huy', 'da huy', 'đã hủy', 'cancelled')`,
-        [ownerId]
+        [farmId]
       ),
       db.query(
         `select count(*)::int as c
          from du_lieu.vat_nuoi vn
          join du_lieu.trang_trai t on t.id = vn.trang_trai_id
-         where t.chu_so_huu_id = $1`,
-        [ownerId]
+         where t.id = $1`,
+        [farmId]
       ),
       db.query(
         `select count(*)::int as c
          from du_lieu.khu_vuc kv
          join du_lieu.trang_trai t on t.id = kv.trang_trai_id
-         where t.chu_so_huu_id = $1 and ${ACTIVE_ZONE_SQL}`,
-        [ownerId]
+         where t.id = $1 and ${ACTIVE_ZONE_SQL}`,
+        [farmId]
       ),
       db.query(
         `select count(*)::int as c
          from du_lieu.ke_hoach_chan_tha kh
          join du_lieu.trang_trai t on t.id = kh.trang_trai_id
-         where t.chu_so_huu_id = $1
+         where t.id = $1
            and coalesce(lower(kh.trang_thai), '') not in ('cancelled', 'da_huy', 'da huy', 'đã hủy')`,
-        [ownerId]
+        [farmId]
       ),
     ]);
 
@@ -212,17 +213,17 @@ async function getFarmMapStats(ownerId: string): Promise<FarmMapStats> {
   }
 }
 
-async function getMapObjects(ownerId: string): Promise<{ mapObjects: FarmMapObject[]; rows: FarmMapAssetRow[] }> {
+async function getMapObjects(farmId: string): Promise<{ mapObjects: FarmMapObject[]; rows: FarmMapAssetRow[] }> {
   try {
     const result = await db.query(
       `select dt.id, dt.ten_doi_tuong, dt.loai_doi_tuong, dt.hinh_hoc_geojson
        from du_lieu.doi_tuong_ban_do dt
        join du_lieu.trang_trai t on t.id = dt.trang_trai_id
-       where t.chu_so_huu_id = $1
+       where t.id = $1
          and coalesce(dt.loai_doi_tuong, '') <> 'sensor'
        order by dt.created_at desc
        limit 200`,
-      [ownerId]
+      [farmId]
     );
 
     const rows = result.rows as MapObjectRow[];
@@ -264,18 +265,18 @@ async function getMapObjects(ownerId: string): Promise<{ mapObjects: FarmMapObje
   }
 }
 
-async function getZones(ownerId: string): Promise<{ zones: FarmMapZone[]; rows: FarmMapAssetRow[] }> {
+async function getZones(farmId: string): Promise<{ zones: FarmMapZone[]; rows: FarmMapAssetRow[] }> {
   try {
     const result = await db.query(
       `select kv.id, kv.ten_khu_vuc, coalesce(kv.loai_khu_vuc, loai.ten) as crop_type, kv.trang_thai as status, kv.created_at, kv.hinh_hoc_geojson
        from du_lieu.khu_vuc kv
        join du_lieu.trang_trai t on t.id = kv.trang_trai_id
        left join du_lieu.danh_muc_loai_khu_vuc loai on loai.id = kv.loai_khu_vuc_id
-       where t.chu_so_huu_id = $1
+       where t.id = $1
          and ${ACTIVE_ZONE_SQL}
        order by kv.created_at desc
        limit 100`,
-      [ownerId]
+      [farmId]
     );
 
     const rows = (result.rows as KhuVucRow[]).map((row) => {
@@ -331,12 +332,14 @@ async function getZones(ownerId: string): Promise<{ zones: FarmMapZone[]; rows: 
 export default async function DashboardMapPage() {
   const ownerId = layOwnerIdTuServerCookie();
   if (!ownerId) redirect("/login?next=/dashboard/map");
+  const access = await getAccessibleFarm(ownerId);
+  if (!access?.farmId) redirect("/register/farm");
 
   const [mapData, stats, zoneData, objectData] = await Promise.all([
-    getLatestFarmMap(ownerId),
-    getFarmMapStats(ownerId),
-    getZones(ownerId),
-    getMapObjects(ownerId),
+    getLatestFarmMap(access.farmId),
+    getFarmMapStats(access.farmId),
+    getZones(access.farmId),
+    getMapObjects(access.farmId),
   ]);
 
   const farmName = mapData?.farm_name || "Trang trại";

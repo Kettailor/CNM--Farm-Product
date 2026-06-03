@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import CowLoading from "@/components/cow-loading";
 import ZoneActionMenu from "@/components/dashboard-zone-actions";
 import MapViewSwitcher from "@/components/dashboard-map-view-switcher";
+import type { ToolbarAction } from "@/components/dashboard-map-tool-icons";
 import { WAREHOUSE_TYPE_OPTIONS, isWarehouseType, type WarehouseType } from "@/lib/warehouse-types";
 import styles from "./page.module.css";
 import type { ZoneDetail } from "@/lib/dashboard-zone-detail";
@@ -15,9 +16,52 @@ type Props = {
   vegetation: unknown;
 };
 
+type Point = { lat: number; lng: number };
+
 const ZONE_STATES = ["đang hoạt động", "bản nháp", "ngừng hoạt động", "bảo trì", "đã ngừng", "dự kiến", "hoàn thành", "đã hủy"] as const;
 const MAP_TYPES = ["vệ tinh", "đường", "địa hình"] as const;
 type ZoneStateValue = (typeof ZONE_STATES)[number];
+
+const isValidLatLng = (lat: string, lng: string) => {
+  const latitude = Number(lat);
+  const longitude = Number(lng);
+  return Number.isFinite(latitude) && Number.isFinite(longitude) && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+};
+
+const calcAreaHa = (points: Point[]) => {
+  if (points.length < 3) return 0;
+  const avgLat = points.reduce((sum, point) => sum + point.lat, 0) / points.length;
+  const mPerDegLat = 111320;
+  const mPerDegLng = 111320 * Math.cos((avgLat * Math.PI) / 180);
+  const projected = points.map((point) => ({ x: point.lng * mPerDegLng, y: point.lat * mPerDegLat }));
+  let area = 0;
+  for (let index = 0; index < projected.length; index += 1) {
+    const nextIndex = (index + 1) % projected.length;
+    area += projected[index].x * projected[nextIndex].y - projected[nextIndex].x * projected[index].y;
+  }
+  return Math.abs(area / 2) / 10000;
+};
+
+const calcPerimeterM = (points: Point[]) => {
+  if (points.length < 2) return 0;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const earthRadiusM = 6371000;
+  const distance = (a: Point, b: Point) => {
+    const dLat = toRad(b.lat - a.lat);
+    const dLng = toRad(b.lng - a.lng);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+    return 2 * earthRadiusM * Math.asin(Math.sqrt(h));
+  };
+  return points.reduce((sum, point, index) => sum + distance(point, points[(index + 1) % points.length]), 0);
+};
+
+const centroid = (points: Point[]) => {
+  if (!points.length) return null;
+  const sum = points.reduce((acc, point) => ({ lat: acc.lat + point.lat, lng: acc.lng + point.lng }), { lat: 0, lng: 0 });
+  return { lat: sum.lat / points.length, lng: sum.lng / points.length };
+};
 
 function zoneStatusValueFromKey(status: string): ZoneStateValue {
   if (status === "inactive") return "ngừng hoạt động";
@@ -35,6 +79,7 @@ export default function EditZoneClient({ zone }: Props) {
   const typeFields = ZONE_TYPE_FORM_CONFIGS[zoneTypeKey].fields;
   const [typeSpecific, setTypeSpecific] = useState<Record<string, string>>(zone.typeSpecific);
   const [warehouseTypes, setWarehouseTypes] = useState<WarehouseType[]>(zone.warehouseTypes.filter(isWarehouseType));
+  const [activeTool, setActiveTool] = useState<ToolbarAction | null>(null);
   const [form, setForm] = useState({
     name: zone.name,
     status: zoneStatusValueFromKey(zone.status),
@@ -49,29 +94,77 @@ export default function EditZoneClient({ zone }: Props) {
     zoomLevel: "17",
   });
 
-  const [points] = useState(zone.polygon);
-  const canSave = form.name.trim().length > 0 && (zoneTypeKey !== "storage" || warehouseTypes.length > 0);
+  const [points, setPoints] = useState<Point[]>(zone.polygon);
+  const areaHa = useMemo(() => calcAreaHa(points), [points]);
+  const perimeterM = useMemo(() => calcPerimeterM(points), [points]);
+  const nextAreaHa = areaHa > 0 ? areaHa.toFixed(4) : form.areaHa;
+  const nextPerimeterM = perimeterM > 0 ? perimeterM.toFixed(2) : form.perimeterM;
+  const canSave = form.name.trim().length > 0 && points.length >= 3 && isValidLatLng(form.latitude, form.longitude) && (zoneTypeKey !== "storage" || warehouseTypes.length > 0);
+  const mapLatitude = Number.isFinite(Number(form.latitude)) ? Number(form.latitude) : zone.center.lat;
+  const mapLongitude = Number.isFinite(Number(form.longitude)) ? Number(form.longitude) : zone.center.lng;
   const toggleWarehouseType = (type: WarehouseType) => {
     setWarehouseTypes((current) => current.includes(type) ? current.filter((item) => item !== type) : [...current, type]);
   };
 
+  const applyPoints = useCallback((nextPoints: Point[]) => {
+    setPoints(nextPoints);
+    const nextCenter = centroid(nextPoints);
+    if (!nextCenter) return;
+    setForm((current) => ({
+      ...current,
+      latitude: nextCenter.lat.toFixed(6),
+      longitude: nextCenter.lng.toFixed(6),
+    }));
+  }, []);
+
+  const onMapClick = useCallback((point: Point) => {
+    if (activeTool !== "add") return;
+    applyPoints([...points, point]);
+  }, [activeTool, applyPoints, points]);
+
+  const onToolbarAction = useCallback((action: ToolbarAction) => {
+    if (action === "add") {
+      setActiveTool((current) => (current === "add" ? null : "add"));
+      return;
+    }
+    if (action === "undo") applyPoints(points.slice(0, -1));
+    if (action === "clear") applyPoints([]);
+  }, [applyPoints, points]);
+
+  const onResetPolygon = useCallback(() => {
+    setActiveTool(null);
+    setPoints(zone.polygon);
+    setForm((current) => ({
+      ...current,
+      latitude: String(zone.center.lat),
+      longitude: String(zone.center.lng),
+      areaHa: zone.areaHa ? String(zone.areaHa) : "",
+      perimeterM: zone.perimeterM ? String(zone.perimeterM) : "",
+    }));
+  }, [zone.areaHa, zone.center.lat, zone.center.lng, zone.perimeterM, zone.polygon]);
+
   const mapPreview = useMemo(
     () => (
       <MapViewSwitcher
-        lat={Number(form.latitude) || zone.center.lat}
-        lng={Number(form.longitude) || zone.center.lng}
+        lat={mapLatitude}
+        lng={mapLongitude}
         zoom={Number(form.zoomLevel) || 17}
         title={zone.name}
         initialMode={form.mapType === "vệ tinh" ? "satellite" : form.mapType === "đường" ? "roadmap" : "terrain"}
         frameClassName={styles.mapCanvas}
         polygon={points}
-        fitToPolygon
+        fitToPolygon={points.length >= 3}
         hideModeTabs={false}
         hideEcoNote
         lockMap={false}
+        showToolbar
+        toolbarAboveMap
+        activeTool={activeTool}
+        onToolbarAction={onToolbarAction}
+        onMapClick={onMapClick}
       />
     ),
-    [form.latitude, form.longitude, form.mapType, form.zoomLevel, points, zone.center.lat, zone.center.lng, zone.name]
+    [activeTool, form.mapType, form.zoomLevel, mapLatitude, mapLongitude, onMapClick, onToolbarAction, points, zone.name]
   );
 
   const onSave = async () => {
@@ -93,6 +186,8 @@ export default function EditZoneClient({ zone }: Props) {
         capacity: zone.capacity,
         typeSpecific: zone.typeSpecific,
         zoneTypeKey: zone.typeKey,
+        latitude: zone.center.lat,
+        longitude: zone.center.lng,
         polygon: zone.polygon,
       };
       const after = {
@@ -100,11 +195,13 @@ export default function EditZoneClient({ zone }: Props) {
         status: form.status,
         description: form.description,
         color: form.color,
-        areaHa: form.areaHa,
-        perimeterM: form.perimeterM,
+        areaHa: nextAreaHa,
+        perimeterM: nextPerimeterM,
         capacity: capacityValue,
         typeSpecific: { ...typeSpecific, zoneTypeKey, warehouseTypes: nextWarehouseTypes },
         zoneTypeKey,
+        latitude: form.latitude,
+        longitude: form.longitude,
         polygon: points,
       };
 
@@ -117,8 +214,10 @@ export default function EditZoneClient({ zone }: Props) {
           description: form.description,
           color: form.color,
           points,
-          areaHa: form.areaHa,
-          perimeterM: form.perimeterM,
+          areaHa: nextAreaHa,
+          perimeterM: nextPerimeterM,
+          latitude: form.latitude,
+          longitude: form.longitude,
           capacity: capacityValue,
           typeSpecific: {
             ...typeSpecific,
@@ -147,23 +246,48 @@ export default function EditZoneClient({ zone }: Props) {
           <span className={styles.kicker}>Chỉnh sửa khu vực</span>
           <h1>{zone.name}</h1>
         </div>
-        <ZoneActionMenu context="edit" zoneId={zone.id} zoneStatus={zone.status} backHref={`/dashboard/khu-vuc/${zone.id}`} />
+        <ZoneActionMenu context="edit" zoneId={zone.id} zoneStatus={zone.status} backHref={`/dashboard/khu-vuc/${zone.id}`} canWrite />
       </header>
 
       <div className={styles.body}>
+        {error && <p className={styles.errorText}>{error}</p>}
+
         <div className={styles.editLayout}>
+          <section className={`${styles.panelCard} ${styles.mapEditorCard}`}>
+            <div className={styles.panelTitle}>
+              <div>
+                <h3>Ranh giới khu vực</h3>
+                <p>{activeTool === "add" ? "Đang thêm điểm polygon" : "Bản đồ chỉnh sửa"}</p>
+              </div>
+              <div className={styles.panelActions}>
+                <button type="button" className={styles.smallButton} onClick={onResetPolygon} disabled={loading}>
+                  Khôi phục
+                </button>
+                <span className={styles.badge}>{points.length} điểm</span>
+              </div>
+            </div>
+
+            <div className={styles.mapMetrics}>
+              <div className={styles.metricTile}><span>Diện tích</span><strong>{areaHa > 0 ? `${areaHa.toFixed(2)} ha` : "Chưa đủ điểm"}</strong></div>
+              <div className={styles.metricTile}><span>Chu vi</span><strong>{perimeterM > 0 ? `${perimeterM.toFixed(0)} m` : "Chưa đủ điểm"}</strong></div>
+              <div className={styles.metricTile}><span>Tâm khu vực</span><strong>{mapLatitude.toFixed(5)}, {mapLongitude.toFixed(5)}</strong></div>
+              <div className={styles.metricTile}><span>Ranh giới</span><strong>{points.length >= 3 ? "Hợp lệ" : "Cần 3 điểm"}</strong></div>
+            </div>
+
+            <div className={styles.mapBox}>{mapPreview}</div>
+          </section>
+
           <div className={styles.formSection}>
             <section className={styles.sectionBlock}>
               <div className={styles.sectionHeaderSmall}>
-                <h3>Thông tin chung</h3>
-                <p>Đặt tên, trạng thái, mô tả và màu hiển thị cho khu vực.</p>
+                <h3>Thông tin chính</h3>
               </div>
               <div className={styles.formGrid}>
+                <div className={styles.field}>
+                  <label htmlFor="zone-name">Tên khu vực</label>
+                  <input id="zone-name" className={styles.input} value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+                </div>
                 <div className={styles.twoCols}>
-                  <div className={styles.field}>
-                    <label htmlFor="zone-name">Tên khu vực</label>
-                    <input id="zone-name" className={styles.input} value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
-                  </div>
                   <div className={styles.field}>
                     <label htmlFor="zone-status">Trạng thái</label>
                     <select id="zone-status" className={styles.select} value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as ZoneStateValue }))}>
@@ -174,16 +298,16 @@ export default function EditZoneClient({ zone }: Props) {
                       ))}
                     </select>
                   </div>
-                </div>
-                <div className={styles.field}>
-                  <label htmlFor="zone-type">Loại khu vực</label>
-                  <select id="zone-type" className={styles.select} value={zoneTypeKey} onChange={(e) => setZoneTypeKey(e.target.value as ZoneTypeKey)}>
-                    {ZONE_TYPE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div className={styles.field}>
+                    <label htmlFor="zone-type">Loại khu vực</label>
+                    <select id="zone-type" className={styles.select} value={zoneTypeKey} onChange={(e) => setZoneTypeKey(e.target.value as ZoneTypeKey)}>
+                      {ZONE_TYPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div className={styles.field}>
                   <label htmlFor="zone-description">Mô tả</label>
@@ -215,8 +339,7 @@ export default function EditZoneClient({ zone }: Props) {
 
             <section className={styles.sectionBlock}>
               <div className={styles.sectionHeaderSmall}>
-                <h3>Vị trí và polygon</h3>
-                <p>Tâm bản đồ và số liệu vị trí được hiển thị để đối chiếu, không làm thay đổi dữ liệu gốc.</p>
+                <h3>Tọa độ và nền bản đồ</h3>
               </div>
               <div className={styles.formGrid}>
                 <div className={styles.twoCols}>
@@ -231,143 +354,82 @@ export default function EditZoneClient({ zone }: Props) {
                 </div>
                 <div className={styles.twoCols}>
                   <div className={styles.field}>
-                    <label htmlFor="zone-area">Diện tích</label>
-                    <input id="zone-area" className={styles.input} value={form.areaHa} onChange={(e) => setForm((p) => ({ ...p, areaHa: e.target.value }))} />
-                  </div>
-                  <div className={styles.field}>
-                    <label htmlFor="zone-perimeter">Chu vi</label>
-                    <input id="zone-perimeter" className={styles.input} value={form.perimeterM} onChange={(e) => setForm((p) => ({ ...p, perimeterM: e.target.value }))} />
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className={styles.sectionBlock}>
-              <div className={styles.sectionHeaderSmall}>
-                <h3>Thiết lập bản đồ</h3>
-                <p>Chọn kiểu bản đồ và mức zoom để xem khu vực rõ hơn.</p>
-              </div>
-              <div className={styles.twoCols}>
-                <div className={styles.field}>
-                  <label htmlFor="zone-map-type">Loại bản đồ</label>
-                  <select id="zone-map-type" className={styles.select} value={form.mapType} onChange={(e) => setForm((p) => ({ ...p, mapType: e.target.value }))}>
-                    {MAP_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className={styles.field}>
-                  <label htmlFor="zone-zoom">Mức thu phóng</label>
-                  <select id="zone-zoom" className={styles.select} value={form.zoomLevel} onChange={(e) => setForm((p) => ({ ...p, zoomLevel: e.target.value }))}>
-                    {Array.from({ length: 12 }, (_, i) => 10 + i).map((level) => (
-                      <option key={level} value={String(level)}>
-                        {level}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </section>
-
-            <section className={styles.sectionBlock}>
-              <div className={styles.sectionHeaderSmall}>
-                <h3>{ZONE_TYPE_INFO[zoneTypeKey].detailTitle}</h3>
-                <p>
-                  Tùy theo loại khu vực, biểu mẫu chỉnh sửa sẽ ưu tiên các thông tin phù hợp với cách vận hành thực tế.
-                </p>
-              </div>
-              <div className={styles.formGrid}>
-                <div className={styles.twoCols}>
-                  {typeFields.map((field) => (
-                    <div key={field.key} className={styles.field}>
-                      <label htmlFor={`zone-type-${field.key}`}>{field.label}</label>
-                      <input
-                        id={`zone-type-${field.key}`}
-                        className={styles.input}
-                        type={field.type ?? "text"}
-                        step={field.step}
-                        value={typeSpecific[field.key] ?? ""}
-                        onChange={(e) => setTypeSpecific((current) => ({ ...current, [field.key]: e.target.value }))}
-                        placeholder={field.placeholder}
-                      />
-                    </div>
-                  ))}
-                </div>
-                {zoneTypeKey === "storage" && (
-                  <div className={styles.field}>
-                    <label>Nhóm lưu trữ trong kho</label>
-                    <div className={styles.warehouseTypeChecklist}>
-                      {WAREHOUSE_TYPE_OPTIONS.map((option) => (
-                        <label key={option.value} className={styles.warehouseTypeOption}>
-                          <input
-                            type="checkbox"
-                            checked={warehouseTypes.includes(option.value)}
-                            onChange={() => toggleWarehouseType(option.value)}
-                          />
-                          <span>
-                            <strong>{option.shortLabel}</strong>
-                            <small>{option.purpose}</small>
-                          </span>
-                        </label>
+                    <label htmlFor="zone-map-type">Loại bản đồ</label>
+                    <select id="zone-map-type" className={styles.select} value={form.mapType} onChange={(e) => setForm((p) => ({ ...p, mapType: e.target.value }))}>
+                      {MAP_TYPES.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
                       ))}
-                    </div>
+                    </select>
                   </div>
-                )}
-                {(zoneTypeKey === "grazing" || zoneTypeKey === "livestock") && (
-                  <div className={styles.typeHint}>
-                    <strong>Số liệu liên quan</strong>
-                    <span>
-                      Hiện có {zone.metrics.livestockCount} vật nuôi và {zone.metrics.noteCount} ghi chú liên quan.
-                    </span>
+                  <div className={styles.field}>
+                    <label htmlFor="zone-zoom">Mức thu phóng</label>
+                    <select id="zone-zoom" className={styles.select} value={form.zoomLevel} onChange={(e) => setForm((p) => ({ ...p, zoomLevel: e.target.value }))}>
+                      {Array.from({ length: 12 }, (_, i) => 10 + i).map((level) => (
+                        <option key={level} value={String(level)}>
+                          {level}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                )}
+                </div>
               </div>
-            </section>
-
-            <section className={styles.summaryCard}>
-              <div className={styles.summaryHeader}>
-                <h3>Dữ liệu hiện tại</h3>
-                <p>Đây là phần dữ liệu gốc đang dùng để đối chiếu trước khi lưu.</p>
-              </div>
-              <div className={styles.summaryItem}><span>Tên</span><strong>{zone.name}</strong></div>
-              <div className={styles.summaryItem}><span>Loại</span><strong>{zone.typeLabel}</strong></div>
-              <div className={styles.summaryItem}><span>Trạng thái</span><strong>{zone.statusLabel}</strong></div>
-              <div className={styles.summaryItem}><span>Diện tích</span><strong>{zone.areaHa ? `${zone.areaHa.toFixed(2)} ha` : "Chưa có"}</strong></div>
             </section>
           </div>
-
-          <aside className={`${styles.stickyPreview} ${styles.previewCard}`}>
-            <section className={styles.panelCard}>
-              <div className={styles.panelTitle}>
-                <div>
-                  <h3>Xem trước bản đồ</h3>
-                  <p>Giữ nguyên polygon hiện tại trên nền bản đồ thật.</p>
-                </div>
-                <span className={styles.badge}>{points.length} điểm</span>
-              </div>
-              <div className={styles.mapBox}>{mapPreview}</div>
-            </section>
-
-            <section className={styles.panelCard}>
-              <div className={styles.panelTitle}>
-                <div>
-                  <h3>Thông tin nhanh</h3>
-                  <p>Tổng hợp dữ liệu trước khi lưu thay đổi.</p>
-                </div>
-              </div>
-              <div className={styles.previewMeta}>
-                <div className={styles.previewRow}><span>Tên khu vực</span><strong>{form.name || zone.name}</strong></div>
-                <div className={styles.previewRow}><span>Trạng thái</span><strong>{form.status}</strong></div>
-                <div className={styles.previewRow}><span>Màu</span><strong>{form.color}</strong></div>
-                <div className={styles.previewRow}><span>Polygon</span><strong>{points.length}</strong></div>
-              </div>
-            </section>
-          </aside>
         </div>
 
-        {error && <p className={styles.errorText}>{error}</p>}
+        <section className={styles.sectionBlock}>
+          <div className={styles.sectionHeaderSmall}>
+            <h3>{ZONE_TYPE_INFO[zoneTypeKey].detailTitle}</h3>
+          </div>
+          <div className={styles.formGrid}>
+            <div className={styles.typeFieldGrid}>
+              {typeFields.map((field) => (
+                <div key={field.key} className={styles.field}>
+                  <label htmlFor={`zone-type-${field.key}`}>{field.label}</label>
+                  <input
+                    id={`zone-type-${field.key}`}
+                    className={styles.input}
+                    type={field.type ?? "text"}
+                    step={field.step}
+                    value={typeSpecific[field.key] ?? ""}
+                    onChange={(e) => setTypeSpecific((current) => ({ ...current, [field.key]: e.target.value }))}
+                    placeholder={field.placeholder}
+                  />
+                </div>
+              ))}
+            </div>
+            {zoneTypeKey === "storage" && (
+              <div className={styles.field}>
+                <label>Nhóm lưu trữ trong kho</label>
+                <div className={styles.warehouseTypeChecklist}>
+                  {WAREHOUSE_TYPE_OPTIONS.map((option) => (
+                    <label key={option.value} className={styles.warehouseTypeOption}>
+                      <input
+                        type="checkbox"
+                        checked={warehouseTypes.includes(option.value)}
+                        onChange={() => toggleWarehouseType(option.value)}
+                      />
+                      <span>
+                        <strong>{option.shortLabel}</strong>
+                        <small>{option.purpose}</small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            {(zoneTypeKey === "grazing" || zoneTypeKey === "livestock") && (
+              <div className={styles.typeHint}>
+                <strong>Số liệu liên quan</strong>
+                <span>
+                  Hiện có {zone.metrics.livestockCount} vật nuôi và {zone.metrics.noteCount} ghi chú liên quan.
+                </span>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
 
       <footer className={styles.footer}>

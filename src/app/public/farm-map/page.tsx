@@ -16,6 +16,7 @@ export default async function PublicFarmMapPage() {
               <h1 style={{ margin: "10px 0 0", fontSize: "clamp(30px, 4vw, 48px)", lineHeight: 1.05, color: "#173123" }}>Các đối tác của KetKat-EcoFarm</h1>
             </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <a href="/public/vat-nuoi/quet-qr" className="btn btn-secondary">Quét QR vật nuôi</a>
               <a href="/register" className="btn btn-primary">Đăng ký nông trại</a>
               <a href="/login" className="btn btn-secondary">Đăng nhập</a>
             </div>

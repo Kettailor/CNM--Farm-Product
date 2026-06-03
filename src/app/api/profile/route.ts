@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cauHinhCookieXacThuc, layOwnerIdTuServerCookie, TEN_COOKIE_XAC_THUC } from "@/lib/auth";
-import { deleteSettingsFarm, loadSettingsProfile, updateSettingsProfile } from "@/lib/settings-overview";
+import { deleteSettingsFarm, loadSettingsProfile, SettingsAccessError, updateSettingsProfile } from "@/lib/settings-overview";
 
 export async function GET() {
   try {
@@ -25,6 +25,9 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ message: "Cập nhật cài đặt thành công.", profile });
   } catch (error) {
+    if (error instanceof SettingsAccessError) {
+      return NextResponse.json({ message: error.message, error: String(error) }, { status: error.status });
+    }
     return NextResponse.json({ message: "Không thể cập nhật cài đặt.", error: String(error) }, { status: 500 });
   }
 }
@@ -66,6 +69,9 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: "Đã xóa trang trại.", profile, deletedAccount: false });
   } catch (error) {
+    if (error instanceof SettingsAccessError) {
+      return NextResponse.json({ message: error.message, error: String(error) }, { status: error.status });
+    }
     return NextResponse.json(
       { message: error instanceof Error ? error.message : "Không thể xóa trang trại.", error: String(error) },
       { status: 500 }

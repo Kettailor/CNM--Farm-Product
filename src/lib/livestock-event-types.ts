@@ -27,10 +27,10 @@ export type LivestockEventTypeOption = {
 export const LIVESTOCK_EVENT_TYPE_OPTIONS: LivestockEventTypeOption[] = [
   {
     value: "adjustment",
-    label: "Điều chỉnh",
-    shortLabel: "Điều chỉnh",
-    purpose: "Ghi nhận thêm, loại bỏ, lưu trữ hoặc điều chỉnh số lượng cá thể.",
-    defaultTitle: "Điều chỉnh đàn vật nuôi",
+    label: "Tử vong",
+    shortLabel: "Tử vong",
+    purpose: "Ghi nhận cá thể hoặc cả nhóm vật nuôi đã tử vong.",
+    defaultTitle: "Ghi nhận vật nuôi tử vong",
     fields: [],
   },
   {

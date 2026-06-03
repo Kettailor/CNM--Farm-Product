@@ -24,6 +24,13 @@ export type TreatmentWarehouseItem = {
   expiryDate: string | null;
   status: string;
   batchLot: string | null;
+  whpDays: number | null;
+  esiDays: number | null;
+  supplier: string | null;
+  manager: string | null;
+  productDescription: string | null;
+  manufactureDate: string | null;
+  purchaseDate: string | null;
 };
 
 export type LivestockTreatmentRecord = {
@@ -119,6 +126,12 @@ function nullableNumber(value: number | string | null) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function isExpiredDate(value: string | null) {
+  if (!value) return false;
+  const date = new Date(`${value}T23:59:59`);
+  return !Number.isNaN(date.getTime()) && date.getTime() < Date.now();
+}
+
 function cleanText(value: unknown) {
   const text = String(value ?? "").trim();
   return text.length > 0 ? text : null;
@@ -212,7 +225,7 @@ export async function loadLivestockTreatmentSupport(farmId: string, groupId: str
 
   return {
     warehouseItems: warehouseItems
-      .filter((item) => item.status !== "da_huy" && item.status !== "ngung_su_dung")
+      .filter((item) => item.status !== "da_huy" && item.status !== "ngung_su_dung" && item.status !== "het_han" && !isExpiredDate(item.expiryDate))
       .map((item) => ({
         id: item.id,
         code: item.code,
@@ -228,6 +241,13 @@ export async function loadLivestockTreatmentSupport(farmId: string, groupId: str
           cleanText(item.metadata.productBatch) ??
           cleanText(item.metadata.traceCode) ??
           null,
+        whpDays: item.whpDays,
+        esiDays: item.esiDays,
+        supplier: item.supplier,
+        manager: item.manager,
+        productDescription: item.productDescription,
+        manufactureDate: item.manufactureDate,
+        purchaseDate: item.purchaseDate,
       })),
     treatments: treatmentRs.rows.map(mapTreatmentRow),
   };

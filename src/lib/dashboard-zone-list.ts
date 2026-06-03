@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { getAccessibleFarm } from "@/lib/farm-access";
 import { ensureZoneSchema } from "@/lib/zone-schema";
 import { getZoneTypeInfo, normalizeText } from "@/lib/zone-type-utils";
 
@@ -29,9 +30,14 @@ const DEFAULT_COLOR = "#2f855a";
 const statusLabelFromRaw = (raw: string) => { const value = normalizeText(raw); if (value.includes("cancel") || value.includes("huy")) return "Đã hủy"; if (value.includes("inactive") || value.includes("ngung")) return "Ngừng hoạt động"; if (value.includes("draft") || value.includes("planned") || value.includes("lap") || value.includes("du kien")) return "Dự kiến"; if (value.includes("maintenance") || value.includes("bao tri")) return "Bảo trì"; if (value.includes("completed") || value.includes("hoan thanh")) return "Hoàn thành"; return "Đang hoạt động"; };
 const colorFromRaw = (raw: unknown) => (/^#[0-9a-f]{6}$/i.test(String(raw ?? "")) ? String(raw) : DEFAULT_COLOR);
 const centroid = (points: Array<{ lat: number; lng: number }>) => { if (!points.length) return DEFAULT_CENTER; const sum = points.reduce((acc, point) => ({ lat: acc.lat + point.lat, lng: acc.lng + point.lng }), { lat: 0, lng: 0 }); return { lat: sum.lat / points.length, lng: sum.lng / points.length }; };
+const isCoord = (lat: number, lng: number) => lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+const centerFromStoredPoint = (latValue: unknown, lngValue: unknown, polygon: Array<{ lat: number; lng: number }>) => { const lat = Number(latValue); const lng = Number(lngValue); return Number.isFinite(lat) && Number.isFinite(lng) && isCoord(lat, lng) ? { lat, lng } : centroid(polygon); };
 const polygonFromJson = (geo: unknown) => { const polygon = Array.isArray((geo as { geo?: { polygon?: unknown } } | null)?.geo?.polygon) ? ((geo as { geo?: { polygon?: Array<{ lat?: number | string; lng?: number | string }> } } | null)?.geo?.polygon ?? []) : []; return polygon.filter((p) => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng))).map((p) => ({ lat: Number(p.lat), lng: Number(p.lng) })); };
 
 export async function getFarmLocation(ownerId: string): Promise<FarmLocation | null> {
+  const access = await getAccessibleFarm(ownerId);
+  if (!access?.farmId) return null;
+
   const rs = await db.query(
     `select t.ten_trang_trai as farm_name,
             coalesce(v.ten_dia_diem, t.ten_trang_trai, 'Trang trại') as location_name,
@@ -49,10 +55,9 @@ export async function getFarmLocation(ownerId: string): Promise<FarmLocation | n
        order by vv.created_at desc nulls last, vv.id desc
        limit 1
      ) v on true
-     where t.chu_so_huu_id = $1
-     order by t.created_at desc
+     where t.id = $1
      limit 1`,
-    [ownerId]
+    [access.farmId]
   );
   const row = rs.rows[0];
   if (!row) return null;
@@ -70,6 +75,11 @@ export async function getFarmLocation(ownerId: string): Promise<FarmLocation | n
 export async function getZoneList(ownerId: string): Promise<{ farmName: string; zones: ZoneListItem[]; filters: ZoneTypeFilter[]; location: FarmLocation | null }> {
   await ensureZoneSchema();
   const location = await getFarmLocation(ownerId);
+  const access = await getAccessibleFarm(ownerId);
+  if (!access?.farmId) {
+    return { farmName: "Trang trại", zones: [], filters: [{ slug: "tat-ca", label: "Tất cả", count: 0 }], location };
+  }
+
   const rs = await db.query(
     `select
         t.ten_trang_trai as farm_name,
@@ -82,22 +92,24 @@ export async function getZoneList(ownerId: string): Promise<{ farmName: string; 
         coalesce(kv.dien_tich_ha::float8, 0)::float8 as area_ha,
         kv.chu_vi_m::float8 as perimeter_m,
         coalesce(kv.suc_chua::float8, 0) as stocking_rate,
+        kv.tam_vi_do::float8 as center_lat,
+        kv.tam_kinh_do::float8 as center_lng,
         coalesce(kv.mau_sac, kv.hinh_hoc_geojson->'metadata'->>'areaColor', kv.hinh_hoc_geojson->'metadata'->>'area_color') as color,
         kv.hinh_hoc_geojson::jsonb as geo,
         kv.updated_at
      from du_lieu.khu_vuc kv
      join du_lieu.trang_trai t on t.id = kv.trang_trai_id
      left join du_lieu.danh_muc_loai_khu_vuc loai on loai.id = kv.loai_khu_vuc_id
-     where t.chu_so_huu_id = $1
+     where t.id = $1
      order by kv.created_at desc nulls last, kv.id desc
      limit 200`,
-    [ownerId]
+    [access.farmId]
   );
 
   const farmName = String(rs.rows[0]?.farm_name ?? location?.farmName ?? "Trang trại");
   const zones = rs.rows.map((row) => {
     const polygon = polygonFromJson(row.geo);
-    const center = centroid(polygon);
+    const center = centerFromStoredPoint(row.center_lat, row.center_lng, polygon);
     const typeInfo = getZoneTypeInfo(row.raw_type, row.warehouse_types);
     const statusLabel = statusLabelFromRaw(String(row.status ?? ""));
     return { id: String(row.id), name: String(row.name ?? "Khu vực chưa đặt tên"), code: String(row.code ?? row.id), status: String(row.status ?? "active"), statusLabel, type: String(row.raw_type ?? ""), typeLabel: typeInfo.label, typeSlug: typeInfo.slug, areaHa: Number(row.area_ha ?? 0), perimeterM: row.perimeter_m != null ? Number(row.perimeter_m) : null, stockingRate: row.stocking_rate != null ? Number(row.stocking_rate) : null, polygon, center, color: colorFromRaw(row.color), updatedAt: row.updated_at ? new Date(row.updated_at).toLocaleString("vi-VN") : null };

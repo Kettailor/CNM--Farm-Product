@@ -2,8 +2,10 @@ import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { layOwnerIdTuRequest, layOwnerIdTuServerCookie } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getAccessibleFarmId, type FarmAccessAction } from "@/lib/farm-access";
 import { ensureWarehouseSchema } from "@/lib/warehouse-schema";
 import { loadWarehouseItems, loadWarehouseZones, mapWarehouseRow, type WarehouseRow } from "@/lib/warehouse-data";
+import { notifyFarmUsers } from "@/lib/notifications";
 import {
   getWarehouseTypeOption,
   isWarehouseStatus,
@@ -96,16 +98,8 @@ function makeWarehouseCode(type: WarehouseType) {
   return `KHO-${TYPE_PREFIX[type]}-${today}-${randomUUID().slice(0, 6).toUpperCase()}`;
 }
 
-async function getOwnerFarmId(ownerId: string) {
-  const farmRs = await db.query<{ id: string }>(
-    `select id
-     from du_lieu.trang_trai
-     where chu_so_huu_id = $1
-     order by created_at desc
-     limit 1`,
-    [ownerId]
-  );
-  return farmRs.rows[0]?.id;
+async function getOwnerFarmId(ownerId: string, action: FarmAccessAction = "read") {
+  return getAccessibleFarmId(ownerId, action);
 }
 
 function normalizePayload(body: WarehousePayload) {
@@ -190,7 +184,7 @@ export async function GET(request: NextRequest) {
     if (!ownerId) return NextResponse.json({ message: "Phiên đăng nhập không hợp lệ." }, { status: 401 });
 
     await ensureWarehouseSchema();
-    const farmId = await getOwnerFarmId(ownerId);
+    const farmId = await getOwnerFarmId(ownerId, "read");
     if (!farmId) return NextResponse.json({ items: [] });
 
     const [items, zones] = await Promise.all([loadWarehouseItems(farmId), loadWarehouseZones(farmId)]);
@@ -206,8 +200,8 @@ export async function POST(request: NextRequest) {
     if (!ownerId) return NextResponse.json({ message: "Phiên đăng nhập không hợp lệ." }, { status: 401 });
 
     await ensureWarehouseSchema();
-    const farmId = await getOwnerFarmId(ownerId);
-    if (!farmId) return NextResponse.json({ message: "Chưa có trang trại để thêm vật tư kho." }, { status: 404 });
+    const farmId = await getOwnerFarmId(ownerId, "write");
+    if (!farmId) return NextResponse.json({ message: "Không có quyền thêm vật tư kho." }, { status: 403 });
 
     const body = (await request.json()) as WarehousePayload;
     const payload = normalizePayload(body);
@@ -284,7 +278,19 @@ export async function POST(request: NextRequest) {
       ]
     );
 
-    return NextResponse.json({ message: "Đã thêm vào kho.", item: mapWarehouseRow(result.rows[0]) });
+    const item = mapWarehouseRow(result.rows[0]);
+    await notifyFarmUsers({
+      farmId,
+      excludeUserId: ownerId,
+      title: "Kho có vật tư mới",
+      body: item.name,
+      tone: "success",
+      module: "Quản lý kho",
+      href: "/dashboard/quan-ly-kho",
+      metadata: { itemId: item.id, type: item.type },
+    }).catch(() => undefined);
+
+    return NextResponse.json({ message: "Đã thêm vào kho.", item });
   } catch (error) {
     const message = String(error).includes("kho_vat_tu_trang_trai_id_ma_vat_tu_key")
       ? "Mã vật tư đã tồn tại trong kho của trang trại."

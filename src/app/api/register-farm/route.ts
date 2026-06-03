@@ -6,13 +6,40 @@ import { ensureFarmSettingsDefaults, ensureSettingsSchema } from "@/lib/settings
 
 type Payload = {
   farm: { name: string; areaHectare: number; specialFactors?: string; otherActivity?: string };
-  location: { locationName?: string; mapsLink?: string; lat: string; lng: string };
-  production: { livestock: Array<{ name: string; quantity?: number }> };
+  location: {
+    locationName?: string;
+    addressLine2?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    country?: string;
+    mapsLink?: string;
+    lat: string;
+    lng: string;
+  };
+  production: { livestock: Array<{ name: string }> };
   settings: { annualRainfall: number; carryingCapacity: number; springStart: string };
   referral: { channels: string[]; otherNote?: string };
 };
 
 const isCoordInRange = (lat: number, lng: number) => lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+const cleanString = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : null);
+
+function parseAddressParts(locationName?: string) {
+  const parts = (locationName ?? "").split(",").map((part) => part.trim()).filter(Boolean);
+  const country = parts.at(-1) ?? null;
+  let cursor = parts.length - 2;
+  let postalCode: string | null = null;
+  if (cursor >= 0 && /^[0-9A-Z -]{4,12}$/i.test(parts[cursor])) {
+    postalCode = parts[cursor];
+    cursor -= 1;
+  }
+
+  const state = cursor >= 0 ? parts[cursor] : null;
+  const previous = cursor - 1 >= 0 ? parts[cursor - 1] : null;
+  const city = state && /^(thành phố|tp\.?|city)/i.test(state) ? state : previous ?? state;
+  return { city, state, postalCode, country };
+}
 
 const FARM_LIVESTOCK_OVERVIEW_SCHEMA_SQL = `
 create extension if not exists pgcrypto;
@@ -61,6 +88,14 @@ export async function POST(request: NextRequest) {
 
     await db.query(FARM_LIVESTOCK_OVERVIEW_SCHEMA_SQL);
     await ensureSettingsSchema();
+    const parsedAddress = parseAddressParts(body.location.locationName);
+    const addressMetadata = {
+      address_line_2: cleanString(body.location.addressLine2),
+      city: cleanString(body.location.city) ?? parsedAddress.city,
+      postal_code: cleanString(body.location.postalCode) ?? parsedAddress.postalCode,
+      state: cleanString(body.location.state) ?? parsedAddress.state,
+      country: cleanString(body.location.country) ?? parsedAddress.country,
+    };
 
     const client = await db.connect();
     try {
@@ -82,8 +117,8 @@ export async function POST(request: NextRequest) {
 
       await client.query(
         `insert into du_lieu.cai_dat_trang_trai
-          (trang_trai_id, dien_tich_ha, yeu_to_dac_biet, hoat_dong_khac, luong_mua_hang_nam, suc_tai_chan_tha, mua_xuan_bat_dau)
-         values ($1,$2,$3,$4,$5,$6,$7)
+          (trang_trai_id, dien_tich_ha, yeu_to_dac_biet, hoat_dong_khac, luong_mua_hang_nam, suc_tai_chan_tha, mua_xuan_bat_dau, metadata_json)
+         values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)
          on conflict (trang_trai_id) do update
          set dien_tich_ha = excluded.dien_tich_ha,
              yeu_to_dac_biet = excluded.yeu_to_dac_biet,
@@ -91,6 +126,7 @@ export async function POST(request: NextRequest) {
              luong_mua_hang_nam = excluded.luong_mua_hang_nam,
              suc_tai_chan_tha = excluded.suc_tai_chan_tha,
              mua_xuan_bat_dau = excluded.mua_xuan_bat_dau,
+             metadata_json = coalesce(du_lieu.cai_dat_trang_trai.metadata_json, '{}'::jsonb) || excluded.metadata_json,
              updated_at = now()`,
         [
           farmId,
@@ -100,12 +136,15 @@ export async function POST(request: NextRequest) {
           body.settings?.annualRainfall ?? null,
           body.settings?.carryingCapacity ?? null,
           body.settings?.springStart ?? null,
+          JSON.stringify(addressMetadata),
         ]
       );
 
-      for (const item of body.production?.livestock || []) {
-        const livestockType = String(item?.name ?? "").trim();
-        if (!livestockType) continue;
+      const livestockTypes = Array.from(
+        new Set((body.production?.livestock || []).map((item) => String(item?.name ?? "").trim()).filter(Boolean))
+      );
+
+      for (const livestockType of livestockTypes) {
         await client.query(
           `insert into du_lieu.thong_tin_chan_nuoi_trang_trai (trang_trai_id, loai_chan_nuoi)
            values ($1,$2)

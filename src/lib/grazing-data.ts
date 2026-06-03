@@ -15,6 +15,11 @@ import {
   type GrazingStatus,
 } from "@/lib/grazing-types";
 
+const GRAZING_PLAN_LOAD_LIMIT = 60;
+const GRAZING_EVENT_LOAD_LIMIT_PER_PLAN = 80;
+const GRAZING_RESOURCE_LOAD_LIMIT = 500;
+const GRAZING_DETAIL_EVENT_LOAD_LIMIT = 1000;
+
 type PlanRow = {
   id: string;
   ma_ke_hoach: string | null;
@@ -68,6 +73,7 @@ type EventRow = {
   ngay_bat_dau: string | Date | null;
   ngay_ket_thuc: string | Date | null;
   ghi_chu: string | null;
+  metadata_json: GrazingMetadata | null;
 };
 
 function cleanText(value: unknown) {
@@ -156,6 +162,31 @@ function mapEvent(row: EventRow): GrazingEvent {
     startDate: dateOnly(row.ngay_bat_dau),
     endDate: dateOnly(row.ngay_ket_thuc),
     note: cleanText(row.ghi_chu),
+    metadata: row.metadata_json ?? {},
+  };
+}
+
+function mapPlan(row: PlanRow, paddocks: GrazingPaddock[], groups: GrazingLivestockGroup[], events: GrazingEvent[]): GrazingPlan {
+  const id = String(row.id);
+  const type: GrazingPlanType = isGrazingPlanType(row.kieu_ke_hoach) ? row.kieu_ke_hoach : "seasonal";
+  const status: GrazingStatus = isGrazingStatus(row.trang_thai) ? row.trang_thai : "active";
+  return {
+    id,
+    code: cleanText(row.ma_ke_hoach) ?? id,
+    name: cleanText(row.ten_ke_hoach) ?? "Kế hoạch chăn thả",
+    type,
+    status,
+    startDate: dateOnly(row.ngay_bat_dau),
+    endDate: dateOnly(row.ngay_ket_thuc),
+    season: cleanText(row.mua_vu),
+    manager: cleanText(row.nguoi_phu_trach),
+    note: cleanText(row.ghi_chu),
+    paddocks,
+    groups,
+    events,
+    metadata: row.metadata_json ?? {},
+    createdAt: dateTime(row.created_at),
+    updatedAt: dateTime(row.updated_at),
   };
 }
 
@@ -179,8 +210,9 @@ export async function loadGrazingPaddocks(farmId: string): Promise<GrazingPaddoc
          or lower(coalesce(k.mo_ta, '')) like '%chăn thả%'
          or lower(coalesce(k.mo_ta, '')) like '%dong co%'
        )
-     order by k.ten_khu_vuc asc, k.created_at asc`,
-    [farmId]
+     order by k.ten_khu_vuc asc, k.created_at asc
+     limit $2`,
+    [farmId, GRAZING_RESOURCE_LOAD_LIMIT]
   );
   return result.rows.map(mapPaddock);
 }
@@ -193,8 +225,9 @@ export async function loadGrazingGroups(farmId: string): Promise<GrazingLivestoc
      left join du_lieu.khu_vuc k on k.id = n.khu_vuc_id
      where n.trang_trai_id = $1
        and coalesce(lower(n.trang_thai_suc_khoe), '') not in ('da_huy', 'da huy', 'đã hủy', 'ngung theo doi')
-     order by n.ten_nhom asc, n.created_at asc`,
-    [farmId]
+     order by n.ten_nhom asc, n.created_at asc
+     limit $2`,
+    [farmId, GRAZING_RESOURCE_LOAD_LIMIT]
   );
   return result.rows.map(mapGroup);
 }
@@ -204,49 +237,104 @@ export async function loadGrazingPlans(farmId: string): Promise<GrazingPlan[]> {
 
   const [planRs, paddockRs, groupRs, eventRs] = await Promise.all([
     db.query<PlanRow>(
-      `select id::text, ma_ke_hoach, ten_ke_hoach, kieu_ke_hoach, trang_thai, ngay_bat_dau,
-              ngay_ket_thuc, mua_vu, nguoi_phu_trach, ghi_chu, metadata_json, created_at, updated_at
-       from du_lieu.ke_hoach_chan_tha
-       where trang_trai_id = $1
-       order by ngay_bat_dau asc nulls last, updated_at desc nulls last, created_at desc nulls last`,
-      [farmId]
+      `with selected_plans as (
+         select id
+         from du_lieu.ke_hoach_chan_tha
+         where trang_trai_id = $1
+         order by
+           case when coalesce(lower(trang_thai), '') in ('da_huy', 'da huy', 'đã hủy', 'cancelled') then 1 else 0 end,
+           coalesce(updated_at, created_at) desc nulls last,
+           ngay_bat_dau desc nulls last
+         limit $2
+       )
+       select p.id::text, p.ma_ke_hoach, p.ten_ke_hoach, p.kieu_ke_hoach, p.trang_thai, p.ngay_bat_dau,
+              p.ngay_ket_thuc, p.mua_vu, p.nguoi_phu_trach, p.ghi_chu, p.metadata_json, p.created_at, p.updated_at
+       from du_lieu.ke_hoach_chan_tha p
+       join selected_plans sp on sp.id = p.id
+       order by
+         case when coalesce(lower(p.trang_thai), '') in ('da_huy', 'da huy', 'đã hủy', 'cancelled') then 1 else 0 end,
+         coalesce(p.updated_at, p.created_at) desc nulls last,
+         p.ngay_bat_dau desc nulls last`,
+      [farmId, GRAZING_PLAN_LOAD_LIMIT]
     ),
     db.query<PaddockRow>(
-      `select lk.ke_hoach_id::text, k.id::text, k.ma_khu_vuc, k.ten_khu_vuc,
+      `with selected_plans as (
+         select id
+         from du_lieu.ke_hoach_chan_tha
+         where trang_trai_id = $1
+         order by
+           case when coalesce(lower(trang_thai), '') in ('da_huy', 'da huy', 'đã hủy', 'cancelled') then 1 else 0 end,
+           coalesce(updated_at, created_at) desc nulls last,
+           ngay_bat_dau desc nulls last
+         limit $2
+       )
+       select lk.ke_hoach_id::text, k.id::text, k.ma_khu_vuc, k.ten_khu_vuc,
               coalesce(nullif(k.loai_khu_vuc, ''), nullif(loai.ten, ''), nullif(k.hinh_hoc_geojson->'metadata'->>'kind', ''), nullif(k.hinh_hoc_geojson->'metadata'->>'usage', '')) as loai_khu_vuc,
               loai.ten as ten_loai_khu_vuc,
               k.trang_thai,
               coalesce(lk.dien_tich_ha, k.dien_tich_ha) as dien_tich_ha, lk.do_uu_tien, lk.danh_gia
        from du_lieu.ke_hoach_chan_tha_khu_vuc lk
        join du_lieu.khu_vuc k on k.id = lk.khu_vuc_id
-       join du_lieu.ke_hoach_chan_tha p on p.id = lk.ke_hoach_id
+       join selected_plans sp on sp.id = lk.ke_hoach_id
        left join du_lieu.danh_muc_loai_khu_vuc loai on loai.id = k.loai_khu_vuc_id
-       where p.trang_trai_id = $1
        order by k.ten_khu_vuc asc`,
-      [farmId]
+      [farmId, GRAZING_PLAN_LOAD_LIMIT]
     ),
     db.query<GroupRow>(
-      `select lg.ke_hoach_id::text, n.id::text, n.ma_nhom, n.ten_nhom, n.loai_vat_nuoi,
+      `with selected_plans as (
+         select id
+         from du_lieu.ke_hoach_chan_tha
+         where trang_trai_id = $1
+         order by
+           case when coalesce(lower(trang_thai), '') in ('da_huy', 'da huy', 'đã hủy', 'cancelled') then 1 else 0 end,
+           coalesce(updated_at, created_at) desc nulls last,
+           ngay_bat_dau desc nulls last
+         limit $2
+       )
+       select lg.ke_hoach_id::text, n.id::text, n.ma_nhom, n.ten_nhom, n.loai_vat_nuoi,
               coalesce(lg.so_luong_du_kien, n.so_luong) as so_luong, n.khu_vuc_id::text, k.ten_khu_vuc
        from du_lieu.ke_hoach_chan_tha_nhom_vat_nuoi lg
        join du_lieu.nhom_vat_nuoi n on n.id = lg.nhom_vat_nuoi_id
-       join du_lieu.ke_hoach_chan_tha p on p.id = lg.ke_hoach_id
+       join selected_plans sp on sp.id = lg.ke_hoach_id
        left join du_lieu.khu_vuc k on k.id = n.khu_vuc_id
-       where p.trang_trai_id = $1
        order by n.ten_nhom asc`,
-      [farmId]
+      [farmId, GRAZING_PLAN_LOAD_LIMIT]
     ),
     db.query<EventRow>(
-      `select e.id::text, e.ke_hoach_id::text, e.khu_vuc_id::text, k.ten_khu_vuc,
+      `with selected_plans as (
+         select id
+         from du_lieu.ke_hoach_chan_tha
+         where trang_trai_id = $1
+         order by
+           case when coalesce(lower(trang_thai), '') in ('da_huy', 'da huy', 'đã hủy', 'cancelled') then 1 else 0 end,
+           coalesce(updated_at, created_at) desc nulls last,
+           ngay_bat_dau desc nulls last
+         limit $2
+       )
+       select e.id::text, e.ke_hoach_id::text, e.khu_vuc_id::text, k.ten_khu_vuc,
               e.nhom_vat_nuoi_id::text, n.ten_nhom, e.loai_su_kien, e.tieu_de, e.trang_thai,
-              e.ngay_bat_dau, e.ngay_ket_thuc, e.ghi_chu
-       from du_lieu.su_kien_chan_tha e
-       join du_lieu.ke_hoach_chan_tha p on p.id = e.ke_hoach_id
+              e.ngay_bat_dau, e.ngay_ket_thuc, e.ghi_chu, e.metadata_json
+       from selected_plans sp
+       join du_lieu.ke_hoach_chan_tha p on p.id = sp.id
+       join lateral (
+         select event.*
+         from du_lieu.su_kien_chan_tha event
+         where event.ke_hoach_id = sp.id
+           and not (
+             lower(coalesce(p.kieu_ke_hoach, '')) = 'perpetual'
+             and lower(coalesce(event.metadata_json->>'repeat', '')) in ('true', '1')
+             and (case
+               when coalesce(event.metadata_json->>'recurrenceIndex', '') ~ '^[0-9]+$' then (event.metadata_json->>'recurrenceIndex')::int
+               else 1
+             end) > 1
+           )
+         order by event.ngay_bat_dau asc nulls last, event.created_at asc
+         limit $3
+       ) e on true
        left join du_lieu.khu_vuc k on k.id = e.khu_vuc_id
        left join du_lieu.nhom_vat_nuoi n on n.id = e.nhom_vat_nuoi_id
-       where p.trang_trai_id = $1
-       order by e.ngay_bat_dau asc nulls last, e.created_at asc`,
-      [farmId]
+       order by e.ngay_bat_dau asc nulls last`,
+      [farmId, GRAZING_PLAN_LOAD_LIMIT, GRAZING_EVENT_LOAD_LIMIT_PER_PLAN]
     ),
   ]);
 
@@ -270,25 +358,73 @@ export async function loadGrazingPlans(farmId: string): Promise<GrazingPlan[]> {
 
   return planRs.rows.map((row) => {
     const id = String(row.id);
-    const type: GrazingPlanType = isGrazingPlanType(row.kieu_ke_hoach) ? row.kieu_ke_hoach : "seasonal";
-    const status: GrazingStatus = isGrazingStatus(row.trang_thai) ? row.trang_thai : "active";
-    return {
-      id,
-      code: cleanText(row.ma_ke_hoach) ?? id,
-      name: cleanText(row.ten_ke_hoach) ?? "Kế hoạch chăn thả",
-      type,
-      status,
-      startDate: dateOnly(row.ngay_bat_dau),
-      endDate: dateOnly(row.ngay_ket_thuc),
-      season: cleanText(row.mua_vu),
-      manager: cleanText(row.nguoi_phu_trach),
-      note: cleanText(row.ghi_chu),
-      paddocks: paddocksByPlan.get(id) ?? [],
-      groups: groupsByPlan.get(id) ?? [],
-      events: eventsByPlan.get(id) ?? [],
-      metadata: row.metadata_json ?? {},
-      createdAt: dateTime(row.created_at),
-      updatedAt: dateTime(row.updated_at),
-    };
+    return mapPlan(row, paddocksByPlan.get(id) ?? [], groupsByPlan.get(id) ?? [], eventsByPlan.get(id) ?? []);
   });
+}
+
+export async function loadGrazingPlanById(farmId: string, planId: string): Promise<GrazingPlan | null> {
+  await ensureGrazingSchema();
+
+  const [planRs, paddockRs, groupRs, eventRs] = await Promise.all([
+    db.query<PlanRow>(
+      `select id::text, ma_ke_hoach, ten_ke_hoach, kieu_ke_hoach, trang_thai, ngay_bat_dau,
+              ngay_ket_thuc, mua_vu, nguoi_phu_trach, ghi_chu, metadata_json, created_at, updated_at
+       from du_lieu.ke_hoach_chan_tha
+       where trang_trai_id = $1 and id::text = $2
+       limit 1`,
+      [farmId, planId]
+    ),
+    db.query<PaddockRow>(
+      `select lk.ke_hoach_id::text, k.id::text, k.ma_khu_vuc, k.ten_khu_vuc,
+              coalesce(nullif(k.loai_khu_vuc, ''), nullif(loai.ten, ''), nullif(k.hinh_hoc_geojson->'metadata'->>'kind', ''), nullif(k.hinh_hoc_geojson->'metadata'->>'usage', '')) as loai_khu_vuc,
+              loai.ten as ten_loai_khu_vuc,
+              k.trang_thai,
+              coalesce(lk.dien_tich_ha, k.dien_tich_ha) as dien_tich_ha, lk.do_uu_tien, lk.danh_gia
+       from du_lieu.ke_hoach_chan_tha_khu_vuc lk
+       join du_lieu.ke_hoach_chan_tha p on p.id = lk.ke_hoach_id
+       join du_lieu.khu_vuc k on k.id = lk.khu_vuc_id
+       left join du_lieu.danh_muc_loai_khu_vuc loai on loai.id = k.loai_khu_vuc_id
+       where p.trang_trai_id = $1 and p.id::text = $2
+       order by k.ten_khu_vuc asc`,
+      [farmId, planId]
+    ),
+    db.query<GroupRow>(
+      `select lg.ke_hoach_id::text, n.id::text, n.ma_nhom, n.ten_nhom, n.loai_vat_nuoi,
+              coalesce(lg.so_luong_du_kien, n.so_luong) as so_luong, n.khu_vuc_id::text, k.ten_khu_vuc
+       from du_lieu.ke_hoach_chan_tha_nhom_vat_nuoi lg
+       join du_lieu.ke_hoach_chan_tha p on p.id = lg.ke_hoach_id
+       join du_lieu.nhom_vat_nuoi n on n.id = lg.nhom_vat_nuoi_id
+       left join du_lieu.khu_vuc k on k.id = n.khu_vuc_id
+       where p.trang_trai_id = $1 and p.id::text = $2
+       order by n.ten_nhom asc`,
+      [farmId, planId]
+    ),
+    db.query<EventRow>(
+      `select e.id::text, e.ke_hoach_id::text, e.khu_vuc_id::text, k.ten_khu_vuc,
+              e.nhom_vat_nuoi_id::text, n.ten_nhom, e.loai_su_kien, e.tieu_de, e.trang_thai,
+              e.ngay_bat_dau, e.ngay_ket_thuc, e.ghi_chu, e.metadata_json
+       from du_lieu.su_kien_chan_tha e
+       join du_lieu.ke_hoach_chan_tha p on p.id = e.ke_hoach_id
+       left join du_lieu.khu_vuc k on k.id = e.khu_vuc_id
+       left join du_lieu.nhom_vat_nuoi n on n.id = e.nhom_vat_nuoi_id
+       where p.trang_trai_id = $1
+         and p.id::text = $2
+         and not (
+           lower(coalesce(p.kieu_ke_hoach, '')) = 'perpetual'
+           and lower(coalesce(e.metadata_json->>'repeat', '')) in ('true', '1')
+           and (case
+             when coalesce(e.metadata_json->>'recurrenceIndex', '') ~ '^[0-9]+$' then (e.metadata_json->>'recurrenceIndex')::int
+             else 1
+           end) > 1
+         )
+       order by e.ngay_bat_dau asc nulls last, e.created_at asc
+       limit $3`,
+      [farmId, planId, GRAZING_DETAIL_EVENT_LOAD_LIMIT]
+    ),
+  ]);
+
+  const planRow = planRs.rows[0];
+  if (!planRow) return null;
+
+  return mapPlan(planRow, paddockRs.rows.map(mapPaddock), groupRs.rows.map(mapGroup), eventRs.rows.map(mapEvent));
 }

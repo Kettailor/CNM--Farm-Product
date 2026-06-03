@@ -1,5 +1,6 @@
 import DashboardShell from "@/components/dashboard-shell";
 import { layOwnerIdTuServerCookie } from "@/lib/auth";
+import { todayInBusinessTimeZone } from "@/lib/business-date";
 import { getDashboardOverview } from "@/lib/dashboard-overview";
 import { loadWarehouseItems, loadWarehouseZones } from "@/lib/warehouse-data";
 import { redirect } from "next/navigation";
@@ -21,6 +22,8 @@ export default async function WarehousePage() {
         farmLocation={overview.locationName}
         initialItems={items}
         warehouseZones={zones}
+        canWrite={overview.access.canWrite}
+        businessDate={todayInBusinessTimeZone()}
       />
     </DashboardShell>
   );

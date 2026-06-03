@@ -10,11 +10,64 @@ export type LivestockZoneOption = {
   name: string;
 };
 
+export type LivestockRecordedAnimalOption = {
+  id: string;
+  code: string | null;
+  qrCode: string | null;
+  species: string | null;
+  breed: string | null;
+  status: string | null;
+  zoneId: string | null;
+  zoneName: string | null;
+};
+
+export type LivestockGroupCopyOption = {
+  id: string;
+  name: string;
+  species: string;
+  description: string | null;
+  createFrom: string | null;
+  breed: string | null;
+  headCount: number;
+  gender: string | null;
+  lifeStage: string | null;
+  healthStatus: string | null;
+  purpose: string | null;
+  locationId: string | null;
+  herdNotes: string | null;
+  origin: string | null;
+  price: string | null;
+  expenseAccount: string | null;
+  birthDate: string | null;
+  conceptionType: string | null;
+  averageBirthWeight: string | null;
+  birthNotes: string | null;
+  healthIssues: string | null;
+  maternityId: string | null;
+  paternityId: string | null;
+  colouring: string | null;
+  eyeColor: string | null;
+  earType: string | null;
+  hornType: string | null;
+  mouth: string | null;
+  bodyConditionScore: string | null;
+  traitNotes: string | null;
+  primaryIdentification: string | null;
+  reproductiveState: string | null;
+  reproductiveAvailability: string | null;
+  lifetimeAdg: string | null;
+  lifetimeMjDay: string | null;
+  targetLiveWeight: string | null;
+  targetWeightDate: string | null;
+};
+
 type FormState = {
   species: string;
   groupName: string;
   description: string;
   createFrom: string;
+  sourceGroupId: string;
+  selectedRecordedAnimalIds: string[];
   breed: string;
   headCount: string;
   gender: string;
@@ -364,48 +417,12 @@ const speciesProfiles: SpeciesProfile[] = [
       targetLiveWeight: "2,8",
     },
   },
-  {
-    label: "Cá",
-    groupPrefix: "Đàn cá",
-    breeds: ["Cá rô phi", "Cá trắm", "Cá chép", "Cá lóc", "Cá tra"],
-    genders: ["Hỗn hợp", "Cái", "Đực"],
-    lifeStages: ["Cá giống", "Cá hương", "Cá thương phẩm", "Bố mẹ"],
-    purposes: ["Cá thương phẩm", "Sinh sản", "Nuôi giống"],
-    origins: ["Ươm tại trang trại", "Mua nhập đàn", "Chuyển từ ao khác"],
-    conceptionTypes: ["Không áp dụng", "Sinh sản nhân tạo"],
-    eyeColors: ["Đen", "Vàng"],
-    earTypes: ["Không áp dụng"],
-    hornTypes: ["Không áp dụng"],
-    mouths: ["Bình thường", "Cần kiểm tra"],
-    defaults: {
-      breed: "Cá rô phi",
-      headCount: "200",
-      gender: "Hỗn hợp",
-      lifeStage: "Cá giống",
-      healthStatus: "Đang hoạt động",
-      purpose: "Cá thương phẩm",
-      origin: "Ươm tại trang trại",
-      price: "3000",
-      expenseAccount: "Vật nuôi",
-      conceptionType: "Không áp dụng",
-      averageBirthWeight: "0,02",
-      colouring: "Xám bạc",
-      eyeColor: "Đen",
-      earType: "Không áp dụng",
-      hornType: "Không áp dụng",
-      mouth: "Bình thường",
-      bodyConditionScore: "3",
-      primaryIdentification: "Mã QR cá thể",
-      reproductiveState: "Chưa xác định",
-      reproductiveAvailability: "Chưa xác định",
-      lifetimeAdg: "0,018",
-      lifetimeMjDay: "0,2",
-      targetLiveWeight: "0,8",
-    },
-  },
 ];
 
-const createFromOptions = ["Tạo nhóm mới", "Thêm vật nuôi đã ghi nhận", "Sao chép nhóm hiện có"];
+const CREATE_FROM_NEW = "Tạo nhóm mới";
+const CREATE_FROM_RECORDED = "Thêm vật nuôi đã ghi nhận";
+const CREATE_FROM_COPY = "Sao chép nhóm hiện có";
+const createFromOptions = [CREATE_FROM_NEW, CREATE_FROM_RECORDED, CREATE_FROM_COPY];
 const healthOptions = ["Đang hoạt động", "Cần theo dõi", "Cách ly", "Ngừng theo dõi"];
 const expenseOptions = ["Vật nuôi", "Con giống", "Thức ăn", "Thú y", "Vận chuyển"];
 const reproductionOptions = ["Chưa xác định", "Không mang thai", "Đang mang thai", "Đang nuôi con", "Không áp dụng"];
@@ -416,7 +433,7 @@ const steps = [
     title: "Thiết lập nhóm",
     icon: "list",
     desc: "Chọn loài, thông tin nhóm và cách tạo nhóm.",
-    items: ["Loài vật nuôi", "Tên nhóm", "Mô tả"],
+    items: ["Loài vật nuôi", "Tên nhóm", "Mô tả", "Tạo từ"],
   },
   {
     key: "herd",
@@ -457,7 +474,7 @@ const steps = [
 
 const stepKeys = steps.map((step) => step.key);
 
-type SpeciesVisualKey = "cow" | "buffalo" | "goat" | "sheep" | "pig" | "chicken" | "duck" | "fish" | "other";
+type SpeciesVisualKey = "cow" | "buffalo" | "goat" | "sheep" | "pig" | "chicken" | "duck" | "other";
 type SpeciesVisual = { icon: SpeciesVisualKey; color: string; background: string };
 
 const speciesVisuals: Record<string, SpeciesVisual> = {
@@ -468,7 +485,6 @@ const speciesVisuals: Record<string, SpeciesVisual> = {
   Heo: { icon: "pig", color: "#db2777", background: "linear-gradient(135deg, #fdf2f8, #fbcfe8)" },
   Gà: { icon: "chicken", color: "#d97706", background: "linear-gradient(135deg, #fffbeb, #fde68a)" },
   Vịt: { icon: "duck", color: "#0284c7", background: "linear-gradient(135deg, #ecfeff, #bae6fd)" },
-  Cá: { icon: "fish", color: "#2563eb", background: "linear-gradient(135deg, #eff6ff, #bfdbfe)" },
 };
 
 function getSpeciesVisual(species: string): SpeciesVisual {
@@ -540,14 +556,6 @@ function SpeciesGlyph({ type }: { type: SpeciesVisualKey }) {
           <circle cx="31" cy="31" r="2.2" />
         </svg>
       );
-    case "fish":
-      return (
-        <svg viewBox="0 0 64 64" aria-hidden="true">
-          <path d="M12 33c8-10 22-14 36-4l6-6v20l-6-6c-14 10-28 6-36-4Z" />
-          <path d="M37 27c-3 4-3 8 0 12" />
-          <circle cx="24" cy="31" r="2.3" />
-        </svg>
-      );
     default:
       return (
         <svg viewBox="0 0 64 64" aria-hidden="true">
@@ -566,6 +574,19 @@ function addMonths(months: number) {
   return date.toISOString().slice(0, 10);
 }
 
+function getSpeciesProfile(species: string) {
+  return speciesProfiles.find((item) => item.label === species) ?? speciesProfiles[0];
+}
+
+function sameSpecies(left: string | null, right: string) {
+  if (!left) return true;
+  return left === right;
+}
+
+function textOrEmpty(value: string | null | undefined) {
+  return value ?? "";
+}
+
 function defaultGroupName(profile: SpeciesProfile) {
   return `${profile.groupPrefix} ${new Date().getFullYear()}`;
 }
@@ -576,7 +597,9 @@ function makeInitialForm(defaultLocationId = ""): FormState {
     species: profile.label,
     groupName: defaultGroupName(profile),
     description: "",
-    createFrom: createFromOptions[0],
+    createFrom: CREATE_FROM_NEW,
+    sourceGroupId: "",
+    selectedRecordedAnimalIds: [],
     locationId: defaultLocationId,
     herdNotes: "",
     birthDate: addMonths(-2),
@@ -658,10 +681,14 @@ function Select({
 export default function NewGroupWizard({
   open,
   zones = [],
+  recordedAnimals = [],
+  copyGroups = [],
   onClose,
 }: {
   open: boolean;
   zones?: LivestockZoneOption[];
+  recordedAnimals?: LivestockRecordedAnimalOption[];
+  copyGroups?: LivestockGroupCopyOption[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -671,13 +698,29 @@ export default function NewGroupWizard({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const profile = useMemo(
-    () => speciesProfiles.find((item) => item.label === form.species) ?? speciesProfiles[0],
-    [form.species]
-  );
+  const profile = useMemo(() => getSpeciesProfile(form.species), [form.species]);
   const speciesVisual = useMemo(() => getSpeciesVisual(form.species), [form.species]);
+  const availableRecordedAnimals = useMemo(
+    () => recordedAnimals.filter((animal) => sameSpecies(animal.species, form.species)),
+    [recordedAnimals, form.species]
+  );
+  const selectedRecordedAnimals = useMemo(
+    () => recordedAnimals.filter((animal) => form.selectedRecordedAnimalIds.includes(animal.id)),
+    [recordedAnimals, form.selectedRecordedAnimalIds]
+  );
+  const selectedSourceGroup = useMemo(
+    () => copyGroups.find((group) => group.id === form.sourceGroupId) ?? null,
+    [copyGroups, form.sourceGroupId]
+  );
   const step = steps[stepIndex];
-  const canSave = form.groupName.trim().length > 0 && form.breed.trim().length > 0 && Number(form.headCount) > 0;
+  const hasSourceSelection =
+    form.createFrom === CREATE_FROM_RECORDED
+      ? form.selectedRecordedAnimalIds.length > 0
+      : form.createFrom === CREATE_FROM_COPY
+        ? Boolean(form.sourceGroupId)
+        : true;
+  const hasHeadCount = form.createFrom === CREATE_FROM_RECORDED ? form.selectedRecordedAnimalIds.length > 0 : Number(form.headCount) > 0;
+  const canSave = form.groupName.trim().length > 0 && form.breed.trim().length > 0 && hasHeadCount && hasSourceSelection;
 
   if (!open) return null;
 
@@ -687,13 +730,120 @@ export default function NewGroupWizard({
   };
 
   const changeSpecies = (species: string) => {
-    const nextProfile = speciesProfiles.find((item) => item.label === species) ?? speciesProfiles[0];
+    const nextProfile = getSpeciesProfile(species);
     setError("");
     setForm((current) => ({
       ...current,
       species: nextProfile.label,
       groupName: nameTouched ? current.groupName : defaultGroupName(nextProfile),
+      sourceGroupId: "",
+      selectedRecordedAnimalIds: [],
       ...nextProfile.defaults,
+    }));
+  };
+
+  const changeCreateFrom = (createFrom: string) => {
+    setError("");
+    setForm((current) => {
+      if (createFrom === CREATE_FROM_RECORDED) {
+        return {
+          ...current,
+          createFrom,
+          sourceGroupId: "",
+          selectedRecordedAnimalIds: [],
+          headCount: "0",
+          origin: "Thêm từ hồ sơ đã ghi nhận",
+        };
+      }
+      if (createFrom === CREATE_FROM_COPY) {
+        return {
+          ...current,
+          createFrom,
+          sourceGroupId: "",
+          selectedRecordedAnimalIds: [],
+          origin: "Sao chép nhóm hiện có",
+        };
+      }
+      return {
+        ...current,
+        createFrom,
+        sourceGroupId: "",
+        selectedRecordedAnimalIds: [],
+        headCount: Number(current.headCount) > 0 ? current.headCount : profile.defaults.headCount,
+        origin: profile.defaults.origin,
+      };
+    });
+  };
+
+  const setRecordedSelection = (ids: string[]) => {
+    const uniqueIds = Array.from(new Set(ids));
+    const selected = recordedAnimals.filter((animal) => uniqueIds.includes(animal.id));
+    setError("");
+    setForm((current) => ({
+      ...current,
+      selectedRecordedAnimalIds: uniqueIds,
+      headCount: String(uniqueIds.length),
+      breed: selected[0]?.breed || current.breed,
+      locationId: selected[0]?.zoneId || current.locationId,
+    }));
+  };
+
+  const toggleRecordedAnimal = (animalId: string) => {
+    setRecordedSelection(
+      form.selectedRecordedAnimalIds.includes(animalId)
+        ? form.selectedRecordedAnimalIds.filter((id) => id !== animalId)
+        : [...form.selectedRecordedAnimalIds, animalId]
+    );
+  };
+
+  const applyGroupTemplate = (sourceGroupId: string) => {
+    const group = copyGroups.find((item) => item.id === sourceGroupId);
+    setError("");
+    if (!group) {
+      setForm((current) => ({ ...current, sourceGroupId: "" }));
+      return;
+    }
+
+    const nextProfile = getSpeciesProfile(group.species);
+    setForm((current) => ({
+      ...current,
+      sourceGroupId: group.id,
+      selectedRecordedAnimalIds: [],
+      species: group.species,
+      groupName: nameTouched ? current.groupName : `Bản sao ${group.name}`,
+      description: textOrEmpty(group.description),
+      breed: textOrEmpty(group.breed) || nextProfile.defaults.breed,
+      headCount: group.headCount > 0 ? String(group.headCount) : nextProfile.defaults.headCount,
+      gender: textOrEmpty(group.gender) || nextProfile.defaults.gender,
+      lifeStage: textOrEmpty(group.lifeStage) || nextProfile.defaults.lifeStage,
+      healthStatus: textOrEmpty(group.healthStatus) || nextProfile.defaults.healthStatus,
+      purpose: textOrEmpty(group.purpose) || nextProfile.defaults.purpose,
+      locationId: textOrEmpty(group.locationId),
+      herdNotes: textOrEmpty(group.herdNotes),
+      origin: "Sao chép nhóm hiện có",
+      price: textOrEmpty(group.price) || nextProfile.defaults.price,
+      expenseAccount: textOrEmpty(group.expenseAccount) || nextProfile.defaults.expenseAccount,
+      birthDate: textOrEmpty(group.birthDate) || current.birthDate,
+      conceptionType: textOrEmpty(group.conceptionType) || nextProfile.defaults.conceptionType,
+      averageBirthWeight: textOrEmpty(group.averageBirthWeight) || nextProfile.defaults.averageBirthWeight,
+      birthNotes: textOrEmpty(group.birthNotes),
+      healthIssues: textOrEmpty(group.healthIssues),
+      maternityId: textOrEmpty(group.maternityId),
+      paternityId: textOrEmpty(group.paternityId),
+      colouring: textOrEmpty(group.colouring) || nextProfile.defaults.colouring,
+      eyeColor: textOrEmpty(group.eyeColor) || nextProfile.defaults.eyeColor,
+      earType: textOrEmpty(group.earType) || nextProfile.defaults.earType,
+      hornType: textOrEmpty(group.hornType) || nextProfile.defaults.hornType,
+      mouth: textOrEmpty(group.mouth) || nextProfile.defaults.mouth,
+      bodyConditionScore: textOrEmpty(group.bodyConditionScore) || nextProfile.defaults.bodyConditionScore,
+      traitNotes: textOrEmpty(group.traitNotes),
+      primaryIdentification: textOrEmpty(group.primaryIdentification) || nextProfile.defaults.primaryIdentification,
+      reproductiveState: textOrEmpty(group.reproductiveState) || nextProfile.defaults.reproductiveState,
+      reproductiveAvailability: textOrEmpty(group.reproductiveAvailability) || nextProfile.defaults.reproductiveAvailability,
+      lifetimeAdg: textOrEmpty(group.lifetimeAdg) || nextProfile.defaults.lifetimeAdg,
+      lifetimeMjDay: textOrEmpty(group.lifetimeMjDay) || nextProfile.defaults.lifetimeMjDay,
+      targetLiveWeight: textOrEmpty(group.targetLiveWeight) || nextProfile.defaults.targetLiveWeight,
+      targetWeightDate: textOrEmpty(group.targetWeightDate) || current.targetWeightDate,
     }));
   };
 
@@ -707,7 +857,13 @@ export default function NewGroupWizard({
 
   const save = () => {
     if (!canSave) {
-      setError("Vui lòng nhập tên nhóm, giống và số lượng đầu con trước khi lưu.");
+      setError(
+        form.createFrom === CREATE_FROM_RECORDED
+          ? "Vui lòng nhập tên nhóm, giống và chọn ít nhất một vật nuôi đã ghi nhận."
+          : form.createFrom === CREATE_FROM_COPY
+            ? "Vui lòng chọn nhóm nguồn, nhập tên nhóm, giống và số lượng đầu con."
+            : "Vui lòng nhập tên nhóm, giống và số lượng đầu con trước khi lưu."
+      );
       return;
     }
 
@@ -733,6 +889,93 @@ export default function NewGroupWizard({
         setSaving(false);
       }
     })();
+  };
+
+  const renderCreateFromPanel = () => {
+    if (form.createFrom === CREATE_FROM_RECORDED) {
+      return (
+        <div className={styles.createModePanel}>
+          <div className={styles.createModeHead}>
+            <div>
+              <strong>Thêm vật nuôi đã ghi nhận</strong>
+              <p>Chọn các cá thể chưa thuộc nhóm nào để gom vào nhóm mới. Hệ thống giữ mã QR hiện có và chỉ cập nhật liên kết nhóm.</p>
+            </div>
+            <span>{selectedRecordedAnimals.length}/{availableRecordedAnimals.length}</span>
+          </div>
+          <div className={styles.createModeActions}>
+            <button type="button" onClick={() => setRecordedSelection(availableRecordedAnimals.map((animal) => animal.id))} disabled={availableRecordedAnimals.length === 0}>
+              Chọn tất cả
+            </button>
+            <button type="button" onClick={() => setRecordedSelection([])} disabled={form.selectedRecordedAnimalIds.length === 0}>
+              Bỏ chọn
+            </button>
+          </div>
+          <div className={styles.recordedAnimalList}>
+            {availableRecordedAnimals.length === 0 ? (
+              <div className={styles.emptyState}>Không có cá thể {form.species.toLowerCase()} chưa thuộc nhóm để thêm.</div>
+            ) : (
+              availableRecordedAnimals.map((animal) => (
+                <label key={animal.id} className={styles.recordedAnimalRow}>
+                  <input type="checkbox" checked={form.selectedRecordedAnimalIds.includes(animal.id)} onChange={() => toggleRecordedAnimal(animal.id)} />
+                  <span>
+                    <strong>{animal.code || animal.qrCode || "Cá thể chưa có mã"}</strong>
+                    <small>{[animal.breed, animal.zoneName, animal.status].filter(Boolean).join(" · ") || "Chưa có thông tin phân loại"}</small>
+                  </span>
+                </label>
+              ))
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    if (form.createFrom === CREATE_FROM_COPY) {
+      return (
+        <div className={styles.createModePanel}>
+          <div className={styles.createModeHead}>
+            <div>
+              <strong>Sao chép nhóm hiện có</strong>
+              <p>Chọn một nhóm làm mẫu. Wizard sẽ lấy giống, phân loại, nguồn gốc, đặc điểm và thông số sản xuất từ nhóm đó.</p>
+            </div>
+            <span>{copyGroups.length}</span>
+          </div>
+          <Field label="Nhóm nguồn" required>
+            <select value={form.sourceGroupId} onChange={(event) => applyGroupTemplate(event.target.value)}>
+              <option value="">Chọn nhóm để sao chép</option>
+              {copyGroups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name} · {group.species} · {group.headCount.toLocaleString("vi-VN")} con
+                </option>
+              ))}
+            </select>
+          </Field>
+          {selectedSourceGroup ? (
+            <div className={styles.templateSummary}>
+              <span>{selectedSourceGroup.breed || "Chưa có giống"}</span>
+              <span>{selectedSourceGroup.lifeStage || "Chưa có giai đoạn"}</span>
+              <span>{selectedSourceGroup.purpose || "Chưa có mục đích"}</span>
+            </div>
+          ) : (
+            <div className={styles.emptyState}>Chọn nhóm nguồn để tự điền phần còn lại của form.</div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className={styles.createModePanel}>
+        <div className={styles.createModeHead}>
+          <div>
+            <strong>Tạo nhóm mới</strong>
+            <p>Nhập số lượng đầu con cần khởi tạo. Khi lưu, hệ thống tạo hồ sơ cá thể mới và cấp QR riêng cho từng cá thể.</p>
+          </div>
+          <span>{Number(form.headCount) > 0 ? Number(form.headCount).toLocaleString("vi-VN") : 0}</span>
+        </div>
+        <Field label="Số lượng tạo mới" required>
+          <input type="number" min="1" max="1000" value={form.headCount} onChange={(event) => update("headCount", event.target.value)} />
+        </Field>
+      </div>
+    );
   };
 
   return (
@@ -804,8 +1047,9 @@ export default function NewGroupWizard({
                   <textarea value={form.description} onChange={(event) => update("description", event.target.value)} />
                 </Field>
                 <Field label="Tạo từ">
-                  <Select value={form.createFrom} options={createFromOptions} onChange={(value) => update("createFrom", value)} />
+                  <Select value={form.createFrom} options={createFromOptions} onChange={changeCreateFrom} />
                 </Field>
+                {renderCreateFromPanel()}
               </>
             )}
 
@@ -818,7 +1062,13 @@ export default function NewGroupWizard({
                   <Select value={form.breed} options={profile.breeds} onChange={(value) => update("breed", value)} />
                 </Field>
                 <Field label="Số lượng đầu con" required>
-                  <input type="number" min="1" value={form.headCount} onChange={(event) => update("headCount", event.target.value)} />
+                  <input
+                    type="number"
+                    min="1"
+                    value={form.headCount}
+                    readOnly={form.createFrom === CREATE_FROM_RECORDED}
+                    onChange={(event) => update("headCount", event.target.value)}
+                  />
                 </Field>
                 <Field label="Giới tính">
                   <Select value={form.gender} options={profile.genders} onChange={(value) => update("gender", value)} />
@@ -923,14 +1173,21 @@ export default function NewGroupWizard({
                 <div>
                   <span>Phương thức quản lý</span>
                   <strong>{form.primaryIdentification}</strong>
-                  <p>
-                    Khi lưu nhóm, hệ thống sẽ tự tạo {Number(form.headCount) > 0 ? form.headCount : "mỗi"} mã QR không trùng trong database,
-                    mỗi cá thể một mã riêng để in và dùng cho các chức năng truy xuất sau này.
-                  </p>
+                  {form.createFrom === CREATE_FROM_RECORDED ? (
+                    <p>
+                      Nhóm này dùng lại mã QR của {selectedRecordedAnimals.length.toLocaleString("vi-VN")} cá thể đã ghi nhận.
+                      Hệ thống không tạo mã QR mới cho các cá thể này.
+                    </p>
+                  ) : (
+                    <p>
+                      Khi lưu nhóm, hệ thống sẽ tự tạo {Number(form.headCount) > 0 ? form.headCount : "mỗi"} mã QR không trùng trong database,
+                      mỗi cá thể một mã riêng để in và dùng cho các chức năng truy xuất sau này.
+                    </p>
+                  )}
                 </div>
                 <div className={styles.qrStats}>
-                  <span>Số QR sẽ cấp</span>
-                  <strong>{Number(form.headCount) > 0 ? Number(form.headCount).toLocaleString("vi-VN") : 0}</strong>
+                  <span>{form.createFrom === CREATE_FROM_RECORDED ? "QR dùng lại" : "Số QR sẽ cấp"}</span>
+                  <strong>{form.createFrom === CREATE_FROM_RECORDED ? selectedRecordedAnimals.length.toLocaleString("vi-VN") : Number(form.headCount) > 0 ? Number(form.headCount).toLocaleString("vi-VN") : 0}</strong>
                 </div>
               </div>
             )}
