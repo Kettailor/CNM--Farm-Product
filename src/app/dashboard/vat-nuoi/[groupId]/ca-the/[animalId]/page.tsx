@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import type { CSSProperties } from "react";
 import DashboardShell from "@/components/dashboard-shell";
 import { layOwnerIdTuServerCookie } from "@/lib/auth";
 import { loadLivestockAnimalDetail } from "@/lib/livestock-detail";
 import { getLivestockEventTypeOption, isLivestockEventType } from "@/lib/livestock-event-types";
+import { buildPublicLivestockAnimalQrValue } from "@/lib/public-livestock-url";
 import { renderQrSvg } from "@/lib/qr-code";
 import styles from "../../page.module.css";
 
@@ -13,6 +15,13 @@ type PageProps = {
 };
 
 const accentStyle = (color: string): CSSProperties => ({ "--accent": color } as CSSProperties);
+
+function requestOrigin() {
+  const headerStore = headers();
+  const host = headerStore.get("x-forwarded-host")?.split(",")[0]?.trim() || headerStore.get("host") || "localhost:3000";
+  const protocol = headerStore.get("x-forwarded-proto")?.split(",")[0]?.trim() || "http";
+  return `${protocol}://${host}`;
+}
 
 function formatNumber(value: number | null | undefined, suffix = "") {
   if (value == null || !Number.isFinite(value)) return "Chưa cập nhật";
@@ -97,7 +106,7 @@ export default async function LivestockAnimalDetailPage({ params }: PageProps) {
   if (!detail) notFound();
 
   const animal = detail.animal;
-  const qrValue = animal.qrCode || animal.code || animal.id;
+  const qrValue = buildPublicLivestockAnimalQrValue(animal.id, requestOrigin());
   const latestUpdate = animal.updatedAt || animal.createdAt;
 
   return (

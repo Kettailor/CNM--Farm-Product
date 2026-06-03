@@ -65,9 +65,13 @@ export default function HomePage() {
           <a href="#truong-hop">Trường hợp sử dụng</a>
           <a href="#pham-vi">Phạm vi</a>
           <a href="#ung-dung">Ứng dụng</a>
+          <Link href="/public/vat-nuoi/quet-qr">Quét QR vật nuôi</Link>
        </nav>
 
         <div className="marketing-actions">
+          <Link href="/public/vat-nuoi/quet-qr" className="btn btn-secondary">
+            Quét QR vật nuôi
+          </Link>
           <Link href="/login" className="btn btn-secondary">
             Đăng nhập
           </Link>

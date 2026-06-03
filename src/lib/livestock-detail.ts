@@ -513,3 +513,206 @@ export async function loadLivestockAnimalDetail(ownerId: string, groupId: string
     })),
   };
 }
+
+const PUBLIC_LOOKUP_QUERY_KEYS = ["code", "qr", "ma_qr", "maVatNuoi", "ma_vat_nuoi", "animalId", "animal_id", "id"];
+
+function decodeLookupPart(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function addLookupCandidate(candidates: string[], value: unknown) {
+  const text = String(value ?? "").trim();
+  if (!text || text.length > 260) return;
+  if (!candidates.includes(text)) candidates.push(text);
+}
+
+export function normalizeLivestockPublicLookupCandidates(value: unknown) {
+  const candidates: string[] = [];
+  const raw = String(value ?? "").trim();
+  addLookupCandidate(candidates, raw);
+
+  const maybeUrl = raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("/");
+  if (maybeUrl) {
+    try {
+      const url = new URL(raw, "https://ketkat.local");
+      for (const key of PUBLIC_LOOKUP_QUERY_KEYS) addLookupCandidate(candidates, url.searchParams.get(key));
+
+      const parts = url.pathname.split("/").filter(Boolean).map(decodeLookupPart);
+      const publicIndex = parts.findIndex((part, index) => part === "vat-nuoi" && parts[index - 1] === "public");
+      const shortIndex = parts.findIndex((part, index) => part === "v" && parts[index - 1] === "p");
+
+      if (publicIndex >= 0 && parts[publicIndex + 1] && parts[publicIndex + 1] !== "quet-qr") {
+        addLookupCandidate(candidates, parts[publicIndex + 1]);
+      }
+      if (shortIndex >= 0 && parts[shortIndex + 1]) addLookupCandidate(candidates, parts[shortIndex + 1]);
+    } catch {
+      // Keep the raw value as the lookup candidate.
+    }
+  }
+
+  return candidates.slice(0, 12);
+}
+
+export async function loadPublicLivestockAnimalDetailById(animalId: string): Promise<LivestockAnimalDetail | null> {
+  return loadPublicLivestockAnimalDetailByCandidates([animalId]);
+}
+
+export async function loadPublicLivestockAnimalDetailByCode(code: string): Promise<LivestockAnimalDetail | null> {
+  return loadPublicLivestockAnimalDetailByCandidates(normalizeLivestockPublicLookupCandidates(code));
+}
+
+async function loadPublicLivestockAnimalDetailByCandidates(candidates: string[]): Promise<LivestockAnimalDetail | null> {
+  await ensureLivestockSchema();
+  await ensureLivestockEventSchema();
+  await ensureLivestockTreatmentSchema();
+
+  const lookupValues = candidates.map((candidate) => candidate.trim()).filter(Boolean).slice(0, 12);
+  if (lookupValues.length === 0) return null;
+  const lowerLookupValues = lookupValues.map((candidate) => candidate.toLowerCase());
+
+  const animalRs = await db.query(
+    `select v.id::text, v.trang_trai_id::text, coalesce(v.khu_vuc_id, n.khu_vuc_id)::text as khu_vuc_id, v.nhom_vat_nuoi_id::text,
+            v.ma_vat_nuoi, v.ma_qr, v.the_nhan_dien, v.loai_vat_nuoi, v.giong, v.gioi_tinh,
+            v.giai_doan_sinh_truong, v.ngay_sinh, v.nguon_goc, v.ma_me, v.ma_bo, v.mau_long,
+            v.trang_thai_sinh_san, v.trang_thai, v.mo_ta, v.metadata_json, v.created_at, v.updated_at,
+            n.ma_nhom, n.ten_nhom, n.loai_vat_nuoi as nhom_loai_vat_nuoi, n.giong as nhom_giong,
+            n.trang_thai_suc_khoe, n.muc_dich_san_xuat,
+            t.ten_trang_trai, vt.vi_do, vt.kinh_do, vt.ten_dia_diem,
+            k.ten_khu_vuc, k.trang_thai as khu_vuc_trang_thai, k.dien_tich_ha, k.hinh_hoc_geojson, k.mau_sac
+     from du_lieu.vat_nuoi v
+     join du_lieu.nhom_vat_nuoi n on n.id = v.nhom_vat_nuoi_id
+     join du_lieu.trang_trai t on t.id = v.trang_trai_id
+     left join du_lieu.vi_tri_trang_trai vt on vt.trang_trai_id = t.id
+     left join du_lieu.khu_vuc k on k.id = coalesce(v.khu_vuc_id, n.khu_vuc_id) and coalesce(lower(k.trang_thai), '') not in ('da_huy', 'da huy', 'đã hủy', 'dã hủy', 'cancelled')
+     where (
+          v.id::text = any($1::text[])
+          or lower(coalesce(v.ma_qr, '')) = any($2::text[])
+          or lower(coalesce(v.ma_vat_nuoi, '')) = any($2::text[])
+          or lower(coalesce(v.the_nhan_dien, '')) = any($2::text[])
+       )
+       and coalesce(lower(coalesce(v.loai_vat_nuoi, n.loai_vat_nuoi)), '') not in ('cá', 'ca', 'fish')
+     order by
+       case
+         when v.id::text = any($1::text[]) then 0
+         when lower(coalesce(v.ma_qr, '')) = any($2::text[]) then 1
+         when lower(coalesce(v.ma_vat_nuoi, '')) = any($2::text[]) then 2
+         when lower(coalesce(v.the_nhan_dien, '')) = any($2::text[]) then 3
+         else 4
+       end,
+       v.updated_at desc nulls last,
+       v.created_at desc nulls last
+     limit 1`,
+    [lookupValues, lowerLookupValues]
+  );
+
+  const row = animalRs.rows[0];
+  if (!row) return null;
+
+  const [eventRs, treatmentRs] = await Promise.all([
+    db.query(
+      `select s.id::text, s.ma_su_kien, s.loai_su_kien, s.tieu_de, s.ngay_su_kien,
+              coalesce(sc.gia_tri_so, s.gia_tri_so) as gia_tri_so,
+              coalesce(sc.don_vi, s.don_vi) as don_vi,
+              coalesce(sc.ghi_chu, s.ghi_chu) as ghi_chu,
+              s.created_at
+       from du_lieu.su_kien_vat_nuoi s
+       join du_lieu.su_kien_vat_nuoi_ca_the sc on sc.su_kien_id = s.id
+       where sc.vat_nuoi_id::text = $1 and s.trang_trai_id::text = $2
+       order by s.ngay_su_kien desc nulls last, s.created_at desc
+       limit 12`,
+      [row.id, row.trang_trai_id]
+    ),
+    db.query(
+      `select d.id::text, d.ma_dieu_tri, d.loai_dieu_tri, d.ten_dieu_tri, d.ngay_dieu_tri,
+              d.lieu_luong_moi_con, d.don_vi_lieu_luong, d.phuong_phap, d.trang_thai, d.ghi_chu, d.created_at
+       from du_lieu.dieu_tri_vat_nuoi d
+       join du_lieu.dieu_tri_vat_nuoi_ca_the dc on dc.dieu_tri_id = d.id
+       where dc.vat_nuoi_id::text = $1 and d.trang_trai_id::text = $2
+       order by d.ngay_dieu_tri desc nulls last, d.created_at desc
+       limit 12`,
+      [row.id, row.trang_trai_id]
+    ),
+  ]);
+
+  const polygon = normalizePolygon(row.hinh_hoc_geojson);
+  const zoneName = cleanText(row.ten_khu_vuc);
+
+  return {
+    farm: {
+      id: String(row.trang_trai_id),
+      name: cleanText(row.ten_trang_trai) || "KetKat-EcoFarm",
+      latitude: Number(row.vi_do ?? DEFAULT_COORD.latitude),
+      longitude: Number(row.kinh_do ?? DEFAULT_COORD.longitude),
+      locationName: cleanText(row.ten_dia_diem),
+    },
+    group: {
+      id: String(row.nhom_vat_nuoi_id),
+      code: cleanText(row.ma_nhom) || String(row.nhom_vat_nuoi_id),
+      name: cleanText(row.ten_nhom) || "Nhóm vật nuôi",
+      species: cleanText(row.nhom_loai_vat_nuoi) || cleanText(row.loai_vat_nuoi) || "Vật nuôi",
+      breed: cleanText(row.nhom_giong) || cleanText(row.giong),
+      healthStatus: cleanText(row.trang_thai_suc_khoe),
+      purpose: cleanText(row.muc_dich_san_xuat),
+    },
+    zone: zoneName
+      ? {
+          id: String(row.khu_vuc_id),
+          name: zoneName,
+          status: cleanText(row.khu_vuc_trang_thai),
+          areaHa: Number(row.dien_tich_ha ?? 0),
+          color: isHexColor(row.mau_sac) ? String(row.mau_sac) : "#2f855a",
+          polygon,
+          center: centerFromPolygon(polygon),
+        }
+      : null,
+    animal: {
+      id: String(row.id),
+      code: cleanText(row.ma_vat_nuoi),
+      qrCode: cleanText(row.ma_qr),
+      identity: cleanText(row.the_nhan_dien),
+      species: cleanText(row.loai_vat_nuoi) || cleanText(row.nhom_loai_vat_nuoi),
+      breed: cleanText(row.giong) || cleanText(row.nhom_giong),
+      gender: cleanText(row.gioi_tinh),
+      lifeStage: cleanText(row.giai_doan_sinh_truong),
+      birthDate: asIsoDate(row.ngay_sinh),
+      origin: cleanText(row.nguon_goc),
+      maternityId: cleanText(row.ma_me),
+      paternityId: cleanText(row.ma_bo),
+      colouring: cleanText(row.mau_long),
+      reproductiveState: cleanText(row.trang_thai_sinh_san),
+      status: cleanText(row.trang_thai),
+      description: cleanText(row.mo_ta),
+      metadata: row.metadata_json && typeof row.metadata_json === "object" ? row.metadata_json : {},
+      createdAt: asIsoDate(row.created_at),
+      updatedAt: asIsoDate(row.updated_at),
+    },
+    events: eventRs.rows.map((event) => ({
+      id: String(event.id),
+      code: cleanText(event.ma_su_kien),
+      type: cleanText(event.loai_su_kien),
+      title: cleanText(event.tieu_de),
+      eventDate: asIsoDate(event.ngay_su_kien),
+      numericValue: event.gia_tri_so == null ? null : Number(event.gia_tri_so),
+      unit: cleanText(event.don_vi),
+      note: cleanText(event.ghi_chu),
+      createdAt: asIsoDate(event.created_at),
+    })),
+    treatments: treatmentRs.rows.map((treatment) => ({
+      id: String(treatment.id),
+      code: cleanText(treatment.ma_dieu_tri),
+      type: cleanText(treatment.loai_dieu_tri),
+      name: cleanText(treatment.ten_dieu_tri),
+      treatmentDate: asIsoDate(treatment.ngay_dieu_tri),
+      dosage: treatment.lieu_luong_moi_con == null ? null : Number(treatment.lieu_luong_moi_con),
+      dosageUnit: cleanText(treatment.don_vi_lieu_luong),
+      method: cleanText(treatment.phuong_phap),
+      status: cleanText(treatment.trang_thai),
+      note: cleanText(treatment.ghi_chu),
+      createdAt: asIsoDate(treatment.created_at),
+    })),
+  };
+}

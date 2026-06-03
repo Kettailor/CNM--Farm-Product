@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { layOwnerIdTuServerCookie } from "@/lib/auth";
 import { loadLivestockGroupDetail } from "@/lib/livestock-detail";
+import { buildPublicLivestockAnimalQrValue } from "@/lib/public-livestock-url";
 import { renderQrSvg } from "@/lib/qr-code";
 import PrintClient from "./print-client";
 import styles from "./page.module.css";
@@ -9,6 +11,13 @@ import styles from "./page.module.css";
 type PageProps = {
   params: { groupId: string };
 };
+
+function requestOrigin() {
+  const headerStore = headers();
+  const host = headerStore.get("x-forwarded-host")?.split(",")[0]?.trim() || headerStore.get("host") || "localhost:3000";
+  const protocol = headerStore.get("x-forwarded-proto")?.split(",")[0]?.trim() || "http";
+  return `${protocol}://${host}`;
+}
 
 function formatDate(value: string | null) {
   if (!value) return "Chưa cập nhật";
@@ -24,9 +33,11 @@ export default async function LivestockQrPdfPage({ params }: PageProps) {
   const detail = await loadLivestockGroupDetail(ownerId, params.groupId);
   if (!detail) notFound();
 
+  const qrOrigin = requestOrigin();
   const printableAnimals = detail.animals.map((animal) => ({
     ...animal,
-    printableQr: animal.qrCode || animal.code || animal.id,
+    printableQr: buildPublicLivestockAnimalQrValue(animal.id, qrOrigin),
+    displayQr: animal.qrCode || animal.code || animal.id,
   }));
 
   return (
@@ -63,9 +74,9 @@ export default async function LivestockQrPdfPage({ params }: PageProps) {
               <div className={styles.qrImage} dangerouslySetInnerHTML={{ __html: renderQrSvg(animal.printableQr, { margin: 4 }) }} />
               <div className={styles.qrMeta}>
                 <strong>{animal.code || "Chưa có mã vật nuôi"}</strong>
-                <span>{animal.printableQr}</span>
+                <span>{animal.displayQr}</span>
                 <small>{detail.group.name}</small>
-                <small>{detail.zone?.name || "Chưa gắn khu vực"}</small>
+                <small>{detail.zone?.name || "Chưa gắn khu vực"} · Hồ sơ public</small>
               </div>
             </article>
           ))}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import type { CSSProperties } from "react";
 import DashboardShell from "@/components/dashboard-shell";
@@ -7,6 +8,7 @@ import { layOwnerIdTuServerCookie } from "@/lib/auth";
 import { getDashboardOverview } from "@/lib/dashboard-overview";
 import { loadLivestockGroupDetail, type LivestockDetail } from "@/lib/livestock-detail";
 import { getLivestockEventTypeOption, isLivestockEventType } from "@/lib/livestock-event-types";
+import { buildPublicLivestockAnimalQrValue } from "@/lib/public-livestock-url";
 import { renderQrSvg } from "@/lib/qr-code";
 import EditGroupForm from "./edit-group-form";
 import GroupDetailActions from "./group-detail-actions";
@@ -18,6 +20,13 @@ type PageProps = {
 };
 
 const accentStyle = (color: string): CSSProperties => ({ "--accent": color } as CSSProperties);
+
+function requestOrigin() {
+  const headerStore = headers();
+  const host = headerStore.get("x-forwarded-host")?.split(",")[0]?.trim() || headerStore.get("host") || "localhost:3000";
+  const protocol = headerStore.get("x-forwarded-proto")?.split(",")[0]?.trim() || "http";
+  return `${protocol}://${host}`;
+}
 
 function formatNumber(value: number | null | undefined, suffix = "") {
   if (value == null || !Number.isFinite(value)) return "Chưa cập nhật";
@@ -207,9 +216,10 @@ export default async function LivestockGroupDetailPage({ params, searchParams }:
     redirect(`/dashboard/vat-nuoi/su-kien?groupId=${group.id}&loai=adjustment`);
   }
   const editOpen = overview.access.canWrite && action === "chinh-sua";
-  const qrReadyCount = visibleAnimals.filter((animal) => animal.qrCode).length;
+  const qrReadyCount = visibleAnimals.length;
   const latestUpdate = group.updatedAt || group.createdAt;
   const zoneColor = zone?.color ?? "#2f855a";
+  const qrOrigin = requestOrigin();
   const mapObjects = zone?.center
     ? [
         {
@@ -406,6 +416,7 @@ export default async function LivestockGroupDetailPage({ params, searchParams }:
               <tbody>
                 {visibleAnimals.map((animal) => {
                   const animalDeceased = isDeceasedStatus(animal.status);
+                  const publicQrValue = buildPublicLivestockAnimalQrValue(animal.id, qrOrigin);
                   return (
                   <tr key={animal.id}>
                     <td>
@@ -416,8 +427,8 @@ export default async function LivestockGroupDetailPage({ params, searchParams }:
                     </td>
                     <td>
                       <Link className={styles.qrCell} href={`/dashboard/vat-nuoi/${group.id}/ca-the/${animal.id}`}>
-                        {animal.qrCode ? <span dangerouslySetInnerHTML={{ __html: renderQrSvg(animal.qrCode, { margin: 3 }) }} /> : null}
-                        <code>{animal.qrCode || "Chưa có QR"}</code>
+                        <span dangerouslySetInnerHTML={{ __html: renderQrSvg(publicQrValue, { margin: 3 }) }} />
+                        <code>{animal.qrCode || animal.code || "Hồ sơ public"}</code>
                       </Link>
                     </td>
                     <td><span className={`${styles.statusPill} ${animalDeceased ? styles.deceasedPill : ""}`}>{statusLabel(animal.status)}</span></td>
