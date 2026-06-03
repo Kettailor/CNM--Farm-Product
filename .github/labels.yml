@@ -1,0 +1,43 @@
+- name: "type: bug"
+  color: d73a4a
+  description: Lỗi hoặc regression
+
+- name: "type: feature"
+  color: 0e8a16
+  description: Tính năng mới
+
+- name: "type: docs"
+  color: 0075ca
+  description: Tài liệu
+
+- name: "type: chore"
+  color: cfd3d7
+  description: Bảo trì, cấu hình hoặc việc nội bộ
+
+- name: "area: frontend"
+  color: 1d76db
+  description: UI, pages hoặc components
+
+- name: "area: api"
+  color: 5319e7
+  description: API routes hoặc business logic
+
+- name: "area: database"
+  color: fbca04
+  description: PostgreSQL schema hoặc dữ liệu
+
+- name: "area: devops"
+  color: c2e0c6
+  description: Docker, CI/CD hoặc deploy
+
+- name: "priority: high"
+  color: b60205
+  description: Cần xử lý sớm
+
+- name: "priority: medium"
+  color: fbca04
+  description: Mức ưu tiên trung bình
+
+- name: "priority: low"
+  color: 0e8a16
+  description: Có thể xử lý sau

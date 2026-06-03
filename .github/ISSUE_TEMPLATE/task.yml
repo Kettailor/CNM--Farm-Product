@@ -1,0 +1,35 @@
+name: Task
+description: Công việc kỹ thuật, tài liệu, cấu hình hoặc bảo trì.
+title: "[Task]: "
+labels:
+  - "type: chore"
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: Mục tiêu
+      placeholder: Hoàn thiện...
+    validations:
+      required: true
+  - type: textarea
+    id: checklist
+    attributes:
+      label: Checklist
+      placeholder: |
+        - [ ] Việc 1
+        - [ ] Việc 2
+        - [ ] Kiểm tra
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Khu vực
+      options:
+        - Frontend/UI
+        - API/business logic
+        - Database/schema
+        - Docker/CI/CD
+        - Documentation
+    validations:
+      required: true

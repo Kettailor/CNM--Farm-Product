@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getPublicFarmMapItems } from "@/lib/public-farm-map";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const farms = await getPublicFarmMapItems();

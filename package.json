@@ -1,12 +1,14 @@
 {
-  "name": "farmhub-nextjs",
-  "version": "0.1.0",
+  "name": "cnm-farm-product-traceability",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "quality": "npm run lint && npm run typecheck && npm run build"
   },
   "dependencies": {
     "@types/maplibre-gl": "^1.13.2",

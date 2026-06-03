@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 type MetricKey = "NDVI" | "EVI" | "NDMI" | "NDWI" | "SAVI" | "NDSI";
 
 const clamp = (v: number, min = 0.05, max = 0.95) => Math.max(min, Math.min(max, v));
@@ -55,4 +57,3 @@ export async function GET(request: NextRequest) {
     center: { lat, lng },
   });
 }
-

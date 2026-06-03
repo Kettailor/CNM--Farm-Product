@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { layOwnerIdTuRequest } from "@/lib/auth";
 import { ensureNotificationSchema, listUserNotifications, subscribeUserNotifications } from "@/lib/notifications";
 
+export const dynamic = "force-dynamic";
+
 function sse(event: string, data: unknown) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }

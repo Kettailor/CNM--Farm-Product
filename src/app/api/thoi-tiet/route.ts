@@ -3,6 +3,8 @@ import { layOwnerIdTuRequest } from "@/lib/auth";
 import { getDashboardOverview } from "@/lib/dashboard-overview";
 import { layDuLieuThoiTietToiUu } from "@/lib/thoi-tiet";
 
+export const dynamic = "force-dynamic";
+
 const DEFAULT_COORD = { latitude: 10.762622, longitude: 106.660172 };
 
 export async function GET(request: NextRequest) {

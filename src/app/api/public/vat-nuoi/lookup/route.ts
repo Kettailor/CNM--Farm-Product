@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { loadPublicLivestockAnimalDetailByCode } from "@/lib/livestock-detail";
 import { buildPublicLivestockAnimalPath } from "@/lib/public-livestock-url";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code") ?? request.nextUrl.searchParams.get("q") ?? "";
   if (!code.trim()) {
