@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { layOwnerIdTuRequest } from "@/lib/auth";
 import { listUserNotifications, markAllNotificationsRead } from "@/lib/notifications";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const ownerId = layOwnerIdTuRequest(request);
   if (!ownerId) return NextResponse.json({ message: "Chưa đăng nhập." }, { status: 401 });

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getZoneDetail } from "@/lib/dashboard-zone-detail";
 import { buildVegetationDataset } from "@/lib/zone-vegetation";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(_request: Request, { params }: { params: { zoneId: string } }) {
   try {
     const zone = await getZoneDetail(null, params.zoneId);

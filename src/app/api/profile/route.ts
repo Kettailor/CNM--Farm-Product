@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { cauHinhCookieXacThuc, layOwnerIdTuServerCookie, TEN_COOKIE_XAC_THUC } from "@/lib/auth";
 import { deleteSettingsFarm, loadSettingsProfile, SettingsAccessError, updateSettingsProfile } from "@/lib/settings-overview";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const ownerId = layOwnerIdTuServerCookie();

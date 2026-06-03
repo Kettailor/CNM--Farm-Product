@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TEN_COOKIE_XAC_THUC, cauHinhCookieXacThuc } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 function xoaCookieDangNhap(response: NextResponse) {
   response.cookies.set(TEN_COOKIE_XAC_THUC, "", { ...cauHinhCookieXacThuc, maxAge: 0 });
   response.cookies.set("ownerId", "", { ...cauHinhCookieXacThuc, maxAge: 0 });

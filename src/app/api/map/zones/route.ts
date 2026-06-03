@@ -4,6 +4,8 @@ import { layOwnerIdTuServerCookie } from "@/lib/auth";
 import { getAccessibleFarmId, type FarmAccessAction } from "@/lib/farm-access";
 import { getZoneTypeInfo, normalizeText, type ZoneTypeKey } from "@/lib/zone-type-utils";
 
+export const dynamic = "force-dynamic";
+
 type ZonePayload = {
   id?: string;
   name: string;

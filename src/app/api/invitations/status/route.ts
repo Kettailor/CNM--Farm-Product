@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { expireFarmInvitations } from "@/lib/farm-invitations";
 import { ensureSettingsSchema } from "@/lib/settings-schema";
 
+export const dynamic = "force-dynamic";
+
 function normalizeStatus(value: unknown) {
   return String(value ?? "").trim().toLowerCase();
 }
