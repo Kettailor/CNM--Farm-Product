@@ -30,7 +30,7 @@
     "react-responsive-masonry": "^2.4.1",
     "react-use": "^17.5.1",
     "recharts": "^3.8.1",
-    "sass": "^1.80.2",
+    "sass": "^1.100.0",
     "sharp": "^0.33.5",
     "swiper": "^11.1.14"
   },
