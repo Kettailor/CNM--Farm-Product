@@ -26,13 +26,13 @@ KetKat-EcoFarm là nền tảng quản trị nông trại và truy xuất nguồ
 - **Database:** PostgreSQL 16, schema trong namespace `du_lieu`.
 - **Map/Visualization:** MapLibre GL, Leaflet, Recharts.
 - **QR/Traceability:** ZXing, jsQR, public livestock URLs.
-- **Runtime/Infra:** Node.js 20, Docker, Docker Compose, Nginx, Adminer.
+- **Runtime/Infra:** Node.js 24, Docker, Docker Compose, Nginx, Adminer.
 - **Quality:** ESLint, TypeScript typecheck, production build, GitHub Actions CI.
 
 ## Yêu cầu môi trường
 
-- Node.js 20.x
-- npm 10+
+- Node.js 24.x
+- npm 10.8+
 - Docker Desktop hoặc Docker Engine + Docker Compose
 - Git
 
